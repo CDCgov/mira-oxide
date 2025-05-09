@@ -2,8 +2,8 @@
 use clap::Parser;
 use either::Either;
 use std::{
-    fs::OpenOptions,
-    io::{BufRead, BufReader, BufWriter, Write, stdin, stdout},
+    fs::{File, OpenOptions},
+    io::{stdin, stdout, BufRead, BufReader, BufWriter, Stdin, Write},
     path::PathBuf,
 };
 use zoe::alignment::sw::sw_scalar_alignment;
@@ -35,122 +35,66 @@ pub struct APDArgs {
     output_delimiter: String,
 }
 
+fn create_reader(path: Option<PathBuf>) -> std::io::Result<BufReader<Either<File, Stdin>>> {
+    let reader = if let Some(ref file_path) = path {
+        let file = OpenOptions::new().read(true).open(file_path)?;
+        BufReader::new(Either::Left(file))
+    } else {
+        BufReader::new(Either::Right(stdin()))
+    };
+
+    Ok(reader)
+}
+
+pub fn lines_to_vec<R: BufRead>(reader: R) -> std::io::Result<Vec<Vec<String>>> {
+    let mut columns: Vec<Vec<String>> = Vec::new();
+
+    for line_result in reader.lines() {
+        let line = line_result?;
+        let values: Vec<_> = line.split('\t').map(str::to_owned).collect();
+
+        if columns.is_empty() {
+            columns.resize_with(values.len(), Vec::new);
+        }
+
+        for (col, val) in columns.iter_mut().zip(values) {
+            col.push(val);
+        }
+    }
+
+    Ok(columns)
+}
+
 fn main() -> std::io::Result<()> {
     let args = APDArgs::parse();
     let delim = args.output_delimiter;
 
     //read in input file (dais results)
-    let reader = if let Some(ref file_path) = args.input_file {
-        BufReader::new(Either::Left(
-            OpenOptions::new()
-                .read(true)
-                .open(file_path)
-                .expect("File opening error"),
-        ))
-    } else {
-        BufReader::new(Either::Right(stdin()))
-    };
+    let reader = create_reader(args.input_file)?;
 
     // Initialize vectors to store columns for the input file (dais results)
-    //TODO convert to bytes fr fr ong ong
-    let mut columns: Vec<Vec<String>> = Vec::new();
-
-    // Read the file line by line
-    for line in reader.lines() {
-        let values: Vec<String> = line
-            .expect("REASON")
-            .split('\t')
-            .map(|s| s.to_string())
-            .collect();
-
-        // Ensure the columns vector has enough vectors to store each column
-        if columns.is_empty() {
-            columns.resize(values.len(), Vec::new());
-        }
-
-        // Push each value into the corresponding column vector
-        for (i, value) in values.iter().enumerate() {
-            columns[i].push(value.clone());
-        }
-    }
+    // TODO convert to bytes fr fr ong ong
+    let columns = lines_to_vec(reader)?;
 
     //read in reference file (reference cvv and zoonotic strains)
-    let ref_reader = if let Some(ref ref_file_path) = args.ref_file {
-        BufReader::new(Either::Left(
-            OpenOptions::new()
-                .read(true)
-                .open(ref_file_path)
-                .expect("File opening error"),
-        ))
-    } else {
-        BufReader::new(Either::Right(stdin()))
-    };
+    let ref_reader = create_reader(args.ref_file)?;
 
     // Initialize vectors to store columns (reference cvv and zoonotic strains)
-    let mut ref_columns: Vec<Vec<String>> = Vec::new();
-
-    // Read the file line by line
-    for ref_line in ref_reader.lines() {
-        let ref_values: Vec<String> = ref_line
-            .expect("REASON")
-            .split('\t')
-            .map(|ref_s| ref_s.to_string())
-            .collect();
-
-        // Ensure the columns vector has enough vectors to store each column
-        if ref_columns.is_empty() {
-            ref_columns.resize(ref_values.len(), Vec::new());
-        }
-
-        // Push each value into the corresponding column vector
-        for (i, ref_value) in ref_values.iter().enumerate() {
-            ref_columns[i].push(ref_value.clone());
-        }
-    }
+    let ref_columns: Vec<Vec<String>> = lines_to_vec(ref_reader)?;
 
     //read in mutations file (mutations of interest)
-    let muts_reader = if let Some(ref muts_file_path) = args.muts_file {
-        BufReader::new(Either::Left(
-            OpenOptions::new()
-                .read(true)
-                .open(muts_file_path)
-                .expect("File opening error"),
-        ))
-    } else {
-        BufReader::new(Either::Right(stdin()))
-    };
+    let muts_reader = create_reader(args.muts_file)?;
 
     // Initialize vectors to store columns (mutations of interest)
-    let mut muts_columns: Vec<Vec<String>> = Vec::new();
-
-    // Read the file line by line (mutations of interest)
-    for muts_line in muts_reader.lines() {
-        let muts_values: Vec<String> = muts_line
-            .expect("REASON")
-            .split('\t')
-            .map(|muts_s| muts_s.to_string())
-            .collect();
-
-        // Ensure the columns vector has enough vectors to store each column
-        if muts_columns.is_empty() {
-            muts_columns.resize(muts_values.len(), Vec::new());
-        }
-
-        // Push each value into the corresponding column vector
-        for (i, muts_values) in muts_values.iter().enumerate() {
-            muts_columns[i].push(muts_values.clone());
-        }
-    }
+    let muts_columns: Vec<Vec<String>> = lines_to_vec(muts_reader)?;
 
     let mut writer = if let Some(ref file_path) = args.output_xsv {
-        BufWriter::new(Either::Left(
-            OpenOptions::new()
-                .write(true)
-                .create(true)
-                .truncate(true)
-                .open(file_path)
-                .expect("File write error"),
-        ))
+        let file = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(file_path)?;
+        BufWriter::new(Either::Left(file))
     } else {
         BufWriter::new(Either::Right(stdout()))
     };
