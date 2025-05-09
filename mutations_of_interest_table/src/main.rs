@@ -30,14 +30,14 @@ pub struct APDArgs {
     /// Optional output delimited file
     output_xsv: Option<PathBuf>,
 
-    #[arg(short = 'd', long)]
+    #[arg(short = 'd', long, default_value = ",")]
     /// Use the provider delimiter for separating fields. Default is ','
-    output_delimiter: Option<String>,
+    output_delimiter: String,
 }
 
-fn main() {
+fn main() -> std::io::Result<()> {
     let args = APDArgs::parse();
-    let delim = args.output_delimiter.unwrap_or(",".to_owned());
+    let delim = args.output_delimiter;
 
     //read in input file (dais results)
     let reader = if let Some(ref file_path) = args.input_file {
@@ -289,4 +289,5 @@ fn main() {
             }
         }
     }
+    Ok(())
 }
