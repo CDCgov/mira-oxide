@@ -1,0 +1,13 @@
+[workspace]
+
+members = [
+    "mutations_of_interest_table",
+]
+
+[workspace.dependencies]
+clap = { version = "4", features = ["derive"] }
+either = "1"
+
+zoe = { git = "https://github.com/CDCgov/zoe.git", tag = "v0.0.18", default-features = false, features = [
+    "multiversion",
+] }
