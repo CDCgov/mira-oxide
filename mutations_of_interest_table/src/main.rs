@@ -76,6 +76,30 @@ impl Strain {
             self.phenotypic_consequences.as_str(),
         ].join(delim)
     }
+
+    fn update_entry_from_alignment(&mut self, aa_1: u8, aa_2: u8, muts_columns: &[Vec<String>]) -> bool {
+        self.aa_mut = aa_2 as char;
+        self.aa_ref = aa_1 as char;
+        let hold_aa_mut = self.aa_mut.to_string();
+        //aa differences that are also in our "mutations of interest" list are written to file
+        for k in 0..muts_columns[2].len() {
+            if self.protein == muts_columns[0][k]
+                && hold_aa_mut == muts_columns[2][k]
+                && self.position.to_string() == muts_columns[1][k]
+            {
+                self.phenotypic_consequences = muts_columns[3][k].to_string();
+                return true;
+            //aa that are missing and also in our "mutations of interest" list are written to file
+            } else if self.protein == muts_columns[0][k]
+                && hold_aa_mut == "-"
+                && self.position.to_string() == muts_columns[1][k]
+            {
+                self.phenotypic_consequences = String::from("amino acid information missing");
+                return true;
+            }
+        }
+        false
+    }
 }
 
 fn create_reader(path: Option<PathBuf>) -> std::io::Result<BufReader<Either<File, Stdin>>> {
@@ -106,6 +130,27 @@ pub fn lines_to_vec<R: BufRead>(reader: R) -> std::io::Result<Vec<Vec<String>>> 
     }
 
     Ok(columns)
+}
+
+pub fn align_sequences<'a>(
+    query: &'a [u8],
+    reference: &'a [u8],
+) -> (Vec<u8>, Vec<u8>) {
+    const MAPPING: ByteIndexMap<22> = ByteIndexMap::new(*b"ACDEFGHIKLMNPQRSTVWXY*", b'X');
+    const WEIGHTS: WeightMatrix<i8, 22> = WeightMatrix::new(&MAPPING, 1, 0, Some(b'X'));
+    const GAP_OPEN: i8 = -1;
+    const GAP_EXTEND: i8 = 0;
+
+    let profile = ScalarProfile::<22>::new(query, WEIGHTS, GAP_OPEN, GAP_EXTEND)
+        .expect("Ya beefed it");
+    let alignment = sw_scalar_alignment(reference, &profile);
+
+    pairwise_align_with_cigar(
+        reference,
+        query,
+        &alignment.cigar,
+        alignment.ref_range.start,
+    )
 }
 
 fn main() -> std::io::Result<()> {
@@ -177,23 +222,8 @@ fn main() -> std::io::Result<()> {
                             //aa difference moved foraward in process
                             entry.aa_mut = aa_seq2[aa] as char;
                             entry.aa_ref = aa_seq1[aa] as char;
-                            let hold_aa_mut = entry.aa_mut.to_string();
-                            //aa differences that are also in our "mutations of interest" list are written to file
-                            for k in 0..muts_columns[2].len() {
-                                if entry.protein == muts_columns[0][k]
-                                    && hold_aa_mut == muts_columns[2][k]
-                                    && entry.position.to_string() == muts_columns[1][k]
-                                {
-                                    entry.phenotypic_consequences = muts_columns[3][k].to_string();
-                                    writeln!(&mut writer, "{}", entry.to_delimited(&args.output_delimiter))?;
-                                //aa that are missing and also in our "mutations of interest" list are written to file
-                                } else if entry.protein == muts_columns[0][k]
-                                    && hold_aa_mut == "-"
-                                    && entry.position.to_string() == muts_columns[1][k]
-                                {
-                                    entry.phenotypic_consequences = "amino acid information missing".to_string();
-                                    writeln!(&mut writer, "{}", entry.to_delimited(&args.output_delimiter))?;
-                                }
+                            if entry.update_entry_from_alignment(aa_seq1[aa], aa_seq2[aa], &muts_columns) {
+                                writeln!(&mut writer, "{}", entry.to_delimited(&args.output_delimiter))?;
                             }
                         }
                     }
@@ -202,25 +232,8 @@ fn main() -> std::io::Result<()> {
                     //Using Zoe for alignment
                     let query = columns[6][i].as_bytes();
                     let reference = ref_columns[8][j].as_bytes();
-                    const MAPPING: ByteIndexMap<22> =
-                        ByteIndexMap::new(*b"ACDEFGHIKLMNPQRSTVWXY*", b'X');
-                    //These weight work because previous alignment has taken place.
-                    const WEIGHTS: WeightMatrix<i8, 22> =
-                        WeightMatrix::new(&MAPPING, 1, 0, Some(b'X'));
-                    const GAP_OPEN: i8 = -1;
-                    const GAP_EXTEND: i8 = 0;
+                    let(aligned_1, aligned_2) = align_sequences(query, reference);
 
-                    let profile = ScalarProfile::<22>::new(query, WEIGHTS, GAP_OPEN, GAP_EXTEND)
-                        .expect("Ya beefed it");
-                    let alignment = sw_scalar_alignment(&reference, &profile);
-
-                    //aligned_1 -> referece, aligned_2 -> query.
-                    let (aligned_1, aligned_2) = pairwise_align_with_cigar(
-                        reference,
-                        query,
-                        &alignment.cigar,
-                        alignment.ref_range.start,
-                    );
                     let mut entry = Strain {
                         sample_id: columns[0][i].to_string(),
                         ref_strain: ref_columns[1][j].to_string(),
@@ -242,23 +255,8 @@ fn main() -> std::io::Result<()> {
                             //aa difference moved foraward in process
                             entry.aa_mut = aligned_2[aa] as char;
                             entry.aa_ref = aligned_1[aa] as char;
-                            let hold_aa_mut = entry.aa_mut.to_string();
-                            for k in 0..muts_columns[2].len() {
-                                //aa differences that are also in our "mutations of interest" list are written to file
-                                if entry.protein == muts_columns[0][k]
-                                    && hold_aa_mut == muts_columns[2][k]
-                                    && entry.position.to_string() == muts_columns[1][k]
-                                {
-                                    entry.phenotypic_consequences = muts_columns[3][k].to_string();
-                                    writeln!(&mut writer, "{}", entry.to_delimited(&args.output_delimiter))?;
-                                //aa calls that are missing and also in our "mutations of interest" list are written to file
-                                } else if entry.protein == muts_columns[0][k]
-                                    && hold_aa_mut == "-"
-                                    && entry.position.to_string() == muts_columns[1][k]
-                                {
-                                    entry.phenotypic_consequences = "amino acid information missing".to_string();
-                                    writeln!(&mut writer, "{}", entry.to_delimited(&args.output_delimiter))?;
-                                }
+                            if entry.update_entry_from_alignment(aligned_1[aa], aligned_2[aa], &muts_columns) {
+                                writeln!(&mut writer, "{}", entry.to_delimited(&args.output_delimiter))?;
                             }
                         }
                     }
