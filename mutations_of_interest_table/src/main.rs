@@ -1,4 +1,3 @@
-#![allow(unused_variables)]
 use clap::Parser;
 use either::Either;
 use std::{
@@ -9,7 +8,6 @@ use std::{
 use zoe::alignment::sw::sw_scalar_alignment;
 use zoe::alignment::{ScalarProfile, pairwise_align_with_cigar};
 use zoe::data::{ByteIndexMap, WeightMatrix};
-use zoe::prelude::*;
 
 #[derive(Debug, Parser)]
 #[command(about = "Tool for calculating amino acid difference tables")]
@@ -33,6 +31,51 @@ pub struct APDArgs {
     #[arg(short = 'd', long, default_value = ",")]
     /// Use the provider delimiter for separating fields. Default is ','
     output_delimiter: String,
+}
+
+pub struct Strain {
+    sample_id: String,
+    ref_strain: String,
+    gisaid_accession: String,
+    subtype: String,
+    dais_ref: String,
+    protein: String,
+    aa_ref: char,
+    position: usize,
+    aa_mut: char,
+    phenotypic_consequences: String,
+}
+
+impl Strain {
+    fn header(delim: &str) -> String {
+        [
+            "sample",
+            "ref_strain",
+            "gisaid_accession",
+            "subtype",
+            "dais_reference",
+            "protein",
+            "aa_reference",
+            "aa_position",
+            "aa_mutation",
+            "phenotypic_consequences"
+        ].join(delim)
+    }
+
+    fn to_delimited(&self, delim: &str) -> String {
+        [
+            self.sample_id.as_str(),
+            self.ref_strain.as_str(),
+            self.gisaid_accession.as_str(),
+            self.subtype.as_str(),
+            self.dais_ref.as_str(),
+            self.protein.as_str(),
+            &self.aa_ref.to_string(),
+            &self.position.to_string(),
+            &self.aa_mut.to_string(),
+            self.phenotypic_consequences.as_str(),
+        ].join(delim)
+    }
 }
 
 fn create_reader(path: Option<PathBuf>) -> std::io::Result<BufReader<Either<File, Stdin>>> {
@@ -67,7 +110,7 @@ pub fn lines_to_vec<R: BufRead>(reader: R) -> std::io::Result<Vec<Vec<String>>> 
 
 fn main() -> std::io::Result<()> {
     let args = APDArgs::parse();
-    let delim = args.output_delimiter;
+    // let delim = args.output_delimiter.clone();
 
     //read in input file (dais results)
     let reader = create_reader(args.input_file)?;
@@ -100,11 +143,7 @@ fn main() -> std::io::Result<()> {
     };
 
     //header of output file
-    writeln!(
-        &mut writer,
-        "sample{delim}ref_strain{delim}gisaid_accession{delim}subtype{delim}dais_reference{delim}protein{delim}aa_reference{delim}aa_postion{delim}aa_mutation{delim}phenotypic_consequences"
-    )
-    .unwrap_or_fail();
+    writeln!(&mut writer, "{}", Strain::header(&args.output_delimiter))?;
 
     //Finding reference sequences in the same coordinate space to compare with
     for i in 0..columns[1].len() {
@@ -118,45 +157,42 @@ fn main() -> std::io::Result<()> {
                 //If aa seq are the same length start seqe comparison
                 //aa seqs that are the same length will be aligned already and saves time to not align
                 if aa_seq1.len() == aa_seq2.len() {
-                    let mut position = 0;
-                    let sample_id = columns[0][i].to_string();
-                    let ref_strain = ref_columns[1][j].to_string();
-                    let gisaid_accession = ref_columns[0][j].to_string();
-                    let subtype = columns[1][i].to_string();
-                    let dais_ref = columns[2][i].to_string();
-                    let protein = columns[3][i].to_string();
+                    let mut entry = Strain {
+                        sample_id: columns[0][i].to_string(),
+                        ref_strain: ref_columns[1][j].to_string(),
+                        gisaid_accession: ref_columns[0][j].to_string(),
+                        subtype: columns[1][i].to_string(),
+                        dais_ref: columns[2][i].to_string(),
+                        protein: columns[3][i].to_string(),
+                        position: 0,
+                        aa_ref: 'X',
+                        aa_mut: 'X',
+                        phenotypic_consequences: String::new(),
+                    };
                     for aa in 0..aa_seq1.len() {
-                        position = position + 1;
+                        entry.position += 1;
 
                         if aa_seq1[aa] == aa_seq2[aa] {
                         } else {
                             //aa difference moved foraward in process
-                            let aa_mut = aa_seq2[aa] as char;
-                            let aa_ref = aa_seq1[aa] as char;
-                            let hold_aa_mut = aa_mut.to_string();
+                            entry.aa_mut = aa_seq2[aa] as char;
+                            entry.aa_ref = aa_seq1[aa] as char;
+                            let hold_aa_mut = entry.aa_mut.to_string();
                             //aa differences that are also in our "mutations of interest" list are written to file
                             for k in 0..muts_columns[2].len() {
-                                if protein == muts_columns[0][k]
+                                if entry.protein == muts_columns[0][k]
                                     && hold_aa_mut == muts_columns[2][k]
-                                    && position.to_string() == muts_columns[1][k]
+                                    && entry.position.to_string() == muts_columns[1][k]
                                 {
-                                    let phenotypic_consequences = muts_columns[3][k].to_string();
-                                    writeln!(
-                                &mut writer,
-                                "{sample_id}{delim}{ref_strain}{delim}{gisaid_accession}{delim}{subtype}{delim}{dais_ref}{delim}{protein}{delim}{aa_ref}{delim}{position}{delim}{aa_mut}{delim}{phenotypic_consequences}"
-                                )
-                                .unwrap_or_fail();
+                                    entry.phenotypic_consequences = muts_columns[3][k].to_string();
+                                    writeln!(&mut writer, "{}", entry.to_delimited(&args.output_delimiter))?;
                                 //aa that are missing and also in our "mutations of interest" list are written to file
-                                } else if protein == muts_columns[0][k]
+                                } else if entry.protein == muts_columns[0][k]
                                     && hold_aa_mut == "-"
-                                    && position.to_string() == muts_columns[1][k]
+                                    && entry.position.to_string() == muts_columns[1][k]
                                 {
-                                    let phenotypic_consequences = "amino acid information missing";
-                                    writeln!(
-                                &mut writer,
-                                "{sample_id}{delim}{ref_strain}{delim}{gisaid_accession}{delim}{subtype}{delim}{dais_ref}{delim}{protein}{delim}{aa_ref}{delim}{position}{delim}{aa_mut}{delim}{phenotypic_consequences}"
-                                )
-                                .unwrap_or_fail();
+                                    entry.phenotypic_consequences = "amino acid information missing".to_string();
+                                    writeln!(&mut writer, "{}", entry.to_delimited(&args.output_delimiter))?;
                                 }
                             }
                         }
@@ -185,46 +221,43 @@ fn main() -> std::io::Result<()> {
                         &alignment.cigar,
                         alignment.ref_range.start,
                     );
-                    let mut position = 0;
-                    let sample_id = columns[0][i].to_string();
-                    let ref_strain = ref_columns[1][j].to_string();
-                    let gisaid_accession = ref_columns[0][j].to_string();
-                    let subtype = columns[1][i].to_string();
-                    let dais_ref = columns[2][i].to_string();
-                    let protein = columns[3][i].to_string();
+                    let mut entry = Strain {
+                        sample_id: columns[0][i].to_string(),
+                        ref_strain: ref_columns[1][j].to_string(),
+                        gisaid_accession: ref_columns[0][j].to_string(),
+                        subtype: columns[1][i].to_string(),
+                        dais_ref: columns[2][i].to_string(),
+                        protein: columns[3][i].to_string(),
+                        position: 0,
+                        aa_ref: 'X',
+                        aa_mut: 'X',
+                        phenotypic_consequences: String::new(),
+                    };
 
                     for aa in 0..aligned_1.len() {
-                        position = position + 1;
+                        entry.position += 1;
 
                         if aligned_1[aa] == aligned_2[aa] {
                         } else {
                             //aa difference moved foraward in process
-                            let aa_mut = aligned_2[aa] as char;
-                            let aa_ref = aligned_1[aa] as char;
-                            let hold_aa_mut = aa_mut.to_string();
+                            entry.aa_mut = aligned_2[aa] as char;
+                            entry.aa_ref = aligned_1[aa] as char;
+                            let hold_aa_mut = entry.aa_mut.to_string();
                             for k in 0..muts_columns[2].len() {
                                 //aa differences that are also in our "mutations of interest" list are written to file
-                                if protein == muts_columns[0][k]
+                                if entry.protein == muts_columns[0][k]
                                     && hold_aa_mut == muts_columns[2][k]
-                                    && position.to_string() == muts_columns[1][k]
+                                    && entry.position.to_string() == muts_columns[1][k]
                                 {
-                                    let phenotypic_consequences = muts_columns[3][k].to_string();
-                                    writeln!(
-                                &mut writer,
-                                "{sample_id}{delim}{ref_strain}{delim}{gisaid_accession}{delim}{subtype}{delim}{dais_ref}{delim}{protein}{delim}{aa_ref}{delim}{position}{delim}{aa_mut}{delim}{phenotypic_consequences}"
-                                )
-                                .unwrap_or_fail();
+                                    entry.phenotypic_consequences = muts_columns[3][k].to_string();
+                                    writeln!(&mut writer, "{}", entry.to_delimited(&args.output_delimiter))?;
                                 //aa calls that are missing and also in our "mutations of interest" list are written to file
-                                } else if protein == muts_columns[0][k]
+                                } else if entry.protein == muts_columns[0][k]
                                     && hold_aa_mut == "-"
-                                    && position.to_string() == muts_columns[1][k]
+                                    && entry.position.to_string() == muts_columns[1][k]
                                 {
-                                    let phenotypic_consequences = "amino acid information missing";
-                                    writeln!(
-                                &mut writer,
-                                "{sample_id}{delim}{ref_strain}{delim}{gisaid_accession}{delim}{subtype}{delim}{dais_ref}{delim}{protein}{delim}{aa_ref}{delim}{position}{delim}{aa_mut}{delim}{phenotypic_consequences}"
-                                )
-                                .unwrap_or_fail();
+                                    entry.phenotypic_consequences = "amino acid information missing".to_string();
+                                    writeln!(&mut writer, "{}", entry.to_delimited(&args.output_delimiter))?;
                                 }
                             }
                         }
