@@ -69,6 +69,10 @@ To be sure that your package is working within the workspace go the workspace ar
 cargo run -p new_package_name -- #any inputs needed to run your package
 ```
 
+### Step 6
+
+Provide useage documentation.
+
 For additional information on rust workspaces, [see here](https://rust-book.cs.brown.edu/ch14-03-cargo-workspaces.html).
 
 ## Current Packages
