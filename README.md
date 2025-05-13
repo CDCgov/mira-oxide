@@ -10,7 +10,69 @@ The material embodied in this software is provided to you "as-is" and without wa
 
 ## Overview
 
-Describe the purpose of your project. Add additional sections as necessary to help collaborators and potential collaborators understand and use your project.
+MIRA-Oxide is a RUST workspace that is utilized by [MIRA-NF](https://github.com/CDCgov/MIRA-NF) to perform assembly and annotation of Influenza genomes, SARS-CoV-2 genomes, the SARS-CoV-2 spike-gene and RSV genomes.
+
+## Adding New Package to the MIRA-Oxide Worksace
+
+Before starting be sure that you have rust nightly installed and set as default. You will also need to have Cargo installed. If you need more information about how to install those, [see here](https://rust-book.cs.brown.edu/ch01-00-getting-started.html).
+
+If you are using VScode the rust-analyzer extension is very help with formatting and debugging.
+
+### Step 1
+
+Clone the repository.
+
+```
+git clone https://github.com/CDCgov/mira-oxide.git
+```
+
+### Step 2
+
+Move into the folder made by Cargo and create new branch for your package.
+
+```
+cd mira-oxide
+git checkout -b add_new_package_name
+```
+
+### Step 3
+
+Create a new package using Cargo
+
+```
+cargo new new_package_name
+```
+
+A folder with a the name that you specified should have been created. Inside that folder there should be a Cargo.toml file and a src folder containing a main.rs file.
+
+### Step 4
+
+Start Working! 
+
+Be sure that your package added itself to the main mira-oxide Cargo.toml. Then add any dependencies you will need to the main mira-oxide Cargo.toml.
+
+Then you can start working on your package.
+
+```
+cd new_package_name
+```
+
+Add your dependencies to the package's Cargo.toml and start editing your src/main.rs
+
+### Step 5
+
+Run your program!
+
+To be sure that your package is working within the workspace go the workspace area (path-to-repo-folder/mira-oxide) and run this command:
+
+```
+cargo run -p new_package_name -- #any inputs needed to run your package
+```
+
+For additional information on rust workspaces, [see here](https://rust-book.cs.brown.edu/ch14-03-cargo-workspaces.html).
+
+## Current Packages
+
   
 ## Public Domain Standard Notice
 This repository constitutes a work of the United States Government and is not
