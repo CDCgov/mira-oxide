@@ -14,19 +14,21 @@ MIRA-Oxide is a RUST workspace that is utilized by [MIRA-NF](https://github.com/
 
 ## Adding New Package to the MIRA-Oxide Worksace
 
-Before starting be sure that you have rust nightly installed and set as default. You will also need to have Crago installed. If you need more information about how to install those, [see here](https://rust-book.cs.brown.edu/ch01-00-getting-started.html).
+Before starting be sure that you have rust nightly installed and set as default. You will also need to have Cargo installed. If you need more information about how to install those, [see here](https://rust-book.cs.brown.edu/ch01-00-getting-started.html).
 
-If you are using VScode the rust-analyzer extension if very help with formatting and error handling.
+If you are using VScode the rust-analyzer extension is very help with formatting and debugging.
 
 ### Step 1
 
-clone the repository
+Clone the repository.
 
-`git clone https://github.com/CDCgov/mira-oxide.git`
+```
+git clone https://github.com/CDCgov/mira-oxide.git
+```
 
 ### Step 2
 
-Move into the folder created and create new branch for your package
+Move into the folder made by Cargo and create new branch for your package.
 
 ```
 cd mira-oxide
@@ -35,33 +37,37 @@ git checkout -b add_new_package_name
 
 ### Step 3
 
-Create a new package.
+Create a new package using Cargo
 
-`cargo new new_package_name`
+```
+cargo new new_package_name
+```
 
-A folder with a 
+A folder with a the name that you specified should have been created. Inside that folder there should be a Cargo.toml file and a src folder containing a main.rs file.
 
 ### Step 4
 
 Start Working! 
 
-Be sure that your package added itself to the main Cargo.toml. Then add any dependencies you will need to the main Cargo.toml.
+Be sure that your package added itself to the main mira-oxide Cargo.toml. Then add any dependencies you will need to the main mira-oxide Cargo.toml.
 
 Then you can start working on your package.
 
-`cd new_package_name`
+```
+cd new_package_name
+```
 
-Add you dependencies to the package's Cargo.toml.
-
-Then you can start editing your src/main.rs
+Add your dependencies to the package's Cargo.toml and start editing your src/main.rs
 
 ### Step 5
 
 Run your program!
 
-To be sure that your package is working within the workspace go the workspace area (/mira-oxide) and run this command:
+To be sure that your package is working within the workspace go the workspace area (path-to-repo-folder/mira-oxide) and run this command:
 
-`cargo run -p new_package_name -- #any inputs needed to run your package`
+```
+cargo run -p new_package_name -- #any inputs needed to run your package
+```
 
 For additional information on rust workspaces, [see here](https://rust-book.cs.brown.edu/ch14-03-cargo-workspaces.html).
 
