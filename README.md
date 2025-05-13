@@ -76,7 +76,7 @@ Provide useage documentation.
 For additional information on rust workspaces, [see here](https://rust-book.cs.brown.edu/ch14-03-cargo-workspaces.html).
 
 ## Current Packages
-- [mutations_of_interest_table](../assets/mutations_of_intest_table_readme.md)
+- [mutations_of_interest_table](../mutations_of_interest_table/mutations_of_intest_table_readme.md)
   
 ## Public Domain Standard Notice
 This repository constitutes a work of the United States Government and is not
