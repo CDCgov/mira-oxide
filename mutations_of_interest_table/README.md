@@ -1,3 +1,3 @@
 ## Mutations of Interest Package
 
-![Alt text](assets/images/coming_soon.png)
+![Alt text](../assets/images/coming_soon.png)
