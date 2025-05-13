@@ -71,12 +71,14 @@ cargo run -p new_package_name -- #any inputs needed to run your package
 
 ### Step 6
 
-Provide useage documentation.
+Provide usage documentation.
+
+Create a README.md witin your package folder. Within that README provide a descritpion of the package, it's inputs, it's outputs and how to execute the package.
 
 For additional information on rust workspaces, [see here](https://rust-book.cs.brown.edu/ch14-03-cargo-workspaces.html).
 
 ## Current Packages
-- [mutations_of_interest_table](../mutations_of_interest_table/mutations_of_intest_table_readme.md)
+- [mutations_of_interest_table](/mutations_of_interest_table/mutations_of_intest_table_readme.md)
   
 ## Public Domain Standard Notice
 This repository constitutes a work of the United States Government and is not
