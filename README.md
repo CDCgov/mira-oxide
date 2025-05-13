@@ -2,9 +2,71 @@
 
 **General disclaimer** This repository was created for use by CDC programs to collaborate on public health related projects in support of the [CDC mission](https://www.cdc.gov/about/cdc/#cdc_about_cio_mission-our-mission).  GitHub is not hosted by the CDC, but is a third party website used by CDC and its partners to share information and collaborate on software. CDC use of GitHub does not imply an endorsement of any one particular service, product, or enterprise. 
 
+Use of this service is limited only to non-sensitive and publicly available data. Users must not use, share, or store any kind of sensitive data like health status, provision or payment of healthcare, Personally Identifiable Information (PII) and/or Protected Health Information (PHI), etc. under ANY circumstance.
+
+Administrators for this service reserve the right to moderate all information used, shared, or stored with this service at any time. Any user that cannot abide by this disclaimer and Code of Conduct may be subject to action, up to and including revoking access to services.
+
+The material embodied in this software is provided to you "as-is" and without warranty of any kind, express, implied or otherwise, including without limitation, any warranty of fitness for a particular purpose. In no event shall the Centers for Disease Control and Prevention (CDC) or the United States (U.S.) government be liable to you or anyone else for any direct, special, incidental, indirect or consequential damages of any kind, or any damages whatsoever, including without limitation, loss of profit, loss of use, savings or revenue, or the claims of third parties, whether or not CDC or the U.S. government has been advised of the possibility of such loss, however caused and on any theory of liability, arising out of or in connection with the possession, use or performance of this software.
+
 ## Overview
 
-Describe the purpose of your project. Add additional sections as necessary to help collaborators and potential collaborators understand and use your project.
+MIRA-Oxide is a RUST workspace that is utilized by [MIRA-NF](https://github.com/CDCgov/MIRA-NF) to perform assembly and annotation of Influenza genomes, SARS-CoV-2 genomes, the SARS-CoV-2 spike-gene and RSV genomes.
+
+## Adding New Package to the MIRA-Oxide Worksace
+
+Before starting be sure that you have rust nightly installed and set as default. You will also need to have Crago installed. If you need more information about how to install those, [see here](https://rust-book.cs.brown.edu/ch01-00-getting-started.html).
+
+If you are using VScode the rust-analyzer extension if very help with formatting and error handling.
+
+### Step 1
+
+clone the repository
+
+`git clone https://github.com/CDCgov/mira-oxide.git`
+
+### Step 2
+
+Move into the folder created and create new branch for your package
+
+```
+cd mira-oxide
+git checkout -b add_new_package_name
+```
+
+### Step 3
+
+Create a new package.
+
+`cargo new new_package_name`
+
+A folder with a 
+
+### Step 4
+
+Start Working! 
+
+Be sure that your package added itself to the main Cargo.toml. Then add any dependencies you will need to the main Cargo.toml.
+
+Then you can start working on your package.
+
+`cd new_package_name`
+
+Add you dependencies to the package's Cargo.toml.
+
+Then you can start editing your src/main.rs
+
+### Step 5
+
+Run your program!
+
+To be sure that your package is working within the workspace go the workspace area (/mira-oxide) and run this command:
+
+`cargo run -p new_package_name -- #any inputs needed to run your package`
+
+For additional information on rust workspaces, [see here](https://rust-book.cs.brown.edu/ch14-03-cargo-workspaces.html).
+
+## Current Packages
+
   
 ## Public Domain Standard Notice
 This repository constitutes a work of the United States Government and is not
