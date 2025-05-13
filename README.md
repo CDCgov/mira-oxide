@@ -78,7 +78,7 @@ Create a README.md witin your package folder. Within that README provide a descr
 For additional information on rust workspaces, [see here](https://rust-book.cs.brown.edu/ch14-03-cargo-workspaces.html).
 
 ## Current Packages
-- [mutations_of_interest_table](mutations_of_interest_table/mutations_of_interest_table_readme.md)
+- [mutations_of_interest_table](mutations_of_interest_table/)
   
 ## Public Domain Standard Notice
 This repository constitutes a work of the United States Government and is not
