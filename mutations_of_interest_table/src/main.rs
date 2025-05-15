@@ -1,12 +1,10 @@
-//#[allow(unused_variables)]
+#![allow(dead_code, unused_imports)]
 use clap::Parser;
-
+use csv::ReaderBuilder;
 use either::Either;
-use serde::{self, Deserialize};
+use serde::{self, de::DeserializeOwned, Deserialize};
 use std::{
-    fs::{File, OpenOptions},
-    io::{BufRead, BufReader, BufWriter, Stdin, Write, stdin, stdout},
-    path::PathBuf,
+    error::Error, fs::{File, OpenOptions}, io::{stdin, stdout, BufRead, BufReader, BufWriter, Stdin, Write}, path::{Path, PathBuf}
 };
 use zoe::alignment::sw::sw_scalar_alignment;
 use zoe::alignment::{ScalarProfile, pairwise_align_with_cigar};
@@ -36,7 +34,23 @@ pub struct APDArgs {
     output_delimiter: String,
 }
 
-#[derive(Deserialize)]
+// input files *must* be tab-separated
+fn read_tsv<T: DeserializeOwned, R: std::io::Read>(reader: R, has_headers: bool) -> Result<Vec<T>, Box<dyn std::error::Error>> {
+    let mut rdr = ReaderBuilder::new()
+        .has_headers(has_headers)
+        .delimiter(b'\t')
+        .from_reader(reader);
+
+    let mut records = Vec::new();
+    for result in rdr.deserialize() {
+        let record: T = result?;
+        records.push(record);
+    }
+
+    Ok(records)
+}
+
+#[derive(Deserialize, Debug)]
 pub struct DaisInput {
     sample_id: String,
     subtype: String,
@@ -63,20 +77,21 @@ pub struct DaisInput {
     cds_nt_coordinates: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct RefInput {
-    sample_id: String,
+    isolate_id: String,
+    isolate_name: String,
     subtype: String,
-    ref_strain: String,
+    passage_history: String,
+    nt_id: String,
+    ctype: String,
+    reference_id: String,
     protein: String,
-    #[serde(skip)]
-    nt_hash: String,
-    query_aa_aln_seq: String,
-    #[serde(skip)]
+    aa_aln: String,
     cds_aln: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct MutsOfInterestInput {
     protein: String,
     aa_position: String,
@@ -206,13 +221,30 @@ pub fn align_sequences<'a>(query: &'a [u8], reference: &'a [u8]) -> (Vec<u8>, Ve
     )
 }
 
-fn main() -> std::io::Result<()> {
+fn main() -> Result<(), Box<dyn Error>> {
     let args = APDArgs::parse();
-    // let delim = args.output_delimiter.clone();
 
-    //read in input file (dais results)
-    let reader = create_reader(args.input_file)?;
+    //read in input file (dais input, ref input, muts input)
+    let muts_reader = create_reader(args.muts_file)?;
+    let muts_interest: Vec<MutsOfInterestInput> = read_tsv(muts_reader, false)?;
 
+    let dais_reader = create_reader(args.input_file)?;
+    let dais: Vec<DaisInput> = read_tsv(dais_reader, false)?;
+
+    let ref_reader = create_reader(args.ref_file)?;
+    let refs: Vec<RefInput> = read_tsv(ref_reader, true)?;
+
+    for input in &muts_interest[0..5] {
+        println!("{:#?}", input);
+    }
+    for input in &dais[0..5] {
+        println!("{:#?}", input);
+    }
+    for input in &refs[0..5] {
+        println!("{:#?}", input);
+    }
+
+    /*
     // Initialize vectors to store columns for the input file (dais results)
     // TODO convert to bytes fr fr ong ong
     let dais_columns = lines_to_vec(reader)?;
@@ -332,6 +364,6 @@ fn main() -> std::io::Result<()> {
                 }
             }
         }
-    }
+    }*/
     Ok(())
 }
