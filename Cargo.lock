@@ -471,6 +471,7 @@ name = "mutations_of_interest_table"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "csv",
  "either",
  "serde",
  "zoe",
