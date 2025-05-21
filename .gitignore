@@ -6,3 +6,4 @@
 *.fa
 /test
 *test*
+.vscode/*
