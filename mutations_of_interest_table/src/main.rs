@@ -273,8 +273,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     for aa in 0..aa_seq1.len() {
                         entry.position += 1;
 
-                        if aa_seq1[aa] == aa_seq2[aa] {
-                        } else {
+                        if aa_seq1[aa] != aa_seq2[aa] {
                             //aa difference moved foraward in process
                             entry.aa_mut = aa_seq2[aa] as char;
                             entry.aa_ref = aa_seq1[aa] as char;
@@ -314,8 +313,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     for aa in 0..aligned_1.len() {
                         entry.position += 1;
 
-                        if aligned_1[aa] == aligned_2[aa] {
-                        } else {
+                        if aligned_1[aa] != aligned_2[aa] {
                             //aa difference moved foraward in process
                             entry.aa_mut = aligned_2[aa] as char;
                             entry.aa_ref = aligned_1[aa] as char;
