@@ -96,20 +96,20 @@ pub struct MutsOfInterestInput {
     description: String,
 }
 
-pub struct Entry {
-    sample_id: String,
-    ref_strain: String,
-    gisaid_accession: String,
-    subtype: String,
-    dais_ref: String,
-    protein: String,
+pub struct Entry<'a> {
+    sample_id: &'a str,
+    ref_strain: &'a str,
+    gisaid_accession: &'a str,
+    subtype: &'a str,
+    dais_ref: &'a str,
+    protein: &'a str,
     aa_ref: char,
     position: usize,
     aa_mut: char,
     phenotypic_consequences: String,
 }
 
-impl Entry {
+impl Entry<'_> {
     fn header(delim: &str) -> String {
         [
             "sample",
@@ -128,12 +128,12 @@ impl Entry {
 
     fn to_delimited(&self, delim: &str) -> String {
         [
-            self.sample_id.as_str(),
-            self.ref_strain.as_str(),
-            self.gisaid_accession.as_str(),
-            self.subtype.as_str(),
-            self.dais_ref.as_str(),
-            self.protein.as_str(),
+            self.sample_id,
+            self.ref_strain,
+            self.gisaid_accession,
+            self.subtype,
+            self.dais_ref,
+            self.protein,
             &self.aa_ref.to_string(),
             &self.position.to_string(),
             &self.aa_mut.to_string(),
@@ -249,9 +249,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     //Finding reference sequences in the same coordinate space to compare with
     for dais_entry in &dais {
         for ref_entry in &refs {
-            if dais_entry.subtype.clone() == ref_entry.ctype
-                && dais_entry.ref_strain.clone() == ref_entry.reference_id
-                && dais_entry.protein.clone() == ref_entry.protein
+            if dais_entry.subtype == ref_entry.ctype
+                && dais_entry.ref_strain == ref_entry.reference_id
+                && dais_entry.protein == ref_entry.protein
             {
                 let aa_seq1 = ref_entry.aa_aln.as_bytes();
                 let aa_seq2 = dais_entry.query_aa_aln_seq.as_bytes();
@@ -259,12 +259,12 @@ fn main() -> Result<(), Box<dyn Error>> {
                 //aa seqs that are the same length will be aligned already and saves time to not align
                 if aa_seq1.len() == aa_seq2.len() {
                     let mut entry = Entry {
-                        sample_id: dais_entry.sample_id.clone(),
-                        ref_strain: ref_entry.isolate_name.clone(),
-                        gisaid_accession: ref_entry.isolate_id.clone(),
-                        subtype: dais_entry.subtype.clone(),
-                        dais_ref: dais_entry.ref_strain.clone(),
-                        protein: dais_entry.protein.clone(),
+                        sample_id: &dais_entry.sample_id,
+                        ref_strain: &ref_entry.isolate_name,
+                        gisaid_accession: &ref_entry.isolate_id,
+                        subtype: &dais_entry.subtype,
+                        dais_ref: &dais_entry.ref_strain,
+                        protein: &dais_entry.protein,
                         position: 0,
                         aa_ref: 'X',
                         aa_mut: 'X',
@@ -299,12 +299,12 @@ fn main() -> Result<(), Box<dyn Error>> {
                     let (aligned_1, aligned_2) = align_sequences(query, reference);
 
                     let mut entry = Entry {
-                        sample_id: dais_entry.sample_id.clone(),
-                        ref_strain: ref_entry.isolate_name.clone(),
-                        gisaid_accession: ref_entry.isolate_id.clone(),
-                        subtype: dais_entry.subtype.clone(),
-                        dais_ref: dais_entry.ref_strain.clone(),
-                        protein: dais_entry.protein.clone(),
+                        sample_id: &dais_entry.sample_id,
+                        ref_strain: &ref_entry.isolate_name,
+                        gisaid_accession: &ref_entry.isolate_id,
+                        subtype: &dais_entry.subtype,
+                        dais_ref: &dais_entry.ref_strain,
+                        protein: &dais_entry.protein,
                         position: 0,
                         aa_ref: 'X',
                         aa_mut: 'X',
