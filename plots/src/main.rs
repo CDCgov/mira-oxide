@@ -1,9 +1,11 @@
 use clap::Parser;
 use csv::ReaderBuilder;
 use glob::glob;
-use plotly::common::Mode;
+use plotly::common::{Mode, Title};
+use plotly::configuration::{ToImageButtonOptions,ImageButtonFormats};
 use plotly::{Layout, Plot, Scatter};
-use plotly::layout::{LayoutGrid, GridPattern};
+use plotly::layout::{LayoutGrid, GridPattern, Axis};
+use std::collections::HashMap;
 use std::error::Error;
 use std::fs::File;
 use std::path::PathBuf;
@@ -85,15 +87,29 @@ fn generate_plot_coverage(input_directory: &PathBuf) -> Result<Plot, Box<dyn Err
                                                                             .unwrap()
                                                                             .split('-')
                                                                             .next()
-                                                                            .unwrap()));
+                                                                            .unwrap()))
+                            .x_axis(Axis::new().title(Title::with_text("Position")))
+                            .y_axis(Axis::new().title(Title::with_text("Coverage")));
     plot.set_layout(layout);
+
+    // Apply configuration to plot
+    plot.set_configuration(
+        plotly::Configuration::new()
+            .responsive(true)
+            .display_logo(false)
+            .fill_frame(true)
+            .to_image_button_options(ToImageButtonOptions::new()
+                .format(ImageButtonFormats::Svg)
+                .filename("coverage_plot")
+            )
+        );
 
     Ok(plot)
 }
 
 fn generate_plot_coverage_seg(input_directory: &PathBuf) -> Result<Plot, Box<dyn Error>> {
     // Init a Plotly plot
-    let mut plot = Plot::new();
+        let mut plot = Plot::new();
     
     // Track number of files for subplot layout
     let mut file_count = 0;
@@ -106,13 +122,60 @@ fn generate_plot_coverage_seg(input_directory: &PathBuf) -> Result<Plot, Box<dyn
             file_paths.push(path);
         }
     }
-    
+
     // Calculate grid dimensions for subplots
     let rows = (file_count as f64).sqrt().ceil() as usize;
     let cols = (file_count + rows - 1) / rows; // Ceiling division
     
+    // Load variant data into a HashMap keyed by segment name
+    let mut variants_data: HashMap<String, Vec<(u32, String, String, u32, u32, f32)>> = HashMap::new();
+    
+    // Look for variant files with matching prefixes in the directory
+    for entry in glob(&format!("{}/tables/*variants.txt", input_directory.display()))? {
+        if let Ok(variant_path) = entry {
+            let file = File::open(&variant_path)?;
+            
+            // Create a TSV reader
+            let mut rdr = ReaderBuilder::new()
+                .delimiter(b'\t')
+                .has_headers(true)
+                .from_reader(file);
+            
+            for result in rdr.records() {
+                let record = result?;
+                if record.len() >= 8 {
+                    let segment_name = record[0].to_string();
+                    let position: u32 = record[1].parse()?;
+                    let consensus_allele: String = record[3].to_string();
+                    let minority_allele: String = record[4].to_string();
+                    let consensus_count: u32 = record[5].parse()?;
+                    let minority_count: u32 = record[6].parse()?;
+                    let minority_frequency: f32 = record[8].parse()?;
+
+                    
+                    variants_data
+                        .entry(segment_name)
+                        .or_insert_with(Vec::new)
+                        .push((position, consensus_allele, minority_allele,
+                             consensus_count, minority_count, minority_frequency));
+                }
+            }
+        }
+    }
+
     // Process each file and create a subplot
     for (idx, path) in file_paths.iter().enumerate() {
+        // Extract segment name from file path
+        let segment_name = path.file_name()
+                      .unwrap_or_default()
+                      .to_str()
+                      .unwrap_or("Unknown")
+                      .split('-')
+                      .next()
+                      .unwrap_or("Unknown")
+                      .to_string();
+        
+      
         // Open the CSV file
         let file = File::open(path)?;
 
@@ -134,19 +197,11 @@ fn generate_plot_coverage_seg(input_directory: &PathBuf) -> Result<Plot, Box<dyn
             y_values.push(y);
         }
 
-        // Extract file name for title
-        let file_name = path.file_name()
-                      .unwrap_or_default()
-                      .to_str()
-                      .unwrap_or("Unknown")
-                      .split('-')
-                      .next()
-                      .unwrap_or("Unknown");
-
         // Create a trace for the current CSV file
-        let trace = Scatter::new(x_values, y_values)
+        let trace = Scatter::new(x_values, y_values.clone())
             .mode(Mode::Lines)
-            .name(file_name);
+            .name(&segment_name)
+            .hover_template("<b>Position:</b> %{x}<br><b>Coverage:</b> %{y}<br>");
             
         // Calculate row and column for this subplot (1-indexed)
         let row = idx / cols + 1;
@@ -164,10 +219,63 @@ fn generate_plot_coverage_seg(input_directory: &PathBuf) -> Result<Plot, Box<dyn
             format!("y{}", col + (row - 1) * cols)
         };
 
-        let trace = trace.x_axis(xaxis).y_axis(yaxis);
+        let trace = trace.x_axis(&xaxis).y_axis(&yaxis);
 
         // Add trace to plot
         plot.add_trace(trace);
+        
+        // Add variant data as scatter traces if we have data for this segment
+        if let Some(variants) = variants_data.get(&segment_name) {
+            // Collect positions and values for consensus and minority traces
+            let mut variant_positions: Vec<u32> = Vec::new();
+            let mut consensus_values: Vec<u32> = Vec::new();
+            let mut minority_values: Vec<u32> = Vec::new();
+            let mut hover_texts: Vec<String> = Vec::new();
+            
+            for &(position, ref consensus_allele, ref minority_allele, consensus_count, minority_count, minority_frequency) in variants {
+                variant_positions.push(position);
+                consensus_values.push(consensus_count + minority_count); // Total height
+                minority_values.push(minority_count);
+                hover_texts.push(format!(
+                    "Position: {}<br>Consensus Allele: {}<br>Consensus Count: {}<br>Minority Allele: {}<br>Minority Count: {}<br>Frequency: {:.2}%<br>Total: {}",
+                    position, consensus_allele, consensus_count, minority_allele, minority_count, minority_frequency * 100.0, consensus_count + minority_count
+                ));
+            }
+            
+            // Create trace for consensus (total) values
+            /* 
+            let consensus_trace = Scatter::new(variant_positions.clone(), consensus_values)
+                .mode(Mode::Markers)
+                .name(&format!("{} Consensus", segment_name))
+                .marker(plotly::common::Marker::new()
+                    .color("green")
+                    .size(8)
+                    .symbol(plotly::common::MarkerSymbol::Circle)
+                )
+                .text_array(hover_texts.clone())
+                .x_axis(&xaxis)
+                .y_axis(&yaxis)
+                .show_legend(false);
+            */  
+            // Create trace for minority values
+            let minority_trace = Scatter::new(variant_positions, minority_values)
+                .mode(Mode::Markers)
+                .name(&format!("{}", segment_name))
+                .marker(plotly::common::Marker::new()
+                    .color("black")
+                    .opacity(0.5)
+                    .size(15)
+                    .symbol(plotly::common::MarkerSymbol::TriangleUp)
+                )
+                .text_array(hover_texts)
+                .x_axis(&xaxis)
+                .y_axis(&yaxis)
+                .show_legend(false);
+                
+            // Add variant traces to plot
+            //plot.add_trace(consensus_trace);
+            plot.add_trace(minority_trace);
+        }
     }
     
     // Configure subplot layout
@@ -177,15 +285,27 @@ fn generate_plot_coverage_seg(input_directory: &PathBuf) -> Result<Plot, Box<dyn
                                 .columns(2)
                                 .pattern(GridPattern::Independent)
                             )
-                            .title(&format!("Segmented Coverage | {}", input_directory.file_name()
+                            .title(&format!("Segment Coverage | {}", input_directory.file_name()
                                                                                     .unwrap_or_default()
                                                                                     .to_str()
                                                                                     .unwrap_or("Unknown")
                                             )
-                                );
-    
+                            );
+                                            
     plot.set_layout(layout);
 
+    // Apply configuration to plot
+    plot.set_configuration(
+        plotly::Configuration::new()
+            .responsive(true)
+            .display_logo(false)
+            .fill_frame(true)
+            .to_image_button_options(ToImageButtonOptions::new()
+                .format(ImageButtonFormats::Svg)
+                .filename("coverage_plot")
+            )
+        );
+    
     Ok(plot)
 }
 
