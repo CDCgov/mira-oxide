@@ -2,9 +2,12 @@
 use clap::Parser;
 use csv::ReaderBuilder;
 use either::Either;
-use serde::{self, de::DeserializeOwned, Deserialize};
+use serde::{self, Deserialize, de::DeserializeOwned};
 use std::{
-    error::Error, fs::{File, OpenOptions}, io::{stdin, stdout, BufRead, BufReader, BufWriter, Stdin, Write}, path::{Path, PathBuf}
+    error::Error,
+    fs::{File, OpenOptions},
+    io::{BufRead, BufReader, BufWriter, Stdin, Write, stdin, stdout},
+    path::{Path, PathBuf},
 };
 use zoe::alignment::sw::sw_scalar_alignment;
 use zoe::alignment::{ScalarProfile, pairwise_align_with_cigar};
@@ -35,7 +38,10 @@ pub struct APDArgs {
 }
 
 // input files *must* be tab-separated
-fn read_tsv<T: DeserializeOwned, R: std::io::Read>(reader: R, has_headers: bool) -> Result<Vec<T>, Box<dyn std::error::Error>> {
+fn read_tsv<T: DeserializeOwned, R: std::io::Read>(
+    reader: R,
+    has_headers: bool,
+) -> Result<Vec<T>, Box<dyn std::error::Error>> {
     let mut rdr = ReaderBuilder::new()
         .has_headers(has_headers)
         .delimiter(b'\t')
@@ -56,24 +62,15 @@ pub struct DaisInput {
     subtype: String,
     ref_strain: String,
     protein: String,
-    #[serde(skip)]
     nt_hash: String,
-    #[serde(skip)]
     query_aa_seq: String,
     query_aa_aln_seq: String,
-    #[serde(skip)]
     cds_id: String,
-    #[serde(skip)]
-    insertion: bool,
-    #[serde(skip)]
-    inert_shift: bool,
-    #[serde(skip)]
+    insertion: String,
+    inert_shift: String,
     cds_seq: String,
-    #[serde(skip)]
     cds_aln: String,
-    #[serde(skip)]
     query_nt_coordinates: String,
-    #[serde(skip)]
     cds_nt_coordinates: String,
 }
 
@@ -149,17 +146,18 @@ impl Entry {
         &mut self,
         aa_1: u8,
         aa_2: u8,
-        muts_columns: &[Vec<String>],
+        muts_columns: &Vec<MutsOfInterestInput>,
     ) -> bool {
         self.aa_mut = aa_2 as char;
         self.aa_ref = aa_1 as char;
         let hold_aa_mut = self.aa_mut.to_string();
         //aa differences that are also in our "mutations of interest" list are written to file
-        for k in 0..muts_columns[2].len() {
-            if self.protein == muts_columns[0][k] && self.position.to_string() == muts_columns[1][k]
+        for muts_entry in muts_columns {
+            if self.protein == muts_entry.protein
+                && self.position.to_string() == muts_entry.aa_position
             {
-                if hold_aa_mut == muts_columns[2][k] {
-                    self.phenotypic_consequences = muts_columns[3][k].to_string();
+                if hold_aa_mut == muts_entry.aa {
+                    self.phenotypic_consequences = muts_entry.description.clone();
                     return true;
                 }
                 //aa that are missing and also in our "mutations of interest" list are written to file
@@ -234,33 +232,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     let ref_reader = create_reader(args.ref_file)?;
     let refs: Vec<RefInput> = read_tsv(ref_reader, true)?;
 
-    for input in &muts_interest[0..5] {
-        println!("{:#?}", input);
-    }
-    for input in &dais[0..5] {
-        println!("{:#?}", input);
-    }
-    for input in &refs[0..5] {
-        println!("{:#?}", input);
-    }
-
-    /*
-    // Initialize vectors to store columns for the input file (dais results)
-    // TODO convert to bytes fr fr ong ong
-    let dais_columns = lines_to_vec(reader)?;
-
-    //read in reference file (reference cvv and zoonotic strains)
-    let ref_reader = create_reader(args.ref_file)?;
-
-    // Initialize vectors to store columns (reference cvv and zoonotic strains)
-    let ref_columns: Vec<Vec<String>> = lines_to_vec(ref_reader)?;
-
-    //read in mutations file (mutations of interest)
-    let muts_reader = create_reader(args.muts_file)?;
-
-    // Initialize vectors to store columns (mutations of interest)
-    let muts_columns: Vec<Vec<String>> = lines_to_vec(muts_reader)?;
-
     let mut writer = if let Some(ref file_path) = args.output_xsv {
         let file = OpenOptions::new()
             .write(true)
@@ -276,24 +247,24 @@ fn main() -> Result<(), Box<dyn Error>> {
     writeln!(&mut writer, "{}", Entry::header(&args.output_delimiter))?;
 
     //Finding reference sequences in the same coordinate space to compare with
-    for i in 0..dais_columns[1].len() {
-        for j in 0..ref_columns[1].len() {
-            if dais_columns[1][i] == ref_columns[5][j]
-                && dais_columns[2][i] == ref_columns[6][j]
-                && dais_columns[3][i] == ref_columns[7][j]
+    for dais_entry in &dais {
+        for ref_entry in &refs {
+            if dais_entry.subtype.clone() == ref_entry.ctype
+                && dais_entry.ref_strain.clone() == ref_entry.reference_id
+                && dais_entry.protein.clone() == ref_entry.protein
             {
-                let aa_seq1 = ref_columns[8][j].as_bytes();
-                let aa_seq2 = dais_columns[6][i].as_bytes();
+                let aa_seq1 = ref_entry.aa_aln.as_bytes();
+                let aa_seq2 = dais_entry.query_aa_aln_seq.as_bytes();
                 //If aa seq are the same length start seqe comparison
                 //aa seqs that are the same length will be aligned already and saves time to not align
                 if aa_seq1.len() == aa_seq2.len() {
                     let mut entry = Entry {
-                        sample_id: dais_columns[0][i].to_string(),
-                        ref_strain: ref_columns[1][j].to_string(),
-                        gisaid_accession: ref_columns[0][j].to_string(),
-                        subtype: dais_columns[1][i].to_string(),
-                        dais_ref: dais_columns[2][i].to_string(),
-                        protein: dais_columns[3][i].to_string(),
+                        sample_id: dais_entry.sample_id.clone(),
+                        ref_strain: ref_entry.isolate_name.clone(),
+                        gisaid_accession: ref_entry.isolate_id.clone(),
+                        subtype: dais_entry.subtype.clone(),
+                        dais_ref: dais_entry.ref_strain.clone(),
+                        protein: dais_entry.protein.clone(),
                         position: 0,
                         aa_ref: 'X',
                         aa_mut: 'X',
@@ -310,7 +281,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                             if entry.update_entry_from_alignment(
                                 aa_seq1[aa],
                                 aa_seq2[aa],
-                                &muts_columns,
+                                &muts_interest,
                             ) {
                                 writeln!(
                                     &mut writer,
@@ -323,17 +294,17 @@ fn main() -> Result<(), Box<dyn Error>> {
                 } else {
                     //If aa seq are not the same length perform alignment to get them into the same coordinate space
                     //Using Zoe for alignment
-                    let query = dais_columns[6][i].as_bytes();
-                    let reference = ref_columns[8][j].as_bytes();
+                    let query = dais_entry.query_aa_aln_seq.as_bytes();
+                    let reference = ref_entry.aa_aln.as_bytes();
                     let (aligned_1, aligned_2) = align_sequences(query, reference);
 
                     let mut entry = Entry {
-                        sample_id: dais_columns[0][i].to_string(),
-                        ref_strain: ref_columns[1][j].to_string(),
-                        gisaid_accession: ref_columns[0][j].to_string(),
-                        subtype: dais_columns[1][i].to_string(),
-                        dais_ref: dais_columns[2][i].to_string(),
-                        protein: dais_columns[3][i].to_string(),
+                        sample_id: dais_entry.sample_id.clone(),
+                        ref_strain: ref_entry.isolate_name.clone(),
+                        gisaid_accession: ref_entry.isolate_id.clone(),
+                        subtype: dais_entry.subtype.clone(),
+                        dais_ref: dais_entry.ref_strain.clone(),
+                        protein: dais_entry.protein.clone(),
                         position: 0,
                         aa_ref: 'X',
                         aa_mut: 'X',
@@ -351,7 +322,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                             if entry.update_entry_from_alignment(
                                 aligned_1[aa],
                                 aligned_2[aa],
-                                &muts_columns,
+                                &muts_interest,
                             ) {
                                 writeln!(
                                     &mut writer,
@@ -364,6 +335,6 @@ fn main() -> Result<(), Box<dyn Error>> {
                 }
             }
         }
-    }*/
+    }
     Ok(())
 }
