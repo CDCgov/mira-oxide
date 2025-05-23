@@ -10,6 +10,44 @@ use std::error::Error;
 use std::fs::File;
 use std::path::PathBuf;
 
+// Add this function to generate consistent colors for segment names
+fn get_segment_color(segment_name: &str) -> &'static str {
+    // This ensures the same segment always gets the same color across all plots
+    // Check if segment_name contains any of our known segment identifiers
+    if segment_name.contains("PB2") {
+        "#3366CC"     // blue
+    } else if segment_name.contains("PB1") {
+        "#DC3912"     // red
+    } else if segment_name.contains("PA") {
+        "#FF9900"     // orange
+    } else if segment_name.contains("HA") {
+        "#109618"     // green
+    } else if segment_name.contains("NP") {
+        "#990099"     // purple
+    } else if segment_name.contains("NA") {
+        "#3B3EAC"     // indigo
+    } else if segment_name.contains("MP") {
+        "#0099C6"     // cyan
+    } else if segment_name.contains("NS") {
+        "#DD4477"     // pink
+    } else {
+        // For any other segments, use a hash of the segment name to pick a color
+        let hash = segment_name.bytes().fold(0u32, |acc, b| acc.wrapping_add(b as u32));
+        match hash % 10 {
+            0 => "#3366CC",  // blue
+            1 => "#DC3912",  // red
+            2 => "#FF9900",  // orange
+            3 => "#109618",  // green
+            4 => "#990099",  // purple
+            5 => "#3B3EAC",  // indigo
+            6 => "#0099C6",  // cyan
+            7 => "#DD4477",  // pink
+            8 => "#66AA00",  // lime
+            _ => "#B82E2E",  // dark red
+        }
+    }
+}
+
 #[derive(Parser)]
 #[command(version, about="Generate plotly plots for IRMA output")]
 struct Args {
@@ -63,16 +101,24 @@ fn generate_plot_coverage(input_directory: &PathBuf) -> Result<Plot, Box<dyn Err
                     y_values.push(y);
                 }
 
-                // Create a trace for the current CSV file
+                // Extract segment name
+                let segment_name = path.file_name()
+                                       .unwrap()
+                                       .to_str()
+                                       .unwrap()
+                                       .split('-')
+                                       .next()
+                                       .unwrap();
+                
+                // Get color for this segment
+                let segment_color = get_segment_color(segment_name);
+
+                // Create a trace for the current CSV file with consistent color
                 let trace = Scatter::new(x_values, y_values)
                     .mode(Mode::Lines)
-                    .name(path.file_name()
-                            .unwrap()
-                            .to_str()
-                            .unwrap()
-                            .split('-')
-                            .next()
-                            .unwrap());
+                    .name(segment_name)
+                    .line(plotly::common::Line::new().color(segment_color));
+                
                 plot.add_trace(trace);
             }
             Err(e) => eprintln!("Error reading file: {}", e),
@@ -175,6 +221,8 @@ fn generate_plot_coverage_seg(input_directory: &PathBuf) -> Result<Plot, Box<dyn
                       .unwrap_or("Unknown")
                       .to_string();
         
+        // Get color for this segment
+        let segment_color = get_segment_color(&segment_name);
       
         // Open the CSV file
         let file = File::open(path)?;
@@ -197,22 +245,23 @@ fn generate_plot_coverage_seg(input_directory: &PathBuf) -> Result<Plot, Box<dyn
             y_values.push(y);
         }
 
-        // Create a trace for the current CSV file
+        // Create a trace for the current CSV file with consistent color
         let trace = Scatter::new(x_values, y_values.clone())
             .mode(Mode::Lines)
             .name(&segment_name)
+            .line(plotly::common::Line::new().color(segment_color))
             .hover_template("<b>Position:</b> %{x}<br><b>Coverage:</b> %{y}<br>");
             
         // Calculate row and column for this subplot (1-indexed)
         let row = idx / cols + 1;
         let col = idx % cols + 1;
 
-        // Set xaxis and yaxis for subplot assignment
         let xaxis = if col == 1 && row == 1 {
             "x".to_string()
         } else {
             format!("x{}", col + (row - 1) * cols)
         };
+
         let yaxis = if col == 1 && row == 1 {
             "y".to_string()
         } else {
@@ -242,27 +291,12 @@ fn generate_plot_coverage_seg(input_directory: &PathBuf) -> Result<Plot, Box<dyn
                 ));
             }
             
-            // Create trace for consensus (total) values
-            /* 
-            let consensus_trace = Scatter::new(variant_positions.clone(), consensus_values)
-                .mode(Mode::Markers)
-                .name(&format!("{} Consensus", segment_name))
-                .marker(plotly::common::Marker::new()
-                    .color("green")
-                    .size(8)
-                    .symbol(plotly::common::MarkerSymbol::Circle)
-                )
-                .text_array(hover_texts.clone())
-                .x_axis(&xaxis)
-                .y_axis(&yaxis)
-                .show_legend(false);
-            */  
-            // Create trace for minority values
+            // Create trace for minority values with consistent color (but with transparency)
             let minority_trace = Scatter::new(variant_positions, minority_values)
                 .mode(Mode::Markers)
                 .name(&format!("{}", segment_name))
                 .marker(plotly::common::Marker::new()
-                    .color("black")
+                    .color(segment_color)
                     .opacity(0.5)
                     .size(15)
                     .symbol(plotly::common::MarkerSymbol::TriangleUp)
@@ -273,7 +307,6 @@ fn generate_plot_coverage_seg(input_directory: &PathBuf) -> Result<Plot, Box<dyn
                 .show_legend(false);
                 
             // Add variant traces to plot
-            //plot.add_trace(consensus_trace);
             plot.add_trace(minority_trace);
         }
     }
