@@ -34,7 +34,7 @@ pub struct APDArgs {
 
     #[arg(short = 'd', long, default_value = ",")]
     /// Use the provider delimiter for separating fields. Default is ','
-    output_delimiter: String,
+    output_delimiter: Option<String>,
 }
 
 // input files *must* be tab-separated
@@ -110,38 +110,6 @@ pub struct Entry<'a> {
 }
 
 impl Entry<'_> {
-    fn header(delim: &str) -> String {
-        [
-            "sample",
-            "ref_strain",
-            "gisaid_accession",
-            "subtype",
-            "dais_reference",
-            "protein",
-            "aa_reference",
-            "aa_position",
-            "aa_mutation",
-            "phenotypic_consequences",
-        ]
-        .join(delim)
-    }
-
-    fn to_delimited(&self, delim: &str) -> String {
-        [
-            self.sample_id,
-            self.ref_strain,
-            self.gisaid_accession,
-            self.subtype,
-            self.dais_ref,
-            self.protein,
-            &self.aa_ref.to_string(),
-            &self.position.to_string(),
-            &self.aa_mut.to_string(),
-            self.phenotypic_consequences.as_str(),
-        ]
-        .join(delim)
-    }
-
     fn update_entry_from_alignment(
         &mut self,
         aa_1: u8,
@@ -221,6 +189,7 @@ pub fn align_sequences<'a>(query: &'a [u8], reference: &'a [u8]) -> (Vec<u8>, Ve
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args = APDArgs::parse();
+    let delim = args.output_delimiter.unwrap_or(",".to_owned());
 
     //read in input file (dais input, ref input, muts input)
     let muts_reader = create_reader(args.muts_file)?;
@@ -244,7 +213,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
 
     //header of output file
-    writeln!(&mut writer, "{}", Entry::header(&args.output_delimiter))?;
+    writeln!(
+        &mut writer,
+        "sample, reference_strain,gisaid_accession,ctype,dais_reference,protein,aa_mutation,phenotypic_consequence",
+    )?;
 
     //Finding reference sequences in the same coordinate space to compare with
     for dais_entry in &dais {
@@ -284,8 +256,24 @@ fn main() -> Result<(), Box<dyn Error>> {
                             ) {
                                 writeln!(
                                     &mut writer,
-                                    "{}",
-                                    entry.to_delimited(&args.output_delimiter)
+                                    "{}{}{}{}{}{}{}{}{}{}{}{}{}:{}:{}{}{}",
+                                    entry.sample_id,
+                                    delim,
+                                    entry.ref_strain,
+                                    delim,
+                                    entry.gisaid_accession,
+                                    delim,
+                                    entry.subtype,
+                                    delim,
+                                    entry.dais_ref,
+                                    delim,
+                                    entry.protein,
+                                    delim,
+                                    entry.aa_ref.to_string(),
+                                    entry.position.to_string(),
+                                    entry.aa_mut.to_string(),
+                                    delim,
+                                    entry.phenotypic_consequences.as_str(),
                                 )?;
                             }
                         }
@@ -324,8 +312,24 @@ fn main() -> Result<(), Box<dyn Error>> {
                             ) {
                                 writeln!(
                                     &mut writer,
-                                    "{}",
-                                    entry.to_delimited(&args.output_delimiter)
+                                    "{}{}{}{}{}{}{}{}{}{}{}{}{}:{}:{}{}{}",
+                                    entry.sample_id,
+                                    delim,
+                                    entry.ref_strain,
+                                    delim,
+                                    entry.gisaid_accession,
+                                    delim,
+                                    entry.subtype,
+                                    delim,
+                                    entry.dais_ref,
+                                    delim,
+                                    entry.protein,
+                                    delim,
+                                    entry.aa_ref.to_string(),
+                                    entry.position.to_string(),
+                                    entry.aa_mut.to_string(),
+                                    delim,
+                                    entry.phenotypic_consequences.as_str(),
                                 )?;
                             }
                         }
