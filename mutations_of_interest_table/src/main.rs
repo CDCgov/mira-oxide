@@ -1,3 +1,342 @@
-fn main() {
-    println!("Hello, world!");
+#![allow(dead_code, unused_imports)]
+use clap::Parser;
+use csv::ReaderBuilder;
+use either::Either;
+use serde::{self, Deserialize, de::DeserializeOwned};
+use std::{
+    error::Error,
+    fs::{File, OpenOptions},
+    io::{BufRead, BufReader, BufWriter, Stdin, Write, stdin, stdout},
+    path::{Path, PathBuf},
+};
+use zoe::alignment::sw::sw_scalar_alignment;
+use zoe::alignment::{ScalarProfile, pairwise_align_with_cigar};
+use zoe::data::{ByteIndexMap, WeightMatrix};
+
+#[derive(Debug, Parser)]
+#[command(about = "Tool for calculating amino acid difference tables")]
+pub struct APDArgs {
+    #[arg(short = 'i', long)]
+    /// Optional input fasta
+    input_file: Option<PathBuf>,
+
+    #[arg(short = 'r', long)]
+    /// Optional input fasta
+    ref_file: Option<PathBuf>,
+
+    #[arg(short = 'm', long)]
+    /// Optional input fasta
+    muts_file: Option<PathBuf>,
+
+    #[arg(short = 'o', long)]
+    /// Optional output delimited file
+    output_xsv: Option<PathBuf>,
+
+    #[arg(short = 'd', long, default_value = ",")]
+    /// Use the provider delimiter for separating fields. Default is ','
+    output_delimiter: Option<String>,
+}
+
+// input files *must* be tab-separated
+fn read_tsv<T: DeserializeOwned, R: std::io::Read>(
+    reader: R,
+    has_headers: bool,
+) -> Result<Vec<T>, Box<dyn std::error::Error>> {
+    let mut rdr = ReaderBuilder::new()
+        .has_headers(has_headers)
+        .delimiter(b'\t')
+        .from_reader(reader);
+
+    let mut records = Vec::new();
+    for result in rdr.deserialize() {
+        let record: T = result?;
+        records.push(record);
+    }
+
+    Ok(records)
+}
+
+#[derive(Deserialize, Debug)]
+pub struct DaisInput {
+    sample_id: String,
+    subtype: String,
+    ref_strain: String,
+    protein: String,
+    nt_hash: String,
+    query_aa_seq: String,
+    query_aa_aln_seq: String,
+    cds_id: String,
+    insertion: String,
+    inert_shift: String,
+    cds_seq: String,
+    cds_aln: String,
+    query_nt_coordinates: String,
+    cds_nt_coordinates: String,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct RefInput {
+    isolate_id: String,
+    isolate_name: String,
+    subtype: String,
+    passage_history: String,
+    nt_id: String,
+    ctype: String,
+    reference_id: String,
+    protein: String,
+    aa_aln: String,
+    cds_aln: String,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct MutsOfInterestInput {
+    protein: String,
+    aa_position: String,
+    aa: String,
+    description: String,
+}
+
+pub struct Entry<'a> {
+    sample_id: &'a str,
+    ref_strain: &'a str,
+    gisaid_accession: &'a str,
+    subtype: &'a str,
+    dais_ref: &'a str,
+    protein: &'a str,
+    aa_ref: char,
+    position: usize,
+    aa_mut: char,
+    phenotypic_consequences: String,
+}
+
+impl Entry<'_> {
+    fn update_entry_from_alignment(
+        &mut self,
+        aa_1: u8,
+        aa_2: u8,
+        muts_columns: &Vec<MutsOfInterestInput>,
+    ) -> bool {
+        self.aa_mut = aa_2 as char;
+        self.aa_ref = aa_1 as char;
+        let hold_aa_mut = self.aa_mut.to_string();
+        //aa differences that are also in our "mutations of interest" list are written to file
+        for muts_entry in muts_columns {
+            if self.protein == muts_entry.protein
+                && self.position.to_string() == muts_entry.aa_position
+            {
+                if hold_aa_mut == muts_entry.aa {
+                    self.phenotypic_consequences = muts_entry.description.clone();
+                    return true;
+                }
+                //aa that are missing and also in our "mutations of interest" list are written to file
+                else if hold_aa_mut == "-" {
+                    self.phenotypic_consequences = String::from("amino acid information missing");
+                    return true;
+                }
+            }
+        }
+        false
+    }
+}
+
+fn create_reader(path: Option<PathBuf>) -> std::io::Result<BufReader<Either<File, Stdin>>> {
+    let reader = if let Some(ref file_path) = path {
+        let file = OpenOptions::new().read(true).open(file_path)?;
+        BufReader::new(Either::Left(file))
+    } else {
+        BufReader::new(Either::Right(stdin()))
+    };
+
+    Ok(reader)
+}
+
+pub fn lines_to_vec<R: BufRead>(reader: R) -> std::io::Result<Vec<Vec<String>>> {
+    let mut columns: Vec<Vec<String>> = Vec::new();
+
+    for line_result in reader.lines() {
+        let line = line_result?;
+        let values: Vec<_> = line.split('\t').map(str::to_owned).collect();
+
+        if columns.is_empty() {
+            columns.resize_with(values.len(), Vec::new);
+        }
+
+        for (col, val) in columns.iter_mut().zip(values) {
+            col.push(val);
+        }
+    }
+
+    Ok(columns)
+}
+
+pub fn align_sequences<'a>(query: &'a [u8], reference: &'a [u8]) -> (Vec<u8>, Vec<u8>) {
+    const MAPPING: ByteIndexMap<22> = ByteIndexMap::new(*b"ACDEFGHIKLMNPQRSTVWXY*", b'X');
+    const WEIGHTS: WeightMatrix<i8, 22> = WeightMatrix::new(&MAPPING, 1, 0, Some(b'X'));
+    const GAP_OPEN: i8 = -1;
+    const GAP_EXTEND: i8 = 0;
+
+    let profile =
+        ScalarProfile::<22>::new(query, WEIGHTS, GAP_OPEN, GAP_EXTEND).expect("Ya beefed it");
+    let alignment = sw_scalar_alignment(reference, &profile);
+
+    pairwise_align_with_cigar(
+        reference,
+        query,
+        &alignment.cigar,
+        alignment.ref_range.start,
+    )
+}
+
+fn main() -> Result<(), Box<dyn Error>> {
+    let args = APDArgs::parse();
+    let delim = args.output_delimiter.unwrap_or(",".to_owned());
+
+    //read in input file (dais input, ref input, muts input)
+    let muts_reader = create_reader(args.muts_file)?;
+    let muts_interest: Vec<MutsOfInterestInput> = read_tsv(muts_reader, false)?;
+
+    let dais_reader = create_reader(args.input_file)?;
+    let dais: Vec<DaisInput> = read_tsv(dais_reader, false)?;
+
+    let ref_reader = create_reader(args.ref_file)?;
+    let refs: Vec<RefInput> = read_tsv(ref_reader, true)?;
+
+    let mut writer = if let Some(ref file_path) = args.output_xsv {
+        let file = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(file_path)?;
+        BufWriter::new(Either::Left(file))
+    } else {
+        BufWriter::new(Either::Right(stdout()))
+    };
+
+    //header of output file
+    writeln!(
+        &mut writer,
+        "sample, reference_strain,gisaid_accession,ctype,dais_reference,protein,aa_mutation,phenotypic_consequence",
+    )?;
+
+    //Finding reference sequences in the same coordinate space to compare with
+    for dais_entry in &dais {
+        for ref_entry in &refs {
+            if dais_entry.subtype == ref_entry.ctype
+                && dais_entry.ref_strain == ref_entry.reference_id
+                && dais_entry.protein == ref_entry.protein
+            {
+                let aa_seq1 = ref_entry.aa_aln.as_bytes();
+                let aa_seq2 = dais_entry.query_aa_aln_seq.as_bytes();
+                //If aa seq are the same length start seqe comparison
+                //aa seqs that are the same length will be aligned already and saves time to not align
+                if aa_seq1.len() == aa_seq2.len() {
+                    let mut entry = Entry {
+                        sample_id: &dais_entry.sample_id,
+                        ref_strain: &ref_entry.isolate_name,
+                        gisaid_accession: &ref_entry.isolate_id,
+                        subtype: &dais_entry.subtype,
+                        dais_ref: &dais_entry.ref_strain,
+                        protein: &dais_entry.protein,
+                        position: 0,
+                        aa_ref: 'X',
+                        aa_mut: 'X',
+                        phenotypic_consequences: String::new(),
+                    };
+                    for aa in 0..aa_seq1.len() {
+                        entry.position += 1;
+
+                        if aa_seq1[aa] != aa_seq2[aa] {
+                            //aa difference moved foraward in process
+                            entry.aa_mut = aa_seq2[aa] as char;
+                            entry.aa_ref = aa_seq1[aa] as char;
+                            if entry.update_entry_from_alignment(
+                                aa_seq1[aa],
+                                aa_seq2[aa],
+                                &muts_interest,
+                            ) {
+                                writeln!(
+                                    &mut writer,
+                                    "{}{}{}{}{}{}{}{}{}{}{}{}{}:{}:{}{}{}",
+                                    entry.sample_id,
+                                    delim,
+                                    entry.ref_strain,
+                                    delim,
+                                    entry.gisaid_accession,
+                                    delim,
+                                    entry.subtype,
+                                    delim,
+                                    entry.dais_ref,
+                                    delim,
+                                    entry.protein,
+                                    delim,
+                                    entry.aa_ref.to_string(),
+                                    entry.position.to_string(),
+                                    entry.aa_mut.to_string(),
+                                    delim,
+                                    entry.phenotypic_consequences.as_str(),
+                                )?;
+                            }
+                        }
+                    }
+                } else {
+                    //If aa seq are not the same length perform alignment to get them into the same coordinate space
+                    //Using Zoe for alignment
+                    let query = dais_entry.query_aa_aln_seq.as_bytes();
+                    let reference = ref_entry.aa_aln.as_bytes();
+                    let (aligned_1, aligned_2) = align_sequences(query, reference);
+
+                    let mut entry = Entry {
+                        sample_id: &dais_entry.sample_id,
+                        ref_strain: &ref_entry.isolate_name,
+                        gisaid_accession: &ref_entry.isolate_id,
+                        subtype: &dais_entry.subtype,
+                        dais_ref: &dais_entry.ref_strain,
+                        protein: &dais_entry.protein,
+                        position: 0,
+                        aa_ref: 'X',
+                        aa_mut: 'X',
+                        phenotypic_consequences: String::new(),
+                    };
+
+                    for aa in 0..aligned_1.len() {
+                        entry.position += 1;
+
+                        if aligned_1[aa] != aligned_2[aa] {
+                            //aa difference moved foraward in process
+                            entry.aa_mut = aligned_2[aa] as char;
+                            entry.aa_ref = aligned_1[aa] as char;
+                            if entry.update_entry_from_alignment(
+                                aligned_1[aa],
+                                aligned_2[aa],
+                                &muts_interest,
+                            ) {
+                                writeln!(
+                                    &mut writer,
+                                    "{}{}{}{}{}{}{}{}{}{}{}{}{}:{}:{}{}{}",
+                                    entry.sample_id,
+                                    delim,
+                                    entry.ref_strain,
+                                    delim,
+                                    entry.gisaid_accession,
+                                    delim,
+                                    entry.subtype,
+                                    delim,
+                                    entry.dais_ref,
+                                    delim,
+                                    entry.protein,
+                                    delim,
+                                    entry.aa_ref.to_string(),
+                                    entry.position.to_string(),
+                                    entry.aa_mut.to_string(),
+                                    delim,
+                                    entry.phenotypic_consequences.as_str(),
+                                )?;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
 }
