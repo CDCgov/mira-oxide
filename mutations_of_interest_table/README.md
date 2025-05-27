@@ -35,7 +35,7 @@ cargo run -p mutations_of_interest_table -- -i <PATH>/DAIS_ribosome.seq -r <PATH
 
 If you would like the output to have another deliminator (default: ","), then the `-d` flag can be used to pass another deliminator.
 
-# The Mutations of Interest Table output should be structured like this (comma delimited):
+### The Mutations of Interest Table output should be structured like this (comma delimited):
 
 ```
 sample, reference_strain,gisaid_accession,ctype,dais_reference,protein,aa_mutation,phenotypic_consequence
