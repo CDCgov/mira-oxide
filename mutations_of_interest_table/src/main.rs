@@ -132,7 +132,7 @@ impl Entry<'_> {
                     return true;
                 }
                 //aa that are missing and also in our "mutations of interest" list are written to file
-                else if hold_aa_mut == "-" {
+                else if hold_aa_mut == "." {
                     self.phenotypic_consequences = String::from("amino acid information missing");
                     return true;
                 }
