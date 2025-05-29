@@ -11,7 +11,7 @@ use std::{
 };
 use zoe::alignment::sw::sw_scalar_alignment;
 use zoe::alignment::{ScalarProfile, pairwise_align_with_cigar};
-use zoe::data::{ByteIndexMap, WeightMatrix};
+use zoe::data::{ByteIndexMap, StdGeneticCode, WeightMatrix};
 
 #[derive(Debug, Parser)]
 #[command(about = "Tool for calculating amino acid difference tables")]
@@ -63,7 +63,7 @@ pub struct DaisInput {
     ref_strain: String,
     protein: String,
     nt_hash: String,
-    query_aa_seq: String,
+    query_nt_seq: String,
     query_aa_aln_seq: String,
     cds_id: String,
     insertion: String,
@@ -103,8 +103,11 @@ pub struct Entry<'a> {
     subtype: &'a str,
     dais_ref: &'a str,
     protein: &'a str,
+    nt_ref: char,
+    nt_position: usize,
+    nt_mut: char,
     aa_ref: char,
-    position: usize,
+    aa_position: usize,
     aa_mut: char,
     phenotypic_consequences: String,
 }
@@ -122,7 +125,7 @@ impl Entry<'_> {
         //aa differences that are also in our "mutations of interest" list are written to file
         for muts_entry in muts_columns {
             if self.protein == muts_entry.protein
-                && self.position.to_string() == muts_entry.aa_position
+                && self.aa_position.to_string() == muts_entry.aa_position
             {
                 if hold_aa_mut == muts_entry.aa {
                     self.phenotypic_consequences = muts_entry.description.clone();
@@ -170,13 +173,13 @@ pub fn lines_to_vec<R: BufRead>(reader: R) -> std::io::Result<Vec<Vec<String>>> 
 }
 
 pub fn align_sequences<'a>(query: &'a [u8], reference: &'a [u8]) -> (Vec<u8>, Vec<u8>) {
-    const MAPPING: ByteIndexMap<22> = ByteIndexMap::new(*b"ACDEFGHIKLMNPQRSTVWXY*", b'X');
-    const WEIGHTS: WeightMatrix<i8, 22> = WeightMatrix::new(&MAPPING, 1, 0, Some(b'X'));
+    const MAPPING: ByteIndexMap<6> = ByteIndexMap::new(*b"ACGTN*", b'N');
+    const WEIGHTS: WeightMatrix<i8, 6> = WeightMatrix::new(&MAPPING, 1, 0, Some(b'N'));
     const GAP_OPEN: i8 = -1;
     const GAP_EXTEND: i8 = 0;
 
-    let profile =
-        ScalarProfile::<22>::new(query, WEIGHTS, GAP_OPEN, GAP_EXTEND).expect("Ya beefed it");
+    let profile = ScalarProfile::<6>::new(query, WEIGHTS, GAP_OPEN, GAP_EXTEND)
+        .expect("Alignment profile failed");
     let alignment = sw_scalar_alignment(reference, &profile);
 
     pairwise_align_with_cigar(
@@ -215,7 +218,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     //header of output file
     writeln!(
         &mut writer,
-        "sample, reference_strain,gisaid_accession,ctype,dais_reference,protein,aa_mutation,phenotypic_consequence",
+        "sample, reference_strain,gisaid_accession,ctype,dais_reference,protein,nt_mutation,aa_mutation,phenotypic_consequence",
     )?;
 
     //Finding reference sequences in the same coordinate space to compare with
@@ -225,11 +228,12 @@ fn main() -> Result<(), Box<dyn Error>> {
                 && dais_entry.ref_strain == ref_entry.reference_id
                 && dais_entry.protein == ref_entry.protein
             {
-                let aa_seq1 = ref_entry.aa_aln.as_bytes();
-                let aa_seq2 = dais_entry.query_aa_aln_seq.as_bytes();
-                //If aa seq are the same length start seqe comparison
-                //aa seqs that are the same length will be aligned already and saves time to not align
-                if aa_seq1.len() == aa_seq2.len() {
+                let nt_seq1 = ref_entry.cds_aln.as_bytes();
+                let nt_seq2 = dais_entry.cds_aln.as_bytes();
+                //If nt seq are the same length start seq comparison
+                //nt seqs that are the same length will be aligned already and saves time to not align
+
+                if nt_seq1.len() == nt_seq2.len() {
                     let mut entry = Entry {
                         sample_id: &dais_entry.sample_id,
                         ref_strain: &ref_entry.isolate_name,
@@ -237,52 +241,92 @@ fn main() -> Result<(), Box<dyn Error>> {
                         subtype: &dais_entry.subtype,
                         dais_ref: &dais_entry.ref_strain,
                         protein: &dais_entry.protein,
-                        position: 0,
+                        nt_position: 0,
+                        nt_ref: 'N',
+                        nt_mut: 'N',
+                        aa_position: 0,
                         aa_ref: 'X',
                         aa_mut: 'X',
                         phenotypic_consequences: String::new(),
                     };
-                    for aa in 0..aa_seq1.len() {
-                        entry.position += 1;
 
-                        if aa_seq1[aa] != aa_seq2[aa] {
-                            //aa difference moved foraward in process
-                            entry.aa_mut = aa_seq2[aa] as char;
-                            entry.aa_ref = aa_seq1[aa] as char;
-                            if entry.update_entry_from_alignment(
-                                aa_seq1[aa],
-                                aa_seq2[aa],
-                                &muts_interest,
-                            ) {
-                                writeln!(
-                                    &mut writer,
-                                    "{}{}{}{}{}{}{}{}{}{}{}{}{}:{}:{}{}{}",
-                                    entry.sample_id,
-                                    delim,
-                                    entry.ref_strain,
-                                    delim,
-                                    entry.gisaid_accession,
-                                    delim,
-                                    entry.subtype,
-                                    delim,
-                                    entry.dais_ref,
-                                    delim,
-                                    entry.protein,
-                                    delim,
-                                    entry.aa_ref.to_string(),
-                                    entry.position.to_string(),
-                                    entry.aa_mut.to_string(),
-                                    delim,
-                                    entry.phenotypic_consequences.as_str(),
-                                )?;
+                    let compare_seqs: Vec<(usize, &[u8], &[u8])> = nt_seq1
+                        .chunks(3)
+                        .zip(nt_seq2.chunks(3))
+                        .enumerate()
+                        .filter(|(_, (ref_chunk, query_chunk))| ref_chunk != query_chunk)
+                        .map(|(index, (ref_chunk, query_chunk))| (index, ref_chunk, query_chunk))
+                        .collect();
+
+                    for (index, ref_chunk, query_chunk) in compare_seqs {
+                        let mut chunk_position = 0;
+                        for nt in 0..ref_chunk.len() {
+                            chunk_position += 1;
+                            let aa_index = index + 1;
+
+                            let ref_aa;
+                            if ref_chunk.len() == 3 {
+                                ref_aa = StdGeneticCode::translate_codon(ref_chunk);
+                            } else {
+                                ref_aa = b'~';
+                            }
+
+                            let query_aa;
+                            if query_chunk.len() == 3 {
+                                query_aa = StdGeneticCode::translate_codon(query_chunk);
+                            } else {
+                                query_aa = b'~';
+                            }
+
+                            if ref_chunk[nt] != query_chunk[nt] {
+                                let nt_idex = ((index + 1) * 3) - (3 - chunk_position);
+                                entry.nt_position = nt_idex;
+                                entry.nt_ref = ref_chunk[nt] as char;
+                                entry.nt_mut = query_chunk[nt] as char;
+                                entry.aa_position = aa_index;
+                                entry.aa_ref = ref_aa as char;
+                                entry.aa_mut = query_aa as char;
+
+                                //aa difference moved forward in process;
+                                if entry.update_entry_from_alignment(
+                                    ref_aa,
+                                    query_aa,
+                                    &muts_interest,
+                                ) {
+                                    writeln!(
+                                        &mut writer,
+                                        "{}{}{}{}{}{}{}{}{}{}{}{}{}:{}:{}{}{}:{}:{}{}{}",
+                                        entry.sample_id,
+                                        delim,
+                                        entry.ref_strain,
+                                        delim,
+                                        entry.gisaid_accession,
+                                        delim,
+                                        entry.subtype,
+                                        delim,
+                                        entry.dais_ref,
+                                        delim,
+                                        entry.protein,
+                                        delim,
+                                        entry.nt_ref.to_string(),
+                                        entry.nt_position.to_string(),
+                                        entry.nt_mut.to_string(),
+                                        delim,
+                                        entry.aa_ref.to_string(),
+                                        entry.aa_position.to_string(),
+                                        entry.aa_mut.to_string(),
+                                        delim,
+                                        entry.phenotypic_consequences.as_str(),
+                                    )?;
+                                }
                             }
                         }
                     }
                 } else {
                     //If aa seq are not the same length perform alignment to get them into the same coordinate space
                     //Using Zoe for alignment
-                    let query = dais_entry.query_aa_aln_seq.as_bytes();
-                    let reference = ref_entry.aa_aln.as_bytes();
+                    let query = dais_entry.cds_aln.as_bytes();
+                    let reference = ref_entry.cds_aln.as_bytes();
                     let (aligned_1, aligned_2) = align_sequences(query, reference);
 
                     let mut entry = Entry {
@@ -292,45 +336,84 @@ fn main() -> Result<(), Box<dyn Error>> {
                         subtype: &dais_entry.subtype,
                         dais_ref: &dais_entry.ref_strain,
                         protein: &dais_entry.protein,
-                        position: 0,
+                        nt_position: 0,
+                        nt_ref: 'N',
+                        nt_mut: 'N',
+                        aa_position: 0,
                         aa_ref: 'X',
                         aa_mut: 'X',
                         phenotypic_consequences: String::new(),
                     };
+                    let compare_seqs: Vec<(usize, &[u8], &[u8])> = aligned_1
+                        .chunks(3)
+                        .zip(aligned_2.chunks(3))
+                        .enumerate()
+                        .filter(|(_, (ref_chunk, query_chunk))| ref_chunk != query_chunk)
+                        .map(|(index, (ref_chunk, query_chunk))| (index, ref_chunk, query_chunk))
+                        .collect();
 
-                    for aa in 0..aligned_1.len() {
-                        entry.position += 1;
+                    for (index, ref_chunk, query_chunk) in compare_seqs {
+                        let mut chunk_position = 0;
+                        //println!("{chunk_position}");
+                        let aa_index = index + 1;
+                        let ref_aa;
+                        if ref_chunk.len() == 3 {
+                            ref_aa = StdGeneticCode::translate_codon(ref_chunk);
+                        } else {
+                            ref_aa = b'~';
+                        }
 
-                        if aligned_1[aa] != aligned_2[aa] {
-                            //aa difference moved foraward in process
-                            entry.aa_mut = aligned_2[aa] as char;
-                            entry.aa_ref = aligned_1[aa] as char;
-                            if entry.update_entry_from_alignment(
-                                aligned_1[aa],
-                                aligned_2[aa],
-                                &muts_interest,
-                            ) {
-                                writeln!(
-                                    &mut writer,
-                                    "{}{}{}{}{}{}{}{}{}{}{}{}{}:{}:{}{}{}",
-                                    entry.sample_id,
-                                    delim,
-                                    entry.ref_strain,
-                                    delim,
-                                    entry.gisaid_accession,
-                                    delim,
-                                    entry.subtype,
-                                    delim,
-                                    entry.dais_ref,
-                                    delim,
-                                    entry.protein,
-                                    delim,
-                                    entry.aa_ref.to_string(),
-                                    entry.position.to_string(),
-                                    entry.aa_mut.to_string(),
-                                    delim,
-                                    entry.phenotypic_consequences.as_str(),
-                                )?;
+                        let query_aa;
+                        if query_chunk.len() == 3 {
+                            query_aa = StdGeneticCode::translate_codon(query_chunk);
+                        } else {
+                            query_aa = b'~';
+                        }
+                        for nt in 0..ref_chunk.len() {
+                            chunk_position += 1;
+
+                            if ref_chunk[nt] != query_chunk[nt] {
+                                let nt_idex = ((index + 1) * 3) - (3 - chunk_position);
+                                entry.nt_position = nt_idex;
+                                entry.nt_ref = ref_chunk[nt] as char;
+                                entry.nt_mut = query_chunk[nt] as char;
+                                entry.aa_position = aa_index;
+                                entry.aa_ref = ref_aa as char;
+                                entry.aa_mut = query_aa as char;
+
+                                //aa difference moved forward in process;
+
+                                if entry.update_entry_from_alignment(
+                                    ref_aa,
+                                    query_aa,
+                                    &muts_interest,
+                                ) {
+                                    writeln!(
+                                        &mut writer,
+                                        "{}{}{}{}{}{}{}{}{}{}{}{}{}:{}:{}{}{}:{}:{}{}{}",
+                                        entry.sample_id,
+                                        delim,
+                                        entry.ref_strain,
+                                        delim,
+                                        entry.gisaid_accession,
+                                        delim,
+                                        entry.subtype,
+                                        delim,
+                                        entry.dais_ref,
+                                        delim,
+                                        entry.protein,
+                                        delim,
+                                        entry.nt_ref.to_string(),
+                                        entry.nt_position.to_string(),
+                                        entry.nt_mut.to_string(),
+                                        delim,
+                                        entry.aa_ref.to_string(),
+                                        entry.aa_position.to_string(),
+                                        entry.aa_mut.to_string(),
+                                        delim,
+                                        entry.phenotypic_consequences.as_str(),
+                                    )?;
+                                }
                             }
                         }
                     }
