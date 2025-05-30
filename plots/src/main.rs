@@ -190,8 +190,8 @@ fn generate_plot_coverage_seg(input_directory: &PathBuf) -> Result<Plot, Box<dyn
     }
 
     // Calculate grid dimensions for subplots
-    let rows = (file_count as f64).sqrt().ceil() as usize;
-    let cols = (file_count + rows - 1) / rows; // Ceiling division
+    let rows = 4;//((file_count + 2) as f64).sqrt().ceil() as usize;
+    let cols = 2;//(file_count + rows - 1) / rows; // Ceiling division
 
     // Load variant data into a HashMap keyed by segment name
     let mut variants_data: HashMap<String, Vec<(u32, String, String, u32, u32, f32)>> =
@@ -258,7 +258,10 @@ fn generate_plot_coverage_seg(input_directory: &PathBuf) -> Result<Plot, Box<dyn
         let file = File::open(path)?;
 
         // Create a CSV reader
-        let mut rdr = ReaderBuilder::new().delimiter(b'\t').from_reader(file);
+        let mut rdr = ReaderBuilder::new()
+            .delimiter(b'\t')
+            .has_headers(true)
+            .from_reader(file);
 
         // Vectors to store the data
         let mut x_values = Vec::new();
@@ -278,7 +281,8 @@ fn generate_plot_coverage_seg(input_directory: &PathBuf) -> Result<Plot, Box<dyn
             .mode(Mode::Lines)
             .name(&segment_name)
             .line(plotly::common::Line::new().color(segment_color))
-            .hover_template("<b>Position:</b> %{x}<br><b>Coverage:</b> %{y}<br>");
+            .hover_template("<b>Position:</b> %{x}<br><b>Coverage:</b> %{y}<br>")
+            .show_legend(false);
 
         // Calculate row and column for this subplot (1-indexed)
         let row = idx / cols + 1;
@@ -322,7 +326,7 @@ fn generate_plot_coverage_seg(input_directory: &PathBuf) -> Result<Plot, Box<dyn
                 consensus_values.push(consensus_count + minority_count); // Total height
                 minority_values.push(minority_count);
                 hover_texts.push(format!(
-                    "Position: {}<br>Consensus Allele: {}<br>Consensus Count: {}<br>Minority Allele: {}<br>Minority Count: {}<br>Frequency: {:.2}%<br>Total: {}",
+                    "<b>Position:</b> {}<br><br><b>Consensus Allele:</b> {}<br><b>Consensus Count:</b> {}<br><br><b>Minority Allele:</b> {}<br><b>Minority Count:</b> {}<br><b>Minority Frequency:</b> {:.2}%<br><br><b>Total:</b> {}",
                     position, consensus_allele, consensus_count, minority_allele, minority_count, minority_frequency * 100.0, consensus_count + minority_count
                 ));
             }
@@ -349,11 +353,12 @@ fn generate_plot_coverage_seg(input_directory: &PathBuf) -> Result<Plot, Box<dyn
     }
 
     // Configure subplot layout
-    let layout = Layout::new()
+    // Create a base layout first
+    let mut layout = Layout::new()
         .grid(
             LayoutGrid::new()
-                .rows(4)
-                .columns(2)
+                .rows(rows)
+                .columns(cols)
                 .pattern(GridPattern::Independent),
         )
         .title(&format!(
@@ -364,6 +369,61 @@ fn generate_plot_coverage_seg(input_directory: &PathBuf) -> Result<Plot, Box<dyn
                 .to_str()
                 .unwrap_or("Unknown")
         ));
+    
+    // Add annotations for each segment title
+    let mut annotations = Vec::new();
+    for (idx, path) in file_paths.iter().enumerate() {
+        let ctype: Vec<&str> = path
+            .file_name()
+            .unwrap_or_default()
+            .to_str()
+            .unwrap_or("Unknown")
+            .split('-')
+            .next()
+            .unwrap_or("Unknown")
+            .split('_')
+            .collect();
+        let segment_name = ctype[1];
+            /* .file_name()
+            .unwrap_or_default()
+            .to_str()
+            .unwrap_or("Unknown")
+            .split('-')
+            .next()
+            .unwrap_or("Unknown")
+            .split('_')
+            .next()
+            .unwrap_or("Unknown")
+            .next()
+            .unwrap_or("Unknown");
+            */
+        let row = idx / cols;
+        let col = idx % cols;
+        
+        // Calculate position for annotation (centered above each subplot)
+        annotations.push(plotly::layout::Annotation::new()
+            .text(segment_name)
+            .x_ref("paper")
+            .y_ref("paper")
+            //.x((col as f64 + 0.5) / cols as f64)
+            .x(match col {
+                0 => 0.2,
+                1 => 0.8,
+                _ => ((col as f64 + 0.5)/cols as f64), // fallback formula for other columns
+            })
+            .y(match row {
+                0 => 1.0,
+                1 => 0.78, 
+                2 => 0.48,
+                3 => 0.18,
+                _ => ((row as f64 + 0.5) / rows as f64), // fallback formula for other rows
+            })
+            .font(plotly::common::Font::new().size(22).color(get_segment_color(segment_name)))
+            .show_arrow(false));
+    }
+    
+    // Add annotations to layout
+    layout = layout.annotations(annotations);
 
     plot.set_layout(layout);
 
