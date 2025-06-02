@@ -1,4 +1,5 @@
 use clap::Parser;
+use either::Either;
 use std::{
     error::Error,
     fs::{File, OpenOptions},
@@ -7,7 +8,7 @@ use std::{
 };
 
 #[derive(Debug, Parser)]
-#[command(about = "Tool for calculating amino acid difference tables")]
+#[command(about = "Package for aggregating MIRA outputs into json files")]
 pub struct APDArgs {
     #[arg(short = 'i', long)]
     /// Optional input fasta
@@ -30,6 +31,20 @@ pub struct APDArgs {
     irma_config: Option<PathBuf>,
 }
 
+fn create_reader(path: Option<PathBuf>) -> std::io::Result<BufReader<Either<File, Stdin>>> {
+    let reader = if let Some(ref file_path) = path {
+        let file = OpenOptions::new().read(true).open(file_path)?;
+        BufReader::new(Either::Left(file))
+    } else {
+        BufReader::new(Either::Right(stdin()))
+    };
+
+    Ok(reader)
+}
+
 fn main() {
-    println!("Hello, world!");
+    let args = APDArgs::parse();
+
+    //read in samplesheet
+    let samplesheet = create_reader(args.samplesheet)?;
 }
