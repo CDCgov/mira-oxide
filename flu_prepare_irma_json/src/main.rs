@@ -1,5 +1,8 @@
+#![allow(dead_code, unused_imports)]
 use clap::Parser;
+use csv::ReaderBuilder;
 use either::Either;
+use serde::{self, Deserialize, de::DeserializeOwned};
 use std::{
     error::Error,
     fs::{File, OpenOptions},
@@ -31,6 +34,12 @@ pub struct APDArgs {
     irma_config: Option<PathBuf>,
 }
 
+#[derive(Deserialize, Debug)]
+pub struct Samplesheet {
+    sample_id: String,
+    sample_type: String,
+}
+
 fn create_reader(path: Option<PathBuf>) -> std::io::Result<BufReader<Either<File, Stdin>>> {
     let reader = if let Some(ref file_path) = path {
         let file = OpenOptions::new().read(true).open(file_path)?;
@@ -42,9 +51,29 @@ fn create_reader(path: Option<PathBuf>) -> std::io::Result<BufReader<Either<File
     Ok(reader)
 }
 
+fn read_csv<T: DeserializeOwned, R: std::io::Read>(
+    reader: R,
+    has_headers: bool,
+) -> Result<Vec<T>, Box<dyn std::error::Error>> {
+    let mut rdr = ReaderBuilder::new()
+        .has_headers(has_headers)
+        .delimiter(b',')
+        .from_reader(reader);
+
+    let mut records = Vec::new();
+    for result in rdr.deserialize() {
+        let record: T = result?;
+        records.push(record);
+    }
+
+    Ok(records)
+}
 fn main() {
     let args = APDArgs::parse();
 
     //read in samplesheet
-    let samplesheet = create_reader(args.samplesheet)?;
+    let samplesheet_path = create_reader(args.samplesheet).unwrap();
+    let samplesheet: Vec<Samplesheet> = read_csv(samplesheet_path, false).unwrap();
+
+    println!("{:?}", samplesheet)
 }
