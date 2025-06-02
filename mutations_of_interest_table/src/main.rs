@@ -135,6 +135,9 @@ impl Entry<'_> {
                 else if hold_aa_mut == "." {
                     self.phenotypic_consequences = String::from("amino acid information missing");
                     return true;
+                } else if hold_aa_mut == "~" {
+                    self.phenotypic_consequences = String::from("partial amino acid");
+                    return true;
                 }
             }
         }
