@@ -1,0 +1,6 @@
+[package]
+name = "flu_prepare_irma_json"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]

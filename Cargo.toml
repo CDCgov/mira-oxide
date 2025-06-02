@@ -1,6 +1,6 @@
 [workspace]
 
-members = [
+members = [ "flu_prepare_irma_json",
     "mutations_of_interest_table", "plots",
 ]
 
