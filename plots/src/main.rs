@@ -1,6 +1,6 @@
 use csv::ReaderBuilder;
 use glob::glob;
-use plotly::common::{Mode};
+use plotly::common::Mode;
 use plotly::{Layout, Plot, Scatter};
 use std::env;
 use std::error::Error;
@@ -22,16 +22,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut plot = Plot::new();
 
     // Iterate over all CSV files in the input directory
-    for entry in glob(&format!("{}/*coverage.txt", input_directory))? {
+    for entry in glob(&format!("{input_directory}/*coverage.txt",))? {
         match entry {
             Ok(path) => {
                 // Open the CSV file
                 let file = File::open(&path)?;
 
                 // Create a CSV reader
-                let mut rdr = ReaderBuilder::new()
-                                                .delimiter(b'\t')
-                                                .from_reader(file);
+                let mut rdr = ReaderBuilder::new().delimiter(b'\t').from_reader(file);
 
                 // Vectors to store the data
                 let mut x_values = Vec::new();
@@ -52,12 +50,12 @@ fn main() -> Result<(), Box<dyn Error>> {
                     .name(path.file_name().unwrap().to_str().unwrap());
                 plot.add_trace(trace);
             }
-            Err(e) => eprintln!("Error reading file: {}", e),
+            Err(e) => eprintln!("Error reading file: {e}",),
         }
     }
 
     // Set the figure title
-    let layout = Layout::new().title(&format!("Coverage | {}", input_directory));
+    let layout = Layout::new().title(format!("Coverage | {input_directory}"));
     plot.set_layout(layout);
 
     // Save the plot as an HTML file
