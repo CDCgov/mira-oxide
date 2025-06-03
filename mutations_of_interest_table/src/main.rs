@@ -9,9 +9,12 @@ use std::{
     io::{BufRead, BufReader, BufWriter, Stdin, Write, stdin, stdout},
     path::{Path, PathBuf},
 };
-use zoe::alignment::sw::sw_scalar_alignment;
-use zoe::alignment::{ScalarProfile, pairwise_align_with_cigar};
 use zoe::data::{ByteIndexMap, StdGeneticCode, WeightMatrix};
+use zoe::{alignment::sw::sw_scalar_alignment, prelude::Nucleotides};
+use zoe::{
+    alignment::{ScalarProfile, pairwise_align_with_cigar},
+    data::nucleotides::GetCodons,
+};
 
 #[derive(Debug, Parser)]
 #[command(about = "Tool for calculating amino acid difference tables")]
@@ -330,7 +333,10 @@ fn main() -> Result<(), Box<dyn Error>> {
                     //Using Zoe for alignment
                     let query = dais_entry.cds_aln.as_bytes();
                     let reference = ref_entry.cds_aln.as_bytes();
-                    let (aligned_1, aligned_2) = align_sequences(query, reference);
+                    let (aligned_1, aligned_2) = {
+                        let (a1, a2) = align_sequences(query, reference);
+                        (Nucleotides::from(a1), Nucleotides::from(a2))
+                    };
 
                     let mut entry = Entry {
                         sample_id: &dais_entry.sample_id,
@@ -347,39 +353,29 @@ fn main() -> Result<(), Box<dyn Error>> {
                         aa_mut: 'X',
                         phenotypic_consequences: String::new(),
                     };
-                    let compare_seqs: Vec<(usize, &[u8], &[u8])> = aligned_1
-                        .chunks(3)
-                        .zip(aligned_2.chunks(3))
+
+                    let (codons1, _tail1) = aligned_1.as_codons(); // TODO: fix tails
+                    let (codons2, _tail2) = aligned_2.as_codons();
+
+                    for (index, (ref_codon, query_codon)) in codons1
+                        .iter()
+                        .zip(codons2.iter())
                         .enumerate()
                         .filter(|(_, (ref_chunk, query_chunk))| ref_chunk != query_chunk)
-                        .map(|(index, (ref_chunk, query_chunk))| (index, ref_chunk, query_chunk))
-                        .collect();
-
-                    for (index, ref_chunk, query_chunk) in compare_seqs {
-                        let mut chunk_position = 0;
-                        //println!("{chunk_position}");
+                    {
                         let aa_index = index + 1;
-                        let ref_aa;
-                        if ref_chunk.len() == 3 {
-                            ref_aa = StdGeneticCode::translate_codon(ref_chunk);
-                        } else {
-                            ref_aa = b'~';
-                        }
+                        let ref_aa = StdGeneticCode::get(ref_codon).unwrap_or(b'X');
+                        let query_aa = StdGeneticCode::translate_codon(query_codon);
 
-                        let query_aa;
-                        if query_chunk.len() == 3 {
-                            query_aa = StdGeneticCode::translate_codon(query_chunk);
-                        } else {
-                            query_aa = b'~';
-                        }
-                        for nt in 0..ref_chunk.len() {
+                        let mut chunk_position: usize = 0;
+                        for nt in 0..ref_codon.len() {
                             chunk_position += 1;
 
-                            if ref_chunk[nt] != query_chunk[nt] {
+                            if ref_codon[nt] != query_codon[nt] {
                                 let nt_idex = ((index + 1) * 3) - (3 - chunk_position);
                                 entry.nt_position = nt_idex;
-                                entry.nt_ref = ref_chunk[nt] as char;
-                                entry.nt_mut = query_chunk[nt] as char;
+                                entry.nt_ref = ref_codon[nt] as char;
+                                entry.nt_mut = query_codon[nt] as char;
                                 entry.aa_position = aa_index;
                                 entry.aa_ref = ref_aa as char;
                                 entry.aa_mut = query_aa as char;
@@ -391,30 +387,30 @@ fn main() -> Result<(), Box<dyn Error>> {
                                     query_aa,
                                     &muts_interest,
                                 ) {
+                                    let Entry {
+                                        sample_id,
+                                        ref_strain,
+                                        gisaid_accession,
+                                        subtype,
+                                        dais_ref,
+                                        protein,
+                                        nt_ref,
+                                        nt_position,
+                                        nt_mut,
+                                        aa_ref,
+                                        aa_position,
+                                        aa_mut,
+                                        phenotypic_consequences,
+                                    } = &entry;
+                                    let d = &delim;
+
                                     writeln!(
                                         &mut writer,
-                                        "{}{}{}{}{}{}{}{}{}{}{}{}{}:{}:{}{}{}:{}:{}{}{}",
-                                        entry.sample_id,
-                                        delim,
-                                        entry.ref_strain,
-                                        delim,
-                                        entry.gisaid_accession,
-                                        delim,
-                                        entry.subtype,
-                                        delim,
-                                        entry.dais_ref,
-                                        delim,
-                                        entry.protein,
-                                        delim,
-                                        entry.nt_ref.to_string(),
-                                        entry.nt_position.to_string(),
-                                        entry.nt_mut.to_string(),
-                                        delim,
-                                        entry.aa_ref.to_string(),
-                                        entry.aa_position.to_string(),
-                                        entry.aa_mut.to_string(),
-                                        delim,
-                                        entry.phenotypic_consequences.as_str(),
+                                        "{sample_id}{d}{ref_strain}{d}{gisaid_accession}{d}\
+                                        {subtype}{d}{dais_ref}{d}{protein}{d}\
+                                        {nt_ref}:{nt_position}:{nt_mut}{d}\
+                                        {aa_ref}:{aa_position}:{aa_mut}{d}\
+                                        {phenotypic_consequences}",
                                     )?;
                                 }
                             }

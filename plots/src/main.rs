@@ -130,7 +130,7 @@ fn generate_plot_coverage(input_directory: &PathBuf) -> Result<Plot, Box<dyn Err
 
                 plot.add_trace(trace);
             }
-            Err(e) => eprintln!("Error reading file: {}", e),
+            Err(e) => eprintln!("Error reading file: {e}",),
         }
     }
 
