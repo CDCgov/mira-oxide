@@ -9,11 +9,14 @@ use std::{
     io::{BufRead, BufReader, BufWriter, Stdin, Write, stdin, stdout},
     path::{Path, PathBuf},
 };
-use zoe::data::{ByteIndexMap, StdGeneticCode, WeightMatrix};
 use zoe::{alignment::sw::sw_scalar_alignment, prelude::Nucleotides};
 use zoe::{
     alignment::{ScalarProfile, pairwise_align_with_cigar},
     data::nucleotides::GetCodons,
+};
+use zoe::{
+    data::{ByteIndexMap, StdGeneticCode, WeightMatrix},
+    prelude::Len,
 };
 
 #[derive(Debug, Parser)]
@@ -263,9 +266,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                         phenotypic_consequences: String::new(),
                     };
 
-                    let mut tail_index = 0;
-                    let (codons1, tail1) = nt_seq1.as_codons(); // TODO: fix tails
-                    let (codons2, tail2) = nt_seq2.as_codons();
+                    let (codons1, _tail1) = nt_seq1.as_codons(); // TODO: fix tails
+                    let (codons2, _tail2) = nt_seq2.as_codons();
 
                     for (index, (ref_codon, query_codon)) in codons1
                         .iter()
@@ -274,8 +276,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                         .filter(|(_, (ref_chunk, query_chunk))| ref_chunk != query_chunk)
                     {
                         let aa_index = index + 1;
-                        tail_index = aa_index;
-                        let ref_aa = StdGeneticCode::translate_codon(ref_codon);
+                        let ref_aa = StdGeneticCode::get(ref_codon).unwrap_or(b'X');
                         let query_aa = StdGeneticCode::translate_codon(query_codon);
 
                         let mut codon_position: usize = 0;
@@ -285,6 +286,13 @@ fn main() -> Result<(), Box<dyn Error>> {
                             if ref_codon[nt] != query_codon[nt] {
                                 let nt_idex = ((index + 1) * 3) - (3 - codon_position);
                                 entry.nt_position = nt_idex;
+                                entry.nt_ref = ref_codon[nt] as char;
+                                entry.nt_mut = query_codon[nt] as char;
+                                entry.aa_position = aa_index;
+                                entry.aa_ref = ref_aa as char;
+                                entry.aa_mut = query_aa as char;
+
+                                //aa difference moved forward in process;
                                 entry.nt_ref = ref_codon[nt] as char;
                                 entry.nt_mut = query_codon[nt] as char;
                                 entry.aa_position = aa_index;
@@ -321,56 +329,6 @@ fn main() -> Result<(), Box<dyn Error>> {
                                         {nt_ref}:{nt_position}:{nt_mut}{d}\
                                         {aa_ref}:{aa_position}:{aa_mut}{d}\
                                         {phenotypic_consequences}",
-                                    )?;
-                                }
-                            }
-                        }
-                    }
-                    if tail1.len() > 0 {
-                        let mut codon_position: usize = 0;
-                        for nt in 0..tail1.len() {
-                            codon_position += 1;
-
-                            if tail1[nt] != tail2[nt] {
-                                let partial_codon = b'~';
-                                let nt_idex = ((tail_index + 1) * 3) - (3 - codon_position);
-                                entry.nt_position = nt_idex;
-                                entry.nt_ref = tail1[nt] as char;
-                                entry.nt_mut = tail2[nt] as char;
-                                entry.aa_position = tail_index + 1;
-                                entry.aa_ref = '~' as char;
-                                entry.aa_mut = '~' as char;
-
-                                //aa difference moved forward in process;
-                                if entry.update_entry_from_alignment(
-                                    partial_codon,
-                                    partial_codon,
-                                    &muts_interest,
-                                ) {
-                                    let Entry {
-                                        sample_id,
-                                        ref_strain,
-                                        gisaid_accession,
-                                        subtype,
-                                        dais_ref,
-                                        protein,
-                                        nt_ref,
-                                        nt_position,
-                                        nt_mut,
-                                        aa_ref,
-                                        aa_position,
-                                        aa_mut,
-                                        phenotypic_consequences,
-                                    } = &entry;
-                                    let d = &delim;
-
-                                    writeln!(
-                                        &mut writer,
-                                        "{sample_id}{d}{ref_strain}{d}{gisaid_accession}{d}\
-                                    {subtype}{d}{dais_ref}{d}{protein}{d}\
-                                    {nt_ref}:{nt_position}:{nt_mut}{d}\
-                                    {aa_ref}:{aa_position}:{aa_mut}{d}\
-                                    {phenotypic_consequences}",
                                     )?;
                                 }
                             }
@@ -415,12 +373,12 @@ fn main() -> Result<(), Box<dyn Error>> {
                         let ref_aa = StdGeneticCode::get(ref_codon).unwrap_or(b'X');
                         let query_aa = StdGeneticCode::translate_codon(query_codon);
 
-                        let mut chunk_position: usize = 0;
+                        let mut codon_position: usize = 0;
                         for nt in 0..ref_codon.len() {
-                            chunk_position += 1;
+                            codon_position += 1;
 
                             if ref_codon[nt] != query_codon[nt] {
-                                let nt_idex = ((index + 1) * 3) - (3 - chunk_position);
+                                let nt_idex = ((index + 1) * 3) - (3 - codon_position);
                                 entry.nt_position = nt_idex;
                                 entry.nt_ref = ref_codon[nt] as char;
                                 entry.nt_mut = query_codon[nt] as char;
