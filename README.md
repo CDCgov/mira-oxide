@@ -96,13 +96,14 @@ cargo run -p new_package_name -- #any inputs needed to run your package
 
 Provide usage documentation.
 
-Create a README.md witin your package folder. Within that README provide a descritpion of the package, it's inputs, it's outputs and how to execute the package.
+Create a README.md within your package folder. Within that README provide a description of the package, it's inputs, it's outputs and how to execute the package.
 
 For additional information on rust workspaces, [see here](https://rust-book.cs.brown.edu/ch14-03-cargo-workspaces.html).
 
 ## Current Packages
 - [mutations_of_interest_table](mutations_of_interest_table/)
 - [all_sample_hamming_dist](all_sample_hamming_dist/)
+- [all_sample_nt_diffs](all_sample_nt_diffs/)
   
 ## Public Domain Standard Notice
 This repository constitutes a work of the United States Government and is not
