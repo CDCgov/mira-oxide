@@ -37,6 +37,20 @@ git checkout -b add_new_package_name
 
 ### Step 3
 
+Mira-oxide requires rust-nightly to run the [zoe](https://github.com/CDCgov/zoe) crate.
+
+Install the nightly version of rust.
+
+```
+rustup toolchain install nightly
+```
+Using nightly for mira-oxide
+
+```
+rustup override set nightly
+```
+
+### Step 4
 Create a new package using Cargo
 
 ```
@@ -68,7 +82,7 @@ cd new_package_name
 
 Add your dependencies to the package's Cargo.toml and start editing your src/main.rs
 
-### Step 5
+### Step 6
 
 Run your program!
 
@@ -78,7 +92,7 @@ To be sure that your package is working within the workspace go the workspace ar
 cargo run -p new_package_name -- #any inputs needed to run your package
 ```
 
-### Step 6
+### Step 7
 
 Provide usage documentation.
 
@@ -88,6 +102,7 @@ For additional information on rust workspaces, [see here](https://rust-book.cs.b
 
 ## Current Packages
 - [mutations_of_interest_table](mutations_of_interest_table/)
+- [all_sample_hamming_dist](all_sample_hamming_dist/)
   
 ## Public Domain Standard Notice
 This repository constitutes a work of the United States Government and is not
