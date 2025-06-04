@@ -1,14 +1,11 @@
-[workspace]
+[package]
+name = "all_sample_hamming_dist"
+version = "0.1.0"
+edition = "2024"
 
-members = [ "all_sample_hamming_dist",
-    "mutations_of_interest_table", "plots",
-]
-
-[workspace.dependencies]
+[dependencies]
 clap = { version = "4", features = ["derive"] }
 either = "1"
-serde = { version = "1.0.219", features = ["derive"] }
-
 zoe = { git = "https://github.com/CDCgov/zoe.git", tag = "v0.0.18", default-features = false, features = [
     "multiversion",
 ] }
