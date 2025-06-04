@@ -79,7 +79,7 @@ fn main() {
     
         writeln!(
             &mut writer,
-            "sequence_1{}sequence_2{}nt_sequence_1{}positions{}nt_sequence_2",
+            "sequence_1{}sequence_2{}nt_sequence_1{}position{}nt_sequence_2",
             delim, delim, delim, delim
         ).unwrap();
 
