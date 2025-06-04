@@ -1,6 +1,6 @@
 # All Sample Hamming Distance
 
-The all_sample_hamming_dist package takes a fasta file containing all you samples of interest after they have been aligned. The outputs is a hamming distance matrix that provides the hamming distance between all of the sequences within the fasta file provided. 
+The all_sample_nt_diffs package takes a fasta file containing all your samples of interest after they have been aligned as an input. The outputs is a hamming distance matrix that provides the hamming distance between all of the sequences within the fasta file provided. 
 
 ### FASTA file Input:
 
@@ -16,7 +16,7 @@ ATGGAGAGAATAAAAGAACTGAGAGATCTAATGTCACAGTCTCGCACTCGCGAGATACTA
 ACCAAAACCACTGTTGACCACATGGCCATAATCAAGAAGTACACATCAGGAAGACCTGAA
 ```
 
-After cloning the mira-oxide repo, execute this command to create a mutations of interest table for the samples:
+After cloning the mira-oxide repo, execute this command to create a hamming distance matrix for the samples provided:
 
 ```
  cargo run -p all_sample_hamming_dist -- -i <PATH>/input.fasta -o <PATH>/outputs.csv

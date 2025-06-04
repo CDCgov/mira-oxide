@@ -1,6 +1,6 @@
 [workspace]
 
-members = [ "all_sample_hamming_dist",
+members = [ "all_sample_hamming_dist", "all_sample_nt_diffs",
     "mutations_of_interest_table", "plots",
 ]
 
