@@ -1,6 +1,6 @@
 # Mutations of Interest Package
 
-The mutations of interest package takes a DAIS-ribosome output from your samples of interest, a reference table with sequences aligned via DAIS-ribosome and a table containing mutations of interest as inputs. The outputs is a list of amino acid mutations that were found within the samples of interest when compared to the reference will be present within the output. 
+The mutations of interest package takes a DAIS-ribosome output from your samples of interest, a reference table with sequences that have been aligned using DAIS-ribosome and a table containing the amino acid mutations of interest as inputs. The output is a list of nucleotide and amino acid mutations that were found within the given samples when compared to the reference. 
 
 ### DAIS-ribosome output of samples should be structured like this (tab delimited):
 ```
@@ -38,13 +38,18 @@ If you would like the output to have another deliminator (default: ","), then th
 ### The Mutations of Interest Table output should be structured like this (comma delimited):
 
 ```
-sample, reference_strain,gisaid_accession,ctype,dais_reference,protein,aa_mutation,phenotypic_consequence
-s3_4,A/Georgia/12/2022,EPI_ISL_15724408,A_HA_H1,CALI07,HA,R:308:K,inference description
-s3_4,A/Michigan/383/2018,EPI_ISL_320690,A_HA_H1,CALI07,HA,R:308:K,inference description
-s3_4,A/West Virginia/30/2022,EPI_ISL_15724406,A_HA_H1,CALI07,HA,R:308:K,inference description
+sample, reference_strain,gisaid_accession,ctype,dais_reference,protein,nt_mutation,aa_mutation,phenotypic_consequence
+s3_4,A/Georgia/12/2022,EPI_ISL_15724408,A_HA_H1,CALI07,HA,G:923:A,R:308:K,Inference description
+s3_4,A/Wisconsin/67/2022,EPI_ISL_15928538,A_HA_H1,CALI07,HA,G:923:A,R:308:K,Inference description
+s3_4,A/Michigan/383/2018,EPI_ISL_320690,A_HA_H1,CALI07,HA,G:923:A,R:308:K,Inference description
+s3_4,A/Michigan/383/2018,EPI_ISL_320690,A_HA_H1,CALI07,HA,G:924:A,R:308:K,Inference description
+s3_4,A/West Virginia/30/2022,EPI_ISL_15724406,A_HA_H1,CALI07,HA,G:923:A,R:308:K,Inference description
+s1_2,A/duck/Bangladesh/19097/2013,EPI_ISL_151729,A_PB1,HK4801,PB1,C:295:.,H:99:.,amino acid information missing
+s1_2,A/duck/Bangladesh/19097/2013,EPI_ISL_151729,A_PB1,HK4801,PB1,A:296:.,H:99:.,amino acid information missing
+s1_2,A/duck/Bangladesh/19097/2013,EPI_ISL_151729,A_PB1,HK4801,PB1,C:297:.,H:99:.,amino acid information missing
 ```
 
 
 ----------------------------------------------------------------------------------
-## Mutations of Interest Package Version 0.2.0 
+## Mutations of Interest Package Version 0.3.0 
 ![Alt text](../assets/images/coming_soon.png)
