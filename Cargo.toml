@@ -1,7 +1,7 @@
 [workspace]
 
 members = [
-    "mutations_of_interest_table", "plots",
+    "mutations_of_interest_table", "plots", "nf_status"
 ]
 
 [workspace.dependencies]
