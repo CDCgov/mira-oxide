@@ -6,7 +6,7 @@ use serde::{self, Deserialize, de::DeserializeOwned};
 use std::{
     error::Error,
     fs::{File, OpenOptions},
-    io::{BufRead, BufReader, BufWriter, Stdin, Write, stdin, stdout},
+    io::{BufRead, BufReader, BufWriter, Read, Stdin, Write, stdin, stdout},
     path::{Path, PathBuf},
 };
 
@@ -20,6 +20,10 @@ pub struct APDArgs {
     #[arg(short = 's', long)]
     /// Optional input fasta
     samplesheet: Option<PathBuf>,
+
+    #[arg(short = 'q', long)]
+    /// Optional input fasta
+    qc_yaml: Option<PathBuf>,
 
     #[arg(short = 'p', long)]
     /// Optional input fasta
@@ -38,6 +42,40 @@ pub struct APDArgs {
 pub struct Samplesheet {
     sample_id: String,
     sample_type: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct QCSettings {
+    med_cov: u32,
+    minor_vars: u32,
+    allow_stop_codons: bool,
+    perc_ref_covered: u32,
+    negative_control_perc: u32,
+    negative_control_perc_exception: u32,
+    positive_control_minimum: u32,
+    padded_consensus: bool,
+    #[serde(default)]
+    med_spike_cov: Option<u32>,
+    #[serde(default)]
+    perc_ref_spike_covered: Option<u32>,
+}
+
+#[derive(Debug, Deserialize)]
+struct QCConfig {
+    #[serde(rename = "ont-flu")]
+    ont_flu: QCSettings,
+    #[serde(rename = "ont-sc2-spike")]
+    ont_sc2_spike: QCSettings,
+    #[serde(rename = "illumina-flu")]
+    illumina_flu: QCSettings,
+    #[serde(rename = "illumina-sc2")]
+    illumina_sc2: QCSettings,
+    #[serde(rename = "ont-sc2")]
+    ont_sc2: QCSettings,
+    #[serde(rename = "illumina-rsv")]
+    illumina_rsv: QCSettings,
+    #[serde(rename = "ont-rsv")]
+    ont_rsv: QCSettings,
 }
 
 fn create_reader(path: Option<PathBuf>) -> std::io::Result<BufReader<Either<File, Stdin>>> {
@@ -68,12 +106,28 @@ fn read_csv<T: DeserializeOwned, R: std::io::Read>(
 
     Ok(records)
 }
-fn main() {
+
+fn read_yaml<R: std::io::Read>(reader: R) -> Result<QCConfig, Box<dyn std::error::Error>> {
+    let mut contents = String::new();
+    let mut buf_reader = BufReader::new(reader);
+    buf_reader.read_to_string(&mut contents)?;
+    let config: QCConfig = serde_yaml::from_str(&contents)?;
+    Ok(config)
+}
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = APDArgs::parse();
 
-    //read in samplesheet
-    let samplesheet_path = create_reader(args.samplesheet).unwrap();
-    let samplesheet: Vec<Samplesheet> = read_csv(samplesheet_path, false).unwrap();
+    // Read in samplesheet
+    let samplesheet_path = create_reader(args.samplesheet)?;
+    let samplesheet: Vec<Samplesheet> = read_csv(samplesheet_path, false)?;
 
-    println!("{:?}", samplesheet)
+    // Read in qc yaml
+    let qc_yaml_path = create_reader(args.qc_yaml)?;
+    let qc_config: QCConfig = read_yaml(qc_yaml_path)?;
+
+    //println!("{:?}", samplesheet);
+    //println!("{:?}", qc_config);
+
+    Ok(())
 }
