@@ -1,0 +1,18 @@
+x-rust-image: &rust-image rust:alpine3.21
+
+x-data-volume: &data-volume
+  type: bind
+  source: /home/xpa3/mira-oxide/test
+  target: /mira-oxide/data
+
+services:
+  mira-oxide:
+    container_name: mira-oxide
+    image: mira-oxide:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    volumes:
+      - *data-volume
+    command: tail -f /dev/null
