@@ -1,9 +1,9 @@
-x-rust-image: &rust-image rust:alpine3.21
+x-rust-image: &rust-image mira-oxide/rust-nightly
 
 x-data-volume: &data-volume
   type: bind
   source: /home/xpa3/mira-oxide/test
-  target: /mira-oxide/data
+  target: /data
 
 services:
   mira-oxide:
