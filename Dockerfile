@@ -19,19 +19,14 @@ RUN apk update && apk add --no-cache \
     vim \
     tar \
     dos2unix \
-    build-base \
-    musl-dev \
-    openssl-dev \
-    pkgconfig
+    build-base 
 
 ##update to rust nightly
 RUN rustup toolchain install nightly
 
 RUN rustup override set nightly
 
-############# Copy everything into conatiner ##################
-# Create working directory variable
-ENV PROJECT_DIR=/mira-oxide
+############# Copy everything into conatiner then build ##################
 
 # Copy all scripts to docker images
 COPY . .
@@ -39,15 +34,11 @@ COPY . .
 # This build step will cache the dependencies
 RUN cargo build --release
 
-# Set the entrypoint
-#CMD ["./target/release/*"]
-
-#COPY ./target/release/* ${PROJECT_DIR}/target/release/*
-
-#RUN chmod -R 777 ${PROJECT_DIR}/target/release/*
+RUN rm -rf /var/lib/{apt,dpkg,cache,log}/ \
+    /target/debug \
+    /git* 
 
 ############# Fix vulnerablities pkgs ##################
-
 
 # Convert bash script from Windows style line endings to Unix-like control characters
 #RUN dos2unix ${PROJECT_DIR}/fixed_vulnerability_pkgs.sh
@@ -78,7 +69,7 @@ RUN cargo build --release
 ############# Set up working directory ##################
 
 # Create working directory variable
-ENV WORKDIR=${PROJECT_DIR}/data
+ENV WORKDIR=/data
 
 # Set up volume directory in docker
 VOLUME ${WORKDIR}
