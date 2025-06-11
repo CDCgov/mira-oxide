@@ -1,7 +1,7 @@
 [workspace]
 
 members = [ "all_sample_hamming_dist", "all_sample_nt_diffs",
-    "mutations_of_interest_table", "plots",
+    "mutations_of_interest_table", "plots", "check_chemistry",
 ]
 
 [workspace.dependencies]
@@ -9,6 +9,6 @@ clap = { version = "4", features = ["derive"] }
 either = "1"
 serde = { version = "1.0.219", features = ["derive"] }
 
-zoe = { git = "https://github.com/CDCgov/zoe.git", tag = "v0.0.18", default-features = false, features = [
+zoe = { version = "0.0.19", default-features = false, features = [
     "multiversion",
 ] }

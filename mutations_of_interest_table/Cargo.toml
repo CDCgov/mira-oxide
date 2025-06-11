@@ -9,6 +9,4 @@ csv = "1.3.1"
 either = "1"
 serde = {version = "1.0.219", features = ["derive"] }
 
-zoe = { git = "https://github.com/CDCgov/zoe.git", tag = "v0.0.18", default-features = false, features = [
-    "multiversion",
-] }
+zoe.workspace = true
