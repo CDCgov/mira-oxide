@@ -74,6 +74,45 @@ pub enum IRMAConfig {
     Custom,
 }
 
+
+fn get_config_path(experiment: Experiment, seq_len: Option<usize>, irma_config: Option<IRMAConfig>) -> String {
+    let wd_path = "get this from args";
+    let path_extension = match (experiment, seq_len, irma_config) {
+        (_, None, _) => "".to_owned(),
+        (_, _, Some(irma_config)) => {
+            match irma_config {
+                IRMAConfig::Sensitive => format!("{wd_path}/bin/irma_config/FLU-sensitive.sh"),
+                IRMAConfig::Secondary => format!("{wd_path}/bin/irma_config/FLU-secondary.sh"),
+                IRMAConfig::UTR => format!("{wd_path}/bin/irma_config/FLU-utr.sh"),
+                IRMAConfig::Custom => format!("{wd_path} we gonna have to do something else here"),
+            }
+        }
+        (Experiment::FluIllumina, Some(seq_len), None) => {
+            if seq_len >= 145 {
+                format!("{wd_path}/bin/irma_config/FLU.sh")
+            } else {
+                format!("{wd_path}/bin/irma_config/FLU-2x75.sh")
+            }
+        }
+        (Experiment::SC2WholeGenomeIllumina, Some(seq_len), None) => {
+            if seq_len > 80 {
+                format!("{wd_path}/bin/irma_config/CoV.sh")
+            } else {
+                format!("{wd_path}/bin/irma_config/SC2-2x75.sh")
+            }
+        }
+        (Experiment::RSVIllumina, Some(seq_len), None) => {
+            if seq_len > 80 {
+                format!("{wd_path}/bin/irma_config/RSV.sh")
+            } else {
+                format!("{wd_path}/bin/irma_config/RSV-2x75.sh")
+            }
+        }
+    };
+    path_extension
+} 
+
+
 impl ValueEnum for IRMAConfig {
     #[inline]
     fn value_variants<'a>() -> &'a [Self] {
@@ -101,8 +140,8 @@ pub enum IrmaModule {
     FLU,
     CoV,
     RSV,
-    FLUMinion,
-    CoVsGene,
+    //FLUMinion,
+    //CoVsGene,
 }
 
 impl fmt::Display for IrmaModule {
@@ -111,8 +150,8 @@ impl fmt::Display for IrmaModule {
             IrmaModule::FLU => write!(f, "FLU"),
             IrmaModule::CoV => write!(f, "CoV"),
             IrmaModule::RSV => write!(f, "RSV"),
-            IrmaModule::FLUMinion => write!(f, "FLU-minion"),
-            IrmaModule::CoVsGene => write!(f, "CoV-s-gene"),
+            //IrmaModule::FLUMinion => write!(f, "FLU-minion"),
+            //IrmaModule::CoVsGene => write!(f, "CoV-s-gene"),
         }
     }
 }
@@ -125,25 +164,40 @@ pub struct ChemistryOutput {
     pub irma_module: IrmaModule,
 }
 
-fn get_average_line_length(fastq: &PathBuf) -> Result<usize, std::io::Error> {
+/// Averages the first five sequence lengths if possible. If the file has no
+/// sequences, returns None
+fn get_average_line_length(fastq: &PathBuf) -> Result<Option<usize>, std::io::Error> {
     let sample_size = 5;
     let file = File::open(&fastq)?;
     let buf_reader = BufReader::new(file);
     let fastq_reader = FastQReader::new(buf_reader);
-    let avg_length = fastq_reader.take(sample_size).map(|fastq| {
-        let fastq = fastq.expect("Could not read fastq!");
-        fastq.sequence.len()
-    }).sum::<usize>() as f64 / sample_size as f64;
-    Ok(avg_length as usize)
+    
+    let mut total_len = 0;
+    let mut count = 0;
+
+    for result in fastq_reader.take(sample_size) {
+        let record = result?;
+        total_len += record.sequence.len();
+        count += 1;
+    }
+
+    if count == 0 {
+        Ok(None)
+    } else {
+        Ok(Some(total_len / count))
+    }
 }
 
 fn parse_chemistry_args(args: &CheckChemArgs) -> Result<ChemistryOutput, std::io::Error> {
-    let _line_length = get_average_line_length(&args.fastq);
+    let line_length = get_average_line_length(&args.fastq)?;
+    
+    
+    let irma_custom = get_config_path(args.experiment, line_length, args.irma_config);
     let out = ChemistryOutput {
-        sample: "".to_owned(),
-        irma_custom: "".to_owned(),
-        subsample: 0usize,
-        irma_module: IrmaModule::CoV,
+        sample: args.sample.clone(),
+        irma_custom,
+        subsample: args.read_count,
+        irma_module: IrmaModule::FLU,
     };
     Ok(out)
 }
