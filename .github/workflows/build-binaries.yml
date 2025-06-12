@@ -23,7 +23,6 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Rust toolchain -- nightly
-        uses: actions-rs/toolchain@v1
         run:
           rustup update nightly
           rustup default nightly
