@@ -23,7 +23,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Rust toolchain -- nightly
-        run:
+        run: |
           rustup update nightly
           rustup default nightly
           rustup target add ${{ matrix.target }}
