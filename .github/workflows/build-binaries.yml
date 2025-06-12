@@ -2,11 +2,13 @@ name: Build Binaries
 
 on:
   push:
-    branches: [ "**" ]
-    branches-ignore: [ main ]
+    branches:
+      - '**'
+      - '!main'
   pull_request:
-    branches: [ "**" ]
-    branches-ignore: [ main ]
+    branches:
+      - '**'
+      - '!main'
 
 jobs:
   build:
