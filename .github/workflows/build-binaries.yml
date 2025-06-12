@@ -2,9 +2,11 @@ name: Build Binaries
 
 on:
   push:
-    branches: [ gh-actions ]
+    branches: [ "**" ]
+    branches-ignore: [ main ]
   pull_request:
-    branches: [ main ]
+    branches: [ "**" ]
+    branches-ignore: [ main ]
 
 jobs:
   build:
