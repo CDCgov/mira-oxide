@@ -10,3 +10,4 @@
 *crt
 *test*
 .vscode/*
+*lock
