@@ -7,6 +7,16 @@ use std::{
 };
 use zoe::prelude::*;
 
+/* currently, validation is not being performed on the input data.
+e.g. the user can provide -e RSVIllumina -i sensitive
+and the output will be
+
+sample_ID,irma_custom,subsample,irma_module
+sample,.//bin/irma_config/FLU-sensitive.sh,1000,RSV
+
+this matches the current behavior of find_chemistry_i.py but should be improved
+*/
+
 #[derive(Debug, Parser)]
 #[command(about = "Tool for calculating amino acid difference tables")]
 pub struct CheckChemArgs {
@@ -22,7 +32,7 @@ pub struct CheckChemArgs {
     /// Run ID
     //pub run_id: usize,
 
-    #[arg(short = 'e', long)]
+    #[arg(short = 'e', long, ignore_case = true)]
     /// Experiment type
     pub experiment: Experiment,
 
@@ -34,7 +44,7 @@ pub struct CheckChemArgs {
     /// Read counts
     pub read_count: usize,
 
-    #[arg(short = 'i', long)]
+    #[arg(short = 'i', long, ignore_case = true)]
     /// Alternative IRMA config
     pub irma_config: Option<IRMAConfig>,
 
@@ -63,11 +73,26 @@ impl ValueEnum for Experiment {
     #[inline]
     fn to_possible_value(&self) -> Option<PossibleValue> {
         match self {
-            Experiment::FluIllumina => Some(PossibleValue::new("FluIllumina")),
-            Experiment::SC2WholeGenomeIllumina => {
-                Some(PossibleValue::new("SC2WholeGenomeIllumina"))
+            Experiment::FluIllumina => {
+                Some(PossibleValue::new("Flu-Illumina").alias("FluIllumina"))
             }
-            Experiment::RSVIllumina => Some(PossibleValue::new("RSVIllumina")),
+            Experiment::SC2WholeGenomeIllumina => Some(
+                PossibleValue::new("SC2-Whole-Genome-Illumina").alias("SC2WholeGenomeIllumina"),
+            ),
+            Experiment::RSVIllumina => {
+                Some(PossibleValue::new("RSV-Illumina").alias("RSVIllumina"))
+            }
+        }
+    }
+}
+
+/// Selects the appropriate IRMA Module from the user provided experiment type
+impl Experiment {
+    fn get_module(&self) -> IrmaModule {
+        match self {
+            Self::FluIllumina => IrmaModule::FLU,
+            Self::RSVIllumina => IrmaModule::RSV,
+            Self::SC2WholeGenomeIllumina => IrmaModule::CoV,
         }
     }
 }
@@ -213,11 +238,12 @@ fn parse_chemistry_args(args: &CheckChemArgs) -> Result<ChemistryOutput, std::io
     let line_length = get_average_line_length(&args.fastq)?;
 
     let irma_custom = get_config_path(args, line_length);
+    let irma_module = args.experiment.get_module();
     let out = ChemistryOutput {
         sample: args.sample.clone(),
         irma_custom,
         subsample: args.read_count,
-        irma_module: IrmaModule::FLU,
+        irma_module,
     };
     Ok(out)
 }
