@@ -172,7 +172,6 @@ fn generate_plot_coverage_seg(input_directory: &PathBuf) -> Result<Plot, Box<dyn
     let mut plot = Plot::new();
 
     // Track number of files for subplot layout
-    let mut file_count = 0;
     let mut file_paths = Vec::new();
 
     // First, count files and collect paths
@@ -406,14 +405,14 @@ fn generate_plot_coverage_seg(input_directory: &PathBuf) -> Result<Plot, Box<dyn
             .x(match col {
                 0 => 0.2,
                 1 => 0.8,
-                _ => ((col as f64 + 0.5)/cols as f64), // fallback formula for other columns
+                _ => (col as f64 + 0.5)/cols as f64, // fallback formula for other columns
             })
             .y(match row {
                 0 => 1.0,
                 1 => 0.78, 
                 2 => 0.48,
                 3 => 0.18,
-                _ => ((row as f64 + 0.5) / rows as f64), // fallback formula for other rows
+                _ => (row as f64 + 0.5) / rows as f64, // fallback formula for other rows
             })
             .font(plotly::common::Font::new().size(22).color(get_segment_color(segment_name)))
             .show_arrow(false));
