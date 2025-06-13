@@ -58,6 +58,10 @@ pub enum Experiment {
     FluIllumina,
     SC2WholeGenomeIllumina,
     RSVIllumina,
+    FluONT,
+    SC2SpikeOnlyONT,
+    SC2WholeGenomeONT,
+    RSVONT,
 }
 
 impl ValueEnum for Experiment {
@@ -67,6 +71,10 @@ impl ValueEnum for Experiment {
             Self::FluIllumina,
             Self::SC2WholeGenomeIllumina,
             Self::RSVIllumina,
+            Self::FluONT,
+            Self::SC2SpikeOnlyONT,
+            Self::SC2WholeGenomeONT,
+            Self::RSVONT,
         ]
     }
 
@@ -82,6 +90,14 @@ impl ValueEnum for Experiment {
             Experiment::RSVIllumina => {
                 Some(PossibleValue::new("RSV-Illumina").alias("RSVIllumina"))
             }
+            Experiment::FluONT => Some(PossibleValue::new("Flu-ONT").alias("FluONT")),
+            Experiment::SC2SpikeOnlyONT => {
+                Some(PossibleValue::new("SC2-Spike-Only-ONT").alias("SC2SpikeOnlyONT"))
+            }
+            Experiment::SC2WholeGenomeONT => {
+                Some(PossibleValue::new("SC2-Whole-Genome-ONT").alias("SC2WholeGenomeONT"))
+            }
+            Experiment::RSVONT => Some(PossibleValue::new("RSV-ONT").alias("RSVONT")),
         }
     }
 }
@@ -93,6 +109,10 @@ impl Experiment {
             Self::FluIllumina => IrmaModule::FLU,
             Self::RSVIllumina => IrmaModule::RSV,
             Self::SC2WholeGenomeIllumina => IrmaModule::CoV,
+            Self::FluONT => IrmaModule::FLUMinion,
+            Self::SC2SpikeOnlyONT => IrmaModule::CoVsGene,
+            Self::SC2WholeGenomeONT => IrmaModule::CoV,
+            Self::RSVONT => IrmaModule::RSV,
         }
     }
 }
@@ -145,6 +165,10 @@ fn get_config_path(args: &CheckChemArgs, seq_len: Option<usize>) -> String {
                 "/bin/irma_config/RSV-2x75.sh"
             }
         }
+        (Experiment::FluONT, _, None) => "/bin/irma_config/FLU-minion-container.sh",
+        (Experiment::SC2SpikeOnlyONT, _, None) => "/bin/irma_config/s-gene-container.sh",
+        (Experiment::SC2WholeGenomeONT, _, None) => "/bin/irma_config/SC2-WGS-Nanopore.sh",
+        (Experiment::RSVONT, _, None) => "/bin/irma_config/RSV-Nanopore.sh",
     };
 
     let wd_path = args
@@ -176,8 +200,8 @@ pub enum IrmaModule {
     FLU,
     CoV,
     RSV,
-    //FLUMinion,
-    //CoVsGene,
+    FLUMinion,
+    CoVsGene,
 }
 
 impl fmt::Display for IrmaModule {
@@ -186,8 +210,8 @@ impl fmt::Display for IrmaModule {
             IrmaModule::FLU => write!(f, "FLU"),
             IrmaModule::CoV => write!(f, "CoV"),
             IrmaModule::RSV => write!(f, "RSV"),
-            //IrmaModule::FLUMinion => write!(f, "FLU-minion"),
-            //IrmaModule::CoVsGene => write!(f, "CoV-s-gene"),
+            IrmaModule::FLUMinion => write!(f, "FLU-minion"),
+            IrmaModule::CoVsGene => write!(f, "CoV-s-gene"),
         }
     }
 }
