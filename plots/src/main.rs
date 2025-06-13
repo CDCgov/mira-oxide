@@ -180,7 +180,7 @@ fn generate_plot_coverage_seg(input_directory: &PathBuf) -> Result<Plot, Box<dyn
         input_directory.display()
     ))? {
         if let Ok(path) = entry {
-            file_count += 1;
+            //file_count += 1;
             file_paths.push(path);
         }
     }
@@ -639,7 +639,14 @@ fn generate_sankey_plot(input_directory: &PathBuf) -> Result<Plot, Box<dyn Error
             .to_image_button_options(
                 ToImageButtonOptions::new()
                     .format(ImageButtonFormats::Svg)
-                    .filename("read_flow"),
+                    .filename(&format!(
+            "{}_read_flow",
+            input_directory
+                .file_name()
+                .unwrap_or_default()
+                .to_str()
+                .unwrap_or("Unknown")
+        )),
             ),
     );
 
