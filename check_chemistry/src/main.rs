@@ -18,7 +18,7 @@ this matches the current behavior of find_chemistry_i.py but should be improved
 */
 
 #[derive(Debug, Parser)]
-#[command(about = "Tool for calculating amino acid difference tables")]
+#[command(about = "Get relevant IRMA configuration and modules for the current experiment.")]
 pub struct CheckChemArgs {
     #[arg(short = 's', long)]
     /// Name of sample
@@ -27,10 +27,6 @@ pub struct CheckChemArgs {
     #[arg(short = 'q', long)]
     /// Path to fastq file
     pub fastq: PathBuf,
-
-    //#[arg(short = 'r', long)]
-    /// Run ID
-    //pub run_id: usize,
 
     #[arg(short = 'e', long, ignore_case = true)]
     /// Experiment type
@@ -54,6 +50,7 @@ pub struct CheckChemArgs {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
+/// Enum for the possible experiment types, both Illumina and ONT
 pub enum Experiment {
     FluIllumina,
     SC2WholeGenomeIllumina,
@@ -79,6 +76,8 @@ impl ValueEnum for Experiment {
     }
 
     #[inline]
+    /// Provides the literal strings for the users to input to get these enum
+    /// variants
     fn to_possible_value(&self) -> Option<PossibleValue> {
         match self {
             Experiment::FluIllumina => {
@@ -102,8 +101,8 @@ impl ValueEnum for Experiment {
     }
 }
 
-/// Selects the appropriate IRMA Module from the user provided experiment type
 impl Experiment {
+    /// Selects the appropriate IRMA Module from the user provided experiment type
     fn get_module(&self) -> IrmaModule {
         match self {
             Self::FluIllumina => IrmaModule::FLU,
@@ -125,6 +124,8 @@ pub enum IRMAConfig {
     Custom,
 }
 
+/// Selects the correct config file based on experiment, custom config path, and
+/// length of sequences
 fn get_config_path(args: &CheckChemArgs, seq_len: Option<usize>) -> String {
     if args.irma_config == Some(IRMAConfig::Custom) {
         return args
@@ -258,6 +259,7 @@ fn get_average_line_length(fastq: &PathBuf) -> Result<Option<usize>, std::io::Er
     }
 }
 
+/// Takes user input arguments and prepares them for output
 fn parse_chemistry_args(args: &CheckChemArgs) -> Result<ChemistryOutput, std::io::Error> {
     let line_length = get_average_line_length(&args.fastq)?;
 
@@ -289,7 +291,5 @@ fn main() -> Result<(), std::io::Error> {
     writeln!(&mut writer, "{headers}")?;
     writeln!(&mut writer, "{output}")?;
     writer.flush()?;
-    // outputs: headers for a "chemistry csv"
-    // sample, irma_custom_0, irma_custom_1, subsample, IRMA_module
     Ok(())
 }
