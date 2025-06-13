@@ -6,4 +6,4 @@
 *.fa
 /test
 *test*
-*lock
+**/*lock
