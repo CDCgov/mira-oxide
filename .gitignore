@@ -6,4 +6,4 @@
 *.fa
 /test
 *test*
-.vscode/*
+*lock
