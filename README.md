@@ -12,7 +12,7 @@ The material embodied in this software is provided to you "as-is" and without wa
 
 MIRA-Oxide is a RUST workspace that is utilized by [MIRA-NF](https://github.com/CDCgov/MIRA-NF) to perform assembly and annotation of Influenza genomes, SARS-CoV-2 genomes, the SARS-CoV-2 spike-gene and RSV genomes.
 
-## Adding New Package to the MIRA-Oxide Worksace
+## Adding New Package to the MIRA-Oxide Workspace
 
 Before starting be sure that you have rust nightly installed and set as default. You will also need to have Cargo installed. If you need more information about how to install those, [see here](https://rust-book.cs.brown.edu/ch01-00-getting-started.html).
 
@@ -37,6 +37,20 @@ git checkout -b add_new_package_name
 
 ### Step 3
 
+Mira-oxide requires rust-nightly to run the [zoe](https://github.com/CDCgov/zoe) crate.
+
+Install the nightly version of rust.
+
+```
+rustup toolchain install nightly
+```
+Using nightly for mira-oxide
+
+```
+rustup override set nightly
+```
+
+### Step 4
 Create a new package using Cargo
 
 ```
@@ -45,7 +59,7 @@ cargo new new_package_name
 
 A folder with a the name that you specified should have been created. Inside that folder there should be a Cargo.toml file and a src folder containing a main.rs file.
 
-### Step 4
+### Step 5
 
 Start Working! 
 
@@ -59,7 +73,7 @@ cd new_package_name
 
 Add your dependencies to the package's Cargo.toml and start editing your src/main.rs
 
-### Step 5
+### Step 6
 
 Run your program!
 
@@ -69,16 +83,18 @@ To be sure that your package is working within the workspace go the workspace ar
 cargo run -p new_package_name -- #any inputs needed to run your package
 ```
 
-### Step 6
+### Step 7
 
 Provide usage documentation.
 
-Create a README.md witin your package folder. Within that README provide a descritpion of the package, it's inputs, it's outputs and how to execute the package.
+Create a README.md within your package folder. Within that README provide a description of the package, it's inputs, it's outputs and how to execute the package.
 
 For additional information on rust workspaces, [see here](https://rust-book.cs.brown.edu/ch14-03-cargo-workspaces.html).
 
 ## Current Packages
 - [mutations_of_interest_table](mutations_of_interest_table/)
+- [all_sample_hamming_dist](all_sample_hamming_dist/)
+- [all_sample_nt_diffs](all_sample_nt_diffs/)
   
 ## Public Domain Standard Notice
 This repository constitutes a work of the United States Government and is not
