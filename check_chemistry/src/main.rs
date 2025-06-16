@@ -30,10 +30,10 @@ pub struct CheckChemArgs {
     /// Read counts
     pub read_count: usize,
 
-    #[arg(short = 'i', long, ignore_case = true)]
+    #[arg(short = 'i', long, ignore_case = true, default_value = "None")]
     /// Alternative IRMA config. To use Sensitive, Secondary, or UTR, the
     /// experiment type must be Flu-Illumina or Flu-ONT.
-    pub irma_config: Option<IRMAConfig>,
+    pub irma_config: IRMAConfig,
 
     #[arg(short = 'g', long)]
     /// Custom irma config path
@@ -46,30 +46,29 @@ impl CheckChemArgs {
     /// Flu experiment.
     fn validate(&self) -> Result<(), String> {
         match self.irma_config {
-            Some(IRMAConfig::Sensitive)
+            IRMAConfig::Sensitive
                 if self.experiment == Experiment::FluIllumina
                     || self.experiment == Experiment::FluONT =>
             {
                 Ok(())
             }
-            Some(IRMAConfig::Secondary)
+            IRMAConfig::Secondary
                 if self.experiment == Experiment::FluIllumina
                     || self.experiment == Experiment::FluONT =>
             {
                 Ok(())
             }
-            Some(IRMAConfig::UTR)
+            IRMAConfig::UTR
                 if self.experiment == Experiment::FluIllumina
                     || self.experiment == Experiment::FluONT =>
             {
                 Ok(())
             }
-            Some(IRMAConfig::Custom) => Ok(()),
-            None => Ok(()),
+            IRMAConfig::Custom => Ok(()),
+            IRMAConfig::NoConfig => Ok(()),
             _ => Err(format!(
                 "Invalid combination: {:?} cannot be used with {:?}",
-                self.experiment,
-                self.irma_config.unwrap()
+                self.experiment, self.irma_config
             )),
         }
     }
@@ -148,12 +147,37 @@ pub enum IRMAConfig {
     Secondary,
     UTR,
     Custom,
+    NoConfig,
+}
+
+impl ValueEnum for IRMAConfig {
+    #[inline]
+    fn value_variants<'a>() -> &'a [Self] {
+        &[
+            Self::Sensitive,
+            Self::Secondary,
+            Self::UTR,
+            Self::Custom,
+            Self::NoConfig,
+        ]
+    }
+
+    #[inline]
+    fn to_possible_value(&self) -> Option<PossibleValue> {
+        match self {
+            IRMAConfig::Sensitive => Some(PossibleValue::new("Sensitive")),
+            IRMAConfig::Secondary => Some(PossibleValue::new("Secondary")),
+            IRMAConfig::UTR => Some(PossibleValue::new("UTR")),
+            IRMAConfig::Custom => Some(PossibleValue::new("Custom")),
+            IRMAConfig::NoConfig => Some(PossibleValue::new("NoConfig").alias("None")),
+        }
+    }
 }
 
 /// Selects the correct config file based on experiment, custom config path, and
 /// length of sequences
 fn get_config_path(args: &CheckChemArgs, seq_len: Option<usize>) -> String {
-    if args.irma_config == Some(IRMAConfig::Custom) {
+    if args.irma_config == IRMAConfig::Custom {
         return args
             .irma_config_path
             .as_ref()
@@ -165,37 +189,39 @@ fn get_config_path(args: &CheckChemArgs, seq_len: Option<usize>) -> String {
 
     let path_extension = match (args.experiment, seq_len, args.irma_config) {
         (_, None, _) => return "".to_string(),
-        (_, _, Some(irma_config)) => match irma_config {
-            IRMAConfig::Sensitive => "/bin/irma_config/FLU-sensitive.sh",
-            IRMAConfig::Secondary => "/bin/irma_config/FLU-secondary.sh",
-            IRMAConfig::UTR => "/bin/irma_config/FLU-utr.sh",
-            IRMAConfig::Custom => unreachable!(),
-        },
-        (Experiment::FluIllumina, Some(seq_len), None) => {
+        (_, _, IRMAConfig::Sensitive) => "/bin/irma_config/FLU-sensitive.sh",
+        (_, _, IRMAConfig::Secondary) => "/bin/irma_config/FLU-secondary.sh",
+        (_, _, IRMAConfig::UTR) => "/bin/irma_config/FLU-utr.sh",
+        (_, _, IRMAConfig::Custom) => unreachable!(),
+        (Experiment::FluIllumina, Some(seq_len), IRMAConfig::NoConfig) => {
             if seq_len >= 145 {
                 "/bin/irma_config/FLU.sh"
             } else {
                 "/bin/irma_config/FLU-2x75.sh"
             }
         }
-        (Experiment::SC2WholeGenomeIllumina, Some(seq_len), None) => {
+        (Experiment::SC2WholeGenomeIllumina, Some(seq_len), IRMAConfig::NoConfig) => {
             if seq_len > 80 {
                 "/bin/irma_config/CoV.sh"
             } else {
                 "/bin/irma_config/SC2-2x75.sh"
             }
         }
-        (Experiment::RSVIllumina, Some(seq_len), None) => {
+        (Experiment::RSVIllumina, Some(seq_len), IRMAConfig::NoConfig) => {
             if seq_len > 80 {
                 "/bin/irma_config/RSV.sh"
             } else {
                 "/bin/irma_config/RSV-2x75.sh"
             }
         }
-        (Experiment::FluONT, _, None) => "/bin/irma_config/FLU-minion-container.sh",
-        (Experiment::SC2SpikeOnlyONT, _, None) => "/bin/irma_config/s-gene-container.sh",
-        (Experiment::SC2WholeGenomeONT, _, None) => "/bin/irma_config/SC2-WGS-Nanopore.sh",
-        (Experiment::RSVONT, _, None) => "/bin/irma_config/RSV-Nanopore.sh",
+        (Experiment::FluONT, _, IRMAConfig::NoConfig) => "/bin/irma_config/FLU-minion-container.sh",
+        (Experiment::SC2SpikeOnlyONT, _, IRMAConfig::NoConfig) => {
+            "/bin/irma_config/s-gene-container.sh"
+        }
+        (Experiment::SC2WholeGenomeONT, _, IRMAConfig::NoConfig) => {
+            "/bin/irma_config/SC2-WGS-Nanopore.sh"
+        }
+        (Experiment::RSVONT, _, IRMAConfig::NoConfig) => "/bin/irma_config/RSV-Nanopore.sh",
     };
 
     let wd_path = args
@@ -203,23 +229,6 @@ fn get_config_path(args: &CheckChemArgs, seq_len: Option<usize>) -> String {
         .to_str()
         .expect("Failed to convert work directory path to string");
     format!("{}{}", wd_path, path_extension)
-}
-
-impl ValueEnum for IRMAConfig {
-    #[inline]
-    fn value_variants<'a>() -> &'a [Self] {
-        &[Self::Sensitive, Self::Secondary, Self::UTR, Self::Custom]
-    }
-
-    #[inline]
-    fn to_possible_value(&self) -> Option<PossibleValue> {
-        match self {
-            IRMAConfig::Sensitive => Some(PossibleValue::new("Sensitive")),
-            IRMAConfig::Secondary => Some(PossibleValue::new("Secondary")),
-            IRMAConfig::UTR => Some(PossibleValue::new("UTR")),
-            IRMAConfig::Custom => Some(PossibleValue::new("Custom")),
-        }
-    }
 }
 
 #[derive(Debug)]
