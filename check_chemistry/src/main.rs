@@ -7,16 +7,6 @@ use std::{
 };
 use zoe::prelude::*;
 
-/* currently, validation is not being performed on the input data.
-e.g. the user can provide -e RSVIllumina -i sensitive
-and the output will be
-
-sample_ID,irma_custom,subsample,irma_module
-sample,.//bin/irma_config/FLU-sensitive.sh,1000,RSV
-
-this matches the current behavior of find_chemistry_i.py but should be improved
-*/
-
 #[derive(Debug, Parser)]
 #[command(about = "Get relevant IRMA configuration and modules for the current experiment.")]
 pub struct CheckChemArgs {
@@ -41,12 +31,48 @@ pub struct CheckChemArgs {
     pub read_count: usize,
 
     #[arg(short = 'i', long, ignore_case = true)]
-    /// Alternative IRMA config
+    /// Alternative IRMA config. To use Sensitive, Secondary, or UTR, the
+    /// experiment type must be Flu-Illumina or Flu-ONT.
     pub irma_config: Option<IRMAConfig>,
 
     #[arg(short = 'g', long)]
     /// Custom irma config path
     pub irma_config_path: Option<PathBuf>,
+}
+
+impl CheckChemArgs {
+    /// Function for ensuring that specific IRMA configs are only used with the
+    /// proper experiment. Secondary, Sensitive, and UTR must be matched with a
+    /// Flu experiment.
+    fn validate(&self) -> Result<(), String> {
+        match self.irma_config {
+            Some(IRMAConfig::Sensitive)
+                if self.experiment == Experiment::FluIllumina
+                    || self.experiment == Experiment::FluONT =>
+            {
+                Ok(())
+            }
+            Some(IRMAConfig::Secondary)
+                if self.experiment == Experiment::FluIllumina
+                    || self.experiment == Experiment::FluONT =>
+            {
+                Ok(())
+            }
+            Some(IRMAConfig::UTR)
+                if self.experiment == Experiment::FluIllumina
+                    || self.experiment == Experiment::FluONT =>
+            {
+                Ok(())
+            }
+            Some(IRMAConfig::Custom) => Ok(()),
+            None => Ok(()),
+            _ => Err(format!(
+                "Invalid combination: {:?} cannot be used with {:?}",
+                self.experiment,
+                self.irma_config.unwrap()
+            )),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -276,6 +302,12 @@ fn parse_chemistry_args(args: &CheckChemArgs) -> Result<ChemistryOutput, std::io
 
 fn main() -> Result<(), std::io::Error> {
     let args = CheckChemArgs::parse();
+    // handle input validation to ensure valid combinations of
+    if let Err(e) = args.validate() {
+        eprintln!("Error: {}", e);
+        std::process::exit(1);
+    }
+    // parse the arguments into output format
     let output = parse_chemistry_args(&args)?;
     let filename = format!("{}_chemistry.csv", args.sample);
     let headers = "sample_ID,irma_custom,subsample,irma_module";
