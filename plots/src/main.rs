@@ -1,7 +1,7 @@
 use clap::Parser;
 use csv::ReaderBuilder;
 use glob::glob;
-use plotly::common::{Mode, Title};
+use plotly::common::{Label, Mode, Title};
 use plotly::configuration::{ImageButtonFormats, ToImageButtonOptions};
 use plotly::layout::{Axis, GridPattern, LayoutGrid};
 use plotly::{Layout, Plot, Sankey, Scatter};
@@ -600,7 +600,9 @@ fn generate_sankey_plot(input_directory: &PathBuf) -> Result<Plot, Box<dyn Error
                 .label(node_labels_refs)
                 .pad(15)
                 .thickness(20)
-                .line(plotly::sankey::Line::new().color("black")),
+                .line(plotly::sankey::Line::new().color("black"))
+                .hover_template("<b>%{label}</b><br>%{value} reads")
+                .hover_info(plotly::common::HoverInfo::Name),
         )
         .link(
             plotly::sankey::Link::new()
@@ -609,17 +611,16 @@ fn generate_sankey_plot(input_directory: &PathBuf) -> Result<Plot, Box<dyn Error
                 .value(values)
                 //.color(vec!["rgba(0,0,0,0.2)"; values.len()])
                 //.hover_info("all")
-                .hover_template(
-                    "Source: %{source.label}<br>Target: %{target.label}<br>Value: %{value}",
-                ),
-        );
+                .hover_info(plotly::common::HoverInfo::None),
+        )
+        .arrangement(plotly::sankey::Arrangement::Freeform);
 
     plot.add_trace(sankey);
 
     // Set layout
     let layout = Layout::new()
         .title(&format!(
-            "Read Flow | {}",
+            "Read Assignment | {}",
             input_directory
                 .file_name()
                 .unwrap_or_default()
