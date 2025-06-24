@@ -1,9 +1,9 @@
 [package]
-name = "all_sample_hamming_dist"
+name = "check_chemistry"
 version = "0.1.0"
+authors = ["Sam Wiley <dzw2@cdc.gov>"]
 edition = "2024"
 
 [dependencies]
 clap.workspace = true
-either.workspace = true
 zoe.workspace = true
