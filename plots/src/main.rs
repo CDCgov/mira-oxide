@@ -1,7 +1,7 @@
 use clap::Parser;
 use csv::ReaderBuilder;
 use glob::glob;
-use plotly::common::{Label, Mode, Title};
+use plotly::common::{Mode, Title};
 use plotly::configuration::{ImageButtonFormats, ToImageButtonOptions};
 use plotly::layout::{Axis, GridPattern, LayoutGrid};
 use plotly::{Layout, Plot, Sankey, Scatter};
