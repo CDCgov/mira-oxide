@@ -5,7 +5,6 @@
 ####################################################################################################
 FROM rustlang/rust:nightly-alpine AS builder
 
-
 # Required certs for apk update
 COPY ca.crt /root/ca.crt
 
@@ -13,7 +12,6 @@ COPY ca.crt /root/ca.crt
 RUN cat /root/ca.crt >> /etc/ssl/certs/ca-certificates.crt
 
 RUN apk update && apk add --no-cache build-base
-
 
 WORKDIR /app
 
@@ -23,21 +21,7 @@ COPY . .
 # This build step will cache the dependencies
 RUN cargo build --release
 
-
 FROM alpine:latest as deploy
-
-# May only be required for WSL.
-# Required certs for apk update
-COPY ca.crt /root/ca.crt
-
-# Put certs in /etc/ssl/certs location
-RUN cat /root/ca.crt >> /etc/ssl/certs/ca-certificates.crt
-
-# Install system libraries of general use
-RUN apk update && apk add --no-cache \
-    bash \
-    && rm -rf /var/lib/{apt,dpkg,cache,log} \
-    && rm /root/ca.crt
 
 WORKDIR /app
 
@@ -53,9 +37,6 @@ ENV WORKDIR=/data
 
 # Set up volume directory in docker
 VOLUME ${WORKDIR}
-
-# Set up working directory in docker
-WORKDIR ${WORKDIR}    
 
 # Export project directory to PATH
 ENV PATH "$PATH:/app"

@@ -1,4 +1,4 @@
-x-rust-image: &rust-image mira-oxide/rust-nightly
+x-rust-image: &rust-image mira-oxide/latest
 
 x-data-volume: &data-volume
   type: bind
