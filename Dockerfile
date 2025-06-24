@@ -45,8 +45,8 @@ COPY --from=builder \
     /app/target/release/mutations_of_interest_table \
     /app/target/release/all_sample_nt_diffs \
     /app/target/release/all_sample_hamming_dist \
-    /app/target/release/plots /app/
-
+    /app/target/release/plots \
+    /app/target/release/check_chemistry /app/
 
 # Create working directory variable
 ENV WORKDIR=/data
