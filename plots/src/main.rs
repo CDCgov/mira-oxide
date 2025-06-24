@@ -54,29 +54,27 @@ fn get_segment_color(segment_name: &str) -> &'static str {
 #[derive(Parser)]
 #[command(version, about = "Generate plotly plots for IRMA output")]
 struct Args {
-    #[arg(short = 'i', long)]
-    // Required path to IRMA-sample directory
+    #[arg(short = 'i', long, help = "Required")]
     irma_dir: PathBuf,
 
-    #[arg(short = 'o', long)]
-    // Optional output path for HTML files (default: None)
-    output: Option<PathBuf>,
-
-    #[arg(short = 'c', long, default_value_t = false)]
-    // Generate coverage plot (default: false)
+    #[arg(short = 'c', long, default_value_t = false, help = "Generate one coverage plot with all segments (Default: false)")]
     coverage: bool,
 
-    #[arg(short = 'd', long, default_value_t = false)]
-    // Show plots immediately in browser (default: false)
-    display: bool,
-
-    #[arg(short = 's', long, default_value_t = false)]
-    // Generate segmented coverage subplots
+    #[arg(short = 's', long, default_value_t = false, help = "Generate segmented coverage subplots, including minor variant annotation (Default: false)")]
     coverage_seg: bool,
 
-    #[arg(short = 'r', long, default_value_t = false)]
-    // Generate read flow sankey diagram
+    #[arg(short = 'r', long, default_value_t = false, help = "Generate read assignment sankey diagram (Default: false)")]
     read_flow: bool,
+
+    #[arg(short = 'd', long, default_value_t = false, help = "Output plots immediately to browser (Default: false)")]
+    display: bool,
+
+    #[arg(short = 't', long, default_value_t = false, help = "Output inline html to stdout (Default: false)")]
+    inline_html: bool,
+
+    #[arg(short = 'o', long, help = "Output standalone HTML file path (Optional)")]
+    output: Option<PathBuf>,
+
 }
 
 fn generate_plot_coverage(input_directory: &PathBuf) -> Result<Plot, Box<dyn Error>> {
@@ -533,35 +531,73 @@ fn generate_sankey_plot(input_directory: &PathBuf) -> Result<Plot, Box<dyn Error
     let mut fail_qc = 0;
     let mut no_match = 0;
     let mut chi_alt_reads = 0;
+    let mut primary_match_sum = 0;
+    let mut four_segments: Vec<(String, u32)> = Vec::new();
 
-    for (record, reads) in records {
+    for (record, reads) in &records {
         match record.as_str() {
-            "1-initial" => initial_reads = reads,
-            "2-failQC" => fail_qc = reads,
-            "2-passQC" => pass_qc = reads,
-            "3-nomatch" => no_match = reads,
-            "3-chimeric" | "3-altmatch" => chi_alt_reads += reads,
+            "1-initial" => initial_reads = *reads,
+            "2-failQC" => fail_qc = *reads,
+            "2-passQC" => pass_qc = *reads,
+            "3-nomatch" => no_match = *reads,
+            "3-chimeric" | "3-altmatch" => chi_alt_reads += *reads,
             _ => {
-                if record.starts_with("4-") || record.starts_with("5-") {
-                    // Extract segment name
+                if record.starts_with("4-") {
+                    primary_match_sum += *reads;
                     let segment = record[2..].to_string();
-
-                    // Add segment as node
-                    let segment_color = get_segment_color(&segment);
-                    add_node(
-                        &segment,
-                        &mut node_labels,
-                        &mut node_map,
-                        &mut node_colors,
-                        segment_color,
-                    );
-
-                    // Create link from matching to this segment
-                    source_indices.push(node_map["Pass QC"]);
-                    target_indices.push(node_map[&segment]);
-                    values.push(reads);
+                    four_segments.push((segment, *reads));
                 }
             }
+        }
+    }
+
+    // Add Primary Match node if needed
+    if primary_match_sum > 0 {
+        add_node(
+            "Primary Match",
+            &mut node_labels,
+            &mut node_map,
+            &mut node_colors,
+            "#66AA00", // lime
+        );
+        // Link from Pass QC to Primary Match
+        source_indices.push(node_map["Pass QC"]);
+        target_indices.push(node_map["Primary Match"]);
+        values.push(primary_match_sum);
+    }
+
+    // Now add 4- segment nodes and links from Primary Match
+    for (segment, reads) in four_segments {
+        let segment_color = get_segment_color(&segment);
+        add_node(
+            &segment,
+            &mut node_labels,
+            &mut node_map,
+            &mut node_colors,
+            segment_color,
+        );
+        // Link from Primary Match to this segment
+        source_indices.push(node_map["Primary Match"]);
+        target_indices.push(node_map[&segment]);
+        values.push(reads);
+    }
+
+    // Now process 5- records as before
+    for (record, reads) in &records {
+        if record.starts_with("5-") {
+            let segment = record[2..].to_string();
+            let segment_color = get_segment_color(&segment);
+            add_node(
+                &segment,
+                &mut node_labels,
+                &mut node_map,
+                &mut node_colors,
+                segment_color,
+            );
+            // Link from Alt Match to this segment
+            source_indices.push(node_map["Alt Match"]);
+            target_indices.push(node_map[&segment]);
+            values.push(*reads);
         }
     }
 
@@ -596,11 +632,37 @@ fn generate_sankey_plot(input_directory: &PathBuf) -> Result<Plot, Box<dyn Error
 
     // Create Sankey trace
     let node_labels_refs: Vec<&str> = node_labels.iter().map(|s| s.as_str()).collect();
-    //let node_colors_refs: Vec<&str> = node_colors.iter().map(|s| s.as_str()).collect();
+
+    // Explicitly define x and y positions for each node
+    let n = node_labels.len();
+    let mut x = vec![0.0; n];
+    let mut y = vec![0.0; n];
+    // Assign positions for the first five nodes (Initial Reads, Pass QC, Fail QC, No Match, Alt Match)
+    // Remaining nodes (segments) are stacked vertically in the last column
+    let mut seg_idx = 0;
+    for (i, label) in node_labels.iter().enumerate() {
+        match label.as_str() {
+            "Initial Reads" => { x[i] = 0.0; y[i] = 0.5; },
+            "Pass QC" => { x[i] = 0.2; y[i] = 0.2; },
+            "Fail QC" => { x[i] = 0.2; y[i] = 0.1; },
+            "No Match" => { x[i] = 0.4; y[i] = 0.2; },
+            "Alt Match" => { x[i] = 0.4; y[i] = 0.8; },
+            "Primary Match" => { x[i] = 0.4; y[i] = 0.5;}
+            _ => {
+                // Segment nodes: stack vertically in last column
+                x[i] = 0.7;
+                y[i] = 0.1 + 0.8 * (seg_idx as f64) / ((n-5).max(1) as f64);
+                seg_idx += 1;
+            }
+        }
+    }
+
     let sankey = Sankey::new()
         .node(
             plotly::sankey::Node::new()
                 .label(node_labels_refs)
+                .x(x)
+                .y(y)
                 .pad(15)
                 .thickness(20)
                 .line(plotly::sankey::Line::new().color("black"))
@@ -616,7 +678,7 @@ fn generate_sankey_plot(input_directory: &PathBuf) -> Result<Plot, Box<dyn Error
                 //.hover_info("all")
                 .hover_info(plotly::common::HoverInfo::None),
         )
-        .arrangement(plotly::sankey::Arrangement::Freeform);
+        .arrangement(plotly::sankey::Arrangement::Snap);
 
     plot.add_trace(sankey);
 
@@ -694,6 +756,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         if args.display {
             plot.show();
         }
+
+        // If inline HTML is requested, print the HTML to stdout
+        if args.inline_html {
+            println!("{}", plot.to_inline_html(None));
+        }
     }
 
     // Generate segmented coverage subplots if specified
@@ -720,6 +787,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         if args.display {
             plot.show();
         }
+        // If inline HTML is requested, print the HTML to stdout
+        if args.inline_html {
+            println!("{}", plot.to_inline_html(None));
+        }
     }
 
     // Generate read flow sankey diagram if specified
@@ -728,9 +799,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         // Save the plot as an HTML file if output path is provided
         if let Some(optional_file) = &output_html_file {
-            // Add "_flow" suffix to the filename
             let flow_file = optional_file.with_file_name(format!(
-                "{}_flow{}",
+                "{}_read_assignment{}",
                 optional_file
                     .file_stem()
                     .unwrap_or_default()
@@ -745,6 +815,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         // Show the plot if specified
         if args.display {
             plot.show();
+        }
+        // If inline HTML is requested, print the HTML to stdout
+        if args.inline_html {
+            println!("{}", plot.to_inline_html(None));
         }
     }
 
