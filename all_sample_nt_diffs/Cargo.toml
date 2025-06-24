@@ -4,8 +4,6 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-clap = { version = "4", features = ["derive"] }
-either = "1"
-zoe = { git = "https://github.com/CDCgov/zoe.git", tag = "v0.0.18", default-features = false, features = [
-    "multiversion",
-] }
+clap.workspace = true
+either.workspace = true
+zoe.workspace = true
