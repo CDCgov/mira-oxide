@@ -1,6 +1,6 @@
 [package]
-name = "mutations_of_interest_table"
-version = "0.2.0"
+name = "variants_of_interest_table"
+version = "0.2.1"
 edition = "2024"
 
 [dependencies]
