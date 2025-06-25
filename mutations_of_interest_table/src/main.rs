@@ -136,8 +136,12 @@ impl Entry<'_> {
                 if hold_aa_mut == muts_entry.aa {
                     self.phenotypic_consequences = muts_entry.description.clone();
                     return true;
+                } else {
+                    self.phenotypic_consequences = String::from("");
+                    return true;
                 }
                 //aa that are missing and also in our "mutations of interest" list are written to file
+                /*
                 else if hold_aa_mut == "." {
                     self.phenotypic_consequences = String::from("amino acid information missing");
                     return true;
@@ -147,7 +151,7 @@ impl Entry<'_> {
                 } else if hold_aa_mut == "X" {
                     self.phenotypic_consequences = String::from("amino acid information missing");
                     return true;
-                }
+                } */
             }
         }
         false
