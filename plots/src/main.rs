@@ -57,24 +57,52 @@ struct Args {
     #[arg(short = 'i', long, help = "Required")]
     irma_dir: PathBuf,
 
-    #[arg(short = 'c', long, default_value_t = false, help = "Generate one coverage plot with all segments (Default: false)")]
+    #[arg(
+        short = 'c',
+        long,
+        default_value_t = false,
+        help = "Generate one coverage plot with all segments (Default: false)"
+    )]
     coverage: bool,
 
-    #[arg(short = 's', long, default_value_t = false, help = "Generate segmented coverage subplots, including minor variant annotation (Default: false)")]
+    #[arg(
+        short = 's',
+        long,
+        default_value_t = false,
+        help = "Generate segmented coverage subplots, including minor variant annotation (Default: false)"
+    )]
     coverage_seg: bool,
 
-    #[arg(short = 'r', long, default_value_t = false, help = "Generate read assignment sankey diagram (Default: false)")]
+    #[arg(
+        short = 'r',
+        long,
+        default_value_t = false,
+        help = "Generate read assignment sankey diagram (Default: false)"
+    )]
     read_flow: bool,
 
-    #[arg(short = 'd', long, default_value_t = false, help = "Output plots immediately to browser (Default: false)")]
+    #[arg(
+        short = 'd',
+        long,
+        default_value_t = false,
+        help = "Output plots immediately to browser (Default: false)"
+    )]
     display: bool,
 
-    #[arg(short = 't', long, default_value_t = false, help = "Output inline html to stdout (Default: false)")]
+    #[arg(
+        short = 't',
+        long,
+        default_value_t = false,
+        help = "Output inline html to stdout (Default: false)"
+    )]
     inline_html: bool,
 
-    #[arg(short = 'o', long, help = "Output standalone HTML file path (Optional)")]
+    #[arg(
+        short = 'o',
+        long,
+        help = "Output standalone HTML file path (Optional)"
+    )]
     output: Option<PathBuf>,
-
 }
 
 fn generate_plot_coverage(input_directory: &PathBuf) -> Result<Plot, Box<dyn Error>> {
@@ -133,9 +161,6 @@ fn generate_plot_coverage(input_directory: &PathBuf) -> Result<Plot, Box<dyn Err
     }
 
     // Set the figure title
-<<<<<<< HEAD
-    let layout = Layout::new().title(format!("Coverage | {input_directory}"));
-=======
     let layout = Layout::new()
         .title(&format!(
             "Coverage | {}",
@@ -187,8 +212,8 @@ fn generate_plot_coverage_seg(input_directory: &PathBuf) -> Result<Plot, Box<dyn
     }
 
     // Calculate grid dimensions for subplots
-    let rows = 4;//((file_count + 2) as f64).sqrt().ceil() as usize;
-    let cols = 2;//(file_count + rows - 1) / rows; // Ceiling division
+    let rows = 4; //((file_count + 2) as f64).sqrt().ceil() as usize;
+    let cols = 2; //(file_count + rows - 1) / rows; // Ceiling division
 
     // Load variant data into a HashMap keyed by segment name
     let mut variants_data: HashMap<String, Vec<(u32, String, String, u32, u32, f32)>> =
@@ -366,7 +391,7 @@ fn generate_plot_coverage_seg(input_directory: &PathBuf) -> Result<Plot, Box<dyn
                 .to_str()
                 .unwrap_or("Unknown")
         ));
-    
+
     // Add annotations for each segment title
     let mut annotations = Vec::new();
     for (idx, path) in file_paths.iter().enumerate() {
@@ -381,44 +406,50 @@ fn generate_plot_coverage_seg(input_directory: &PathBuf) -> Result<Plot, Box<dyn
             .split('_')
             .collect();
         let segment_name = ctype[1];
-            /* .file_name()
-            .unwrap_or_default()
-            .to_str()
-            .unwrap_or("Unknown")
-            .split('-')
-            .next()
-            .unwrap_or("Unknown")
-            .split('_')
-            .next()
-            .unwrap_or("Unknown")
-            .next()
-            .unwrap_or("Unknown");
-            */
+        /* .file_name()
+        .unwrap_or_default()
+        .to_str()
+        .unwrap_or("Unknown")
+        .split('-')
+        .next()
+        .unwrap_or("Unknown")
+        .split('_')
+        .next()
+        .unwrap_or("Unknown")
+        .next()
+        .unwrap_or("Unknown");
+        */
         let row = idx / cols;
         let col = idx % cols;
-        
+
         // Calculate position for annotation (centered above each subplot)
-        annotations.push(plotly::layout::Annotation::new()
-            .text(segment_name)
-            .x_ref("paper")
-            .y_ref("paper")
-            //.x((col as f64 + 0.5) / cols as f64)
-            .x(match col {
-                0 => 0.2,
-                1 => 0.8,
-                _ => (col as f64 + 0.5)/cols as f64, // fallback formula for other columns
-            })
-            .y(match row {
-                0 => 1.0,
-                1 => 0.78, 
-                2 => 0.48,
-                3 => 0.18,
-                _ => (row as f64 + 0.5) / rows as f64, // fallback formula for other rows
-            })
-            .font(plotly::common::Font::new().size(22).color(get_segment_color(segment_name)))
-            .show_arrow(false));
+        annotations.push(
+            plotly::layout::Annotation::new()
+                .text(segment_name)
+                .x_ref("paper")
+                .y_ref("paper")
+                //.x((col as f64 + 0.5) / cols as f64)
+                .x(match col {
+                    0 => 0.2,
+                    1 => 0.8,
+                    _ => (col as f64 + 0.5) / cols as f64, // fallback formula for other columns
+                })
+                .y(match row {
+                    0 => 1.0,
+                    1 => 0.78,
+                    2 => 0.48,
+                    3 => 0.18,
+                    _ => (row as f64 + 0.5) / rows as f64, // fallback formula for other rows
+                })
+                .font(
+                    plotly::common::Font::new()
+                        .size(22)
+                        .color(get_segment_color(segment_name)),
+                )
+                .show_arrow(false),
+        );
     }
-    
+
     // Add annotations to layout
     layout = layout.annotations(annotations);
 
@@ -642,16 +673,34 @@ fn generate_sankey_plot(input_directory: &PathBuf) -> Result<Plot, Box<dyn Error
     let mut seg_idx = 0;
     for (i, label) in node_labels.iter().enumerate() {
         match label.as_str() {
-            "Initial Reads" => { x[i] = 0.0; y[i] = 0.5; },
-            "Pass QC" => { x[i] = 0.2; y[i] = 0.2; },
-            "Fail QC" => { x[i] = 0.2; y[i] = 0.1; },
-            "No Match" => { x[i] = 0.4; y[i] = 0.2; },
-            "Alt Match" => { x[i] = 0.4; y[i] = 0.8; },
-            "Primary Match" => { x[i] = 0.4; y[i] = 0.5;}
+            "Initial Reads" => {
+                x[i] = 0.0;
+                y[i] = 0.5;
+            }
+            "Pass QC" => {
+                x[i] = 0.2;
+                y[i] = 0.2;
+            }
+            "Fail QC" => {
+                x[i] = 0.2;
+                y[i] = 0.1;
+            }
+            "No Match" => {
+                x[i] = 0.4;
+                y[i] = 0.2;
+            }
+            "Alt Match" => {
+                x[i] = 0.4;
+                y[i] = 0.8;
+            }
+            "Primary Match" => {
+                x[i] = 0.4;
+                y[i] = 0.5;
+            }
             _ => {
                 // Segment nodes: stack vertically in last column
                 x[i] = 0.7;
-                y[i] = 0.1 + 0.8 * (seg_idx as f64) / ((n-5).max(1) as f64);
+                y[i] = 0.1 + 0.8 * (seg_idx as f64) / ((n - 5).max(1) as f64);
                 seg_idx += 1;
             }
         }
@@ -706,13 +755,13 @@ fn generate_sankey_plot(input_directory: &PathBuf) -> Result<Plot, Box<dyn Error
                 ToImageButtonOptions::new()
                     .format(ImageButtonFormats::Svg)
                     .filename(&format!(
-            "{}_read_flow",
-            input_directory
-                .file_name()
-                .unwrap_or_default()
-                .to_str()
-                .unwrap_or("Unknown")
-        )),
+                        "{}_read_flow",
+                        input_directory
+                            .file_name()
+                            .unwrap_or_default()
+                            .to_str()
+                            .unwrap_or("Unknown")
+                    )),
             ),
     );
 

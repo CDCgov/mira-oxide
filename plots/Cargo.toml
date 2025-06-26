@@ -6,7 +6,7 @@ edition = "2024"
 
 [dependencies]
 csv.workspace = true
-glob = "0.3.2"
-ordered-float = "5.0.0"
-#plotly = "0.12.1"
-plotly = { git = "https://github.com/plotly/plotly.rs.git", branch = "main" }
+clap.workspace = true
+glob.workspace = true
+ordered-float.workspace = true
+plotly.workspace = true
