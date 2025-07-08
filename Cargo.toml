@@ -20,4 +20,3 @@ zoe = { version = "0.0.19", default-features = false, features = [
 
 [profile.release]
 strip = true
-csv = "1.3.1"
