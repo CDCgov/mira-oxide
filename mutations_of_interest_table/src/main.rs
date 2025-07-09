@@ -96,6 +96,7 @@ pub struct RefInput {
 
 #[derive(Deserialize, Debug)]
 pub struct MutsOfInterestInput {
+    subtype: String,
     protein: String,
     aa_position: String,
     aa: String,
@@ -121,6 +122,7 @@ pub struct Entry<'a> {
 impl Entry<'_> {
     fn update_entry_from_alignment(
         &mut self,
+        subtype: &str,
         aa_1: u8,
         aa_2: u8,
         muts_columns: &Vec<MutsOfInterestInput>,
@@ -130,7 +132,10 @@ impl Entry<'_> {
         let hold_aa_mut = self.aa_mut.to_string();
         //aa differences that are also in our "mutations of interest" list are written to file
         for muts_entry in muts_columns {
-            if self.protein == muts_entry.protein
+            //println!("ref {}", subtype);
+            //println!("mut {}", muts_entry.subtype);
+            if subtype == muts_entry.subtype
+                && self.protein == muts_entry.protein
                 && self.aa_position.to_string() == muts_entry.aa_position
             {
                 if hold_aa_mut == muts_entry.aa {
@@ -296,6 +301,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
                                 //aa difference moved forward in process;
                                 if entry.update_entry_from_alignment(
+                                    &ref_entry.subtype,
                                     ref_aa,
                                     query_aa,
                                     &muts_interest,
@@ -346,6 +352,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
                                 //aa difference moved forward in process;
                                 if entry.update_entry_from_alignment(
+                                    &ref_entry.subtype,
                                     partial_codon,
                                     partial_codon,
                                     &muts_interest,
@@ -435,6 +442,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
                                 //aa difference moved forward in process;
                                 if entry.update_entry_from_alignment(
+                                    &ref_entry.subtype,
                                     ref_aa,
                                     query_aa,
                                     &muts_interest,
@@ -485,6 +493,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
                                 //aa difference moved forward in process;
                                 if entry.update_entry_from_alignment(
+                                    &ref_entry.subtype,
                                     partial_codon,
                                     partial_codon,
                                     &muts_interest,
