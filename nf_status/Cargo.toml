@@ -1,0 +1,12 @@
+[package]
+name = "nf_status"
+version = "0.1.0"
+edition = "2024"
+authors = ["Ben Rambo-Martin (nbx0@cdc.gov)"]
+description = "Create an empty process status table for MIRA-NF experiment types."
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+regex.workspace = true
+chrono.workspace = true
+plotly.workspace = true
