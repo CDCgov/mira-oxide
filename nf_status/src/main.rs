@@ -21,6 +21,10 @@ struct Args {
         help = "Output HTML file path (default: ./nf_status_table.html)"
     )]
     output: Option<String>,
+
+    /// Output HTML to stdout instead of file
+    #[arg(long = "inline", help = "Output HTML table to stdout instead of file")]
+    inline: bool,
 }
 
 fn main() {
@@ -28,6 +32,7 @@ fn main() {
     let samplesheet_path = &args.samplesheet;
     let nextflow_log_path = &args.nextflow_log;
     let html_output_path = args.output.as_deref().unwrap_or("nf_status_table.html");
+    let output_inline = args.inline;
 
     let file = File::open(samplesheet_path).expect("Could not open samplesheet");
     let reader = BufReader::new(file);
@@ -267,14 +272,18 @@ fn main() {
             html.push_str("</tr>\n");
         }
         html.push_str("</tbody>\n</table>\n</body>\n</html>\n");
-        // Ensure output path ends with .html
-        let html_output_path = if html_output_path.ends_with(".html") {
-            html_output_path.to_string()
+        if output_inline {
+            print!("{}", html);
         } else {
-            format!("{}.html", html_output_path)
-        };
-        std::fs::write(&html_output_path, html).expect("Failed to write HTML table");
-        println!("Raw HTML table written to {}", html_output_path);
+            // Ensure output path ends with .html
+            let html_output_path = if html_output_path.ends_with(".html") {
+                html_output_path.to_string()
+            } else {
+                format!("{}.html", html_output_path)
+            };
+            std::fs::write(&html_output_path, html).expect("Failed to write HTML table");
+            println!("Raw HTML table written to {}", html_output_path);
+        }
     }
     // Print rows for each sample
     fn parse_log_time(s: &str) -> Option<chrono::NaiveDateTime> {
