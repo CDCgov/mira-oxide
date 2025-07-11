@@ -1,7 +1,7 @@
 [workspace]
 
 members = [ "all_sample_hamming_dist", "all_sample_nt_diffs",
-    "variants_of_interest_table", "plots", "check_chemistry", "nf_stats]
+    "variants_of_interest_table", "plots", "check_chemistry", "nf_status"]
 
 [workspace.dependencies]
 clap = { version = "4", features = ["derive"] }
