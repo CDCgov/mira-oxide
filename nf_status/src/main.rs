@@ -1,44 +1,35 @@
 use chrono::{Datelike, Local};
-use std::env;
+use clap::Parser;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 
+#[derive(Parser, Debug)]
+#[command(version, about = "Create a process status table for MIRA-NF runs.")]
+struct Args {
+    /// Path to samplesheet CSV file
+    #[arg(short = 's', long = "samplesheet")]
+    samplesheet: String,
+
+    /// Path to nextflow log file
+    #[arg(short = 'l', long = "log")]
+    nextflow_log: String,
+
+    /// Output HTML file path (optional)
+    #[arg(
+        short = 'o',
+        long = "output",
+        help = "Output HTML file path (default: ./nf_status_table.html)"
+    )]
+    output: Option<String>,
+}
+
 fn main() {
-    let args: Vec<String> = env::args().collect();
-    let mut samplesheet_path = String::new();
-    let mut nextflow_log_path = None;
-    let mut i = 1;
-    while i < args.len() {
-        match args[i].as_str() {
-            "-s" => {
-                if i + 1 < args.len() {
-                    samplesheet_path = args[i + 1].clone();
-                    i += 1;
-                }
-            }
-            "-l" => {
-                if i + 1 < args.len() {
-                    nextflow_log_path = Some(args[i + 1].clone());
-                    i += 1;
-                }
-            }
-            _ => {}
-        }
-        i += 1;
-    }
-    if args.iter().any(|a| a == "-h" || a == "--help") {
-        println!(
-            "nf_status -s <samplesheet.csv> -l <nextflow.log>\n\n\
-Create a process status table for MIRA-NF runs.\n\
-\nArguments:\n  -s <samplesheet.csv>   Path to samplesheet CSV file.\n  -l <nextflow.log>      Path to nextflow log file.\n  -h, --help             Show this help message and exit.\n"
-        );
-        std::process::exit(0);
-    }
-    if samplesheet_path.is_empty() || nextflow_log_path.is_none() {
-        eprintln!("Usage: nf_status -s <samplesheet.csv> -l <nextflow.log>");
-        std::process::exit(1);
-    }
-    let file = File::open(&samplesheet_path).expect("Could not open samplesheet");
+    let args = Args::parse();
+    let samplesheet_path = &args.samplesheet;
+    let nextflow_log_path = &args.nextflow_log;
+    let html_output_path = args.output.as_deref().unwrap_or("nf_status_table.html");
+
+    let file = File::open(samplesheet_path).expect("Could not open samplesheet");
     let reader = BufReader::new(file);
     let mut sample_ids = Vec::new();
     let mut header_found = false;
@@ -71,83 +62,81 @@ Create a process status table for MIRA-NF runs.\n\
     // Track process start times for elapsed time calculation
     let mut process_start_times: HashMap<(String, String), String> = HashMap::new();
     let mut started_processes: std::collections::HashSet<String> = std::collections::HashSet::new();
-    if let Some(ref log_path) = nextflow_log_path {
-        if let Ok(file) = File::open(log_path) {
-            let reader = BufReader::new(file);
-            let re_submit = Regex::new(r"Submitted process > ([^ ]+) \(([^)]+)\)").unwrap();
-            let re_complete = Regex::new(r"Task completed > TaskHandler\[.*name: ([^ ]+)(?: \(([^)]+)\))?; status: ([A-Z]+);",).unwrap();
-            let re_start_time = Regex::new(
-                r"(\w{3}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}) .*Submitted process > ([^ ]+) \(([^)]+)\)",
-            )
-            .unwrap();
-            let mut log_lines: Vec<String> = Vec::new();
-            for line in reader.lines() {
-                if let Ok(line) = line {
-                    log_lines.push(line.clone());
-                    if let Some(caps) = re_submit.captures(&line) {
-                        let process = caps[1].split(':').last().unwrap_or("").to_string();
-                        let sample = caps[2].to_string();
-                        let key = (sample.clone(), process.clone());
-                        // Try to extract timestamp for this submission
-                        if let Some(time_caps) = re_start_time.captures(&line) {
-                            let timestamp = time_caps[1].to_string();
-                            process_start_times.insert(key.clone(), timestamp);
-                        }
-                        status_map.entry(key).or_insert("running".to_string());
+    if let Ok(file) = File::open(nextflow_log_path) {
+        let reader = BufReader::new(file);
+        let re_submit = Regex::new(r"Submitted process > ([^ ]+) \(([^)]+)\)").unwrap();
+        let re_complete = Regex::new(
+            r"Task completed > TaskHandler\[.*name: ([^ ]+)(?: \(([^)]+)\))?; status: ([A-Z]+);",
+        )
+        .unwrap();
+        let re_start_time = Regex::new(
+            r"(\w{3}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}) .*Submitted process > ([^ ]+) \(([^)]+)\)",
+        )
+        .unwrap();
+        let mut log_lines: Vec<String> = Vec::new();
+        for line in reader.lines() {
+            if let Ok(line) = line {
+                log_lines.push(line.clone());
+                if let Some(caps) = re_submit.captures(&line) {
+                    let process = caps[1].split(':').last().unwrap_or("").to_string();
+                    let sample = caps[2].to_string();
+                    let key = (sample.clone(), process.clone());
+                    // Try to extract timestamp for this submission
+                    if let Some(time_caps) = re_start_time.captures(&line) {
+                        let timestamp = time_caps[1].to_string();
+                        process_start_times.insert(key.clone(), timestamp);
                     }
-                    if let Some(caps) = re_complete.captures(&line) {
-                        let process = caps[1].split(':').last().unwrap_or("").to_string();
-                        let sample_opt = caps.get(2).map(|m| m.as_str());
-                        let status = match &caps[3] {
-                            s if s == "COMPLETED" => "completed",
-                            s if s == "FAILED" || s == "ERROR" => "error",
-                            _ => "",
-                        };
-                        if !status.is_empty() {
-                            if let Some(sample) = sample_opt {
-                                if !sample.is_empty() && sample != "1" {
-                                    let key = (sample.to_string(), process.clone());
-                                    status_map.insert(key, status.to_string());
-                                } else {
-                                    // sample == "1" or empty: global process
-                                    global_completed.insert(process.clone());
-                                }
+                    status_map.entry(key).or_insert("running".to_string());
+                }
+                if let Some(caps) = re_complete.captures(&line) {
+                    let process = caps[1].split(':').last().unwrap_or("").to_string();
+                    let sample_opt = caps.get(2).map(|m| m.as_str());
+                    let status = match &caps[3] {
+                        s if s == "COMPLETED" => "completed",
+                        s if s == "FAILED" || s == "ERROR" => "error",
+                        _ => "",
+                    };
+                    if !status.is_empty() {
+                        if let Some(sample) = sample_opt {
+                            if !sample.is_empty() && sample != "1" {
+                                let key = (sample.to_string(), process.clone());
+                                status_map.insert(key, status.to_string());
                             } else {
-                                // No sample: global process
+                                // sample == "1" or empty: global process
                                 global_completed.insert(process.clone());
                             }
+                        } else {
+                            // No sample: global process
+                            global_completed.insert(process.clone());
                         }
                     }
-                    // Track started processes for staged logic
-                    if let Some(caps) = Regex::new(r"Starting process > ([^\s]+)")
-                        .unwrap()
-                        .captures(&line)
-                    {
-                        let proc = caps[1].split(':').last().unwrap_or("").to_string();
-                        started_processes.insert(proc);
-                    }
+                }
+                // Track started processes for staged logic
+                if let Some(caps) = Regex::new(r"Starting process > ([^\s]+)")
+                    .unwrap()
+                    .captures(&line)
+                {
+                    let proc = caps[1].split(':').last().unwrap_or("").to_string();
+                    started_processes.insert(proc);
                 }
             }
         }
     }
     // If log is provided, extract process order from log ("Starting process > ...")
     let mut process_order: Vec<String> = Vec::new();
-    let log_path_opt = nextflow_log_path.as_ref().map(|s| s.as_str());
-    if let Some(log_path) = log_path_opt {
-        if let Ok(file) = File::open(log_path) {
-            let reader = BufReader::new(file);
-            let re_start = regex::Regex::new(r"Starting process > ([^\s]+)").unwrap();
-            let mut seen = std::collections::HashSet::new();
-            for line in reader.lines() {
-                if let Ok(line) = line {
-                    if let Some(caps) = re_start.captures(&line) {
-                        let proc = caps[1].split(':').last().unwrap_or("").to_string();
-                        if proc == "PASSFAILED" {
-                            continue;
-                        }
-                        if seen.insert(proc.clone()) {
-                            process_order.push(proc);
-                        }
+    if let Ok(file) = File::open(nextflow_log_path) {
+        let reader = BufReader::new(file);
+        let re_start = regex::Regex::new(r"Starting process > ([^\s]+)").unwrap();
+        let mut seen = std::collections::HashSet::new();
+        for line in reader.lines() {
+            if let Ok(line) = line {
+                if let Some(caps) = re_start.captures(&line) {
+                    let proc = caps[1].split(':').last().unwrap_or("").to_string();
+                    if proc == "PASSFAILED" {
+                        continue;
+                    }
+                    if seen.insert(proc.clone()) {
+                        process_order.push(proc);
                     }
                 }
             }
@@ -175,7 +164,9 @@ Create a process status table for MIRA-NF runs.\n\
     let mut table_header = vec!["SAMPLE ID".to_string()];
     if let Some(idx) = process_order.iter().position(|p| p == "CHECKMIRAVERSION") {
         table_header.push(process_order[idx].clone());
-        let mut rest: Vec<String> = process_order.iter().enumerate()
+        let mut rest: Vec<String> = process_order
+            .iter()
+            .enumerate()
             .filter(|(i, p)| *i != idx)
             .map(|(_, p)| p.clone())
             .collect();
@@ -189,11 +180,27 @@ Create a process status table for MIRA-NF runs.\n\
         // Use reordered process columns for row
         let process_cols = &table_header[1..];
         for proc in process_cols {
-            if proc == "PASSFAILED" { continue; }
+            if proc == "PASSFAILED" {
+                continue;
+            }
             let key = (sample.clone(), proc.clone());
-            let status = status_map.get(&key).map(|s| s.as_str())
-                .or_else(|| if global_completed.contains(proc) { Some("completed") } else { None })
-                .or_else(|| if !started_processes.contains(proc) { Some("staged") } else { None });
+            let status = status_map
+                .get(&key)
+                .map(|s| s.as_str())
+                .or_else(|| {
+                    if global_completed.contains(proc) {
+                        Some("completed")
+                    } else {
+                        None
+                    }
+                })
+                .or_else(|| {
+                    if !started_processes.contains(proc) {
+                        Some("staged")
+                    } else {
+                        None
+                    }
+                });
             if let Some("running") = status {
                 if let Some(start_str) = process_start_times.get(&key) {
                     if let Some(start_time) = parse_log_time(start_str) {
@@ -221,9 +228,9 @@ Create a process status table for MIRA-NF runs.\n\
     {
         let mut html = String::new();
         html.push_str(r#"<!doctype html>
-        <html lang="en">
+        <html lang=\"en\">
         <head>
-        <meta charset="utf-8" />
+        <meta charset=\"utf-8\" />
         <title>nf_status_table</title>
         <style>
             html, body { height: 100%; margin: 0; padding: 0; box-sizing: border-box; }
@@ -260,8 +267,14 @@ Create a process status table for MIRA-NF runs.\n\
             html.push_str("</tr>\n");
         }
         html.push_str("</tbody>\n</table>\n</body>\n</html>\n");
-        std::fs::write("nf_status_table.html", html).expect("Failed to write HTML table");
-        println!("Raw HTML table written to nf_status_table.html");
+        // Ensure output path ends with .html
+        let html_output_path = if html_output_path.ends_with(".html") {
+            html_output_path.to_string()
+        } else {
+            format!("{}.html", html_output_path)
+        };
+        std::fs::write(&html_output_path, html).expect("Failed to write HTML table");
+        println!("Raw HTML table written to {}", html_output_path);
     }
     // Print rows for each sample
     fn parse_log_time(s: &str) -> Option<chrono::NaiveDateTime> {
