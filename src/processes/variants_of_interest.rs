@@ -21,7 +21,7 @@ use zoe::{
 
 #[derive(Debug, Parser)]
 #[command(about = "Tool for calculating amino acid difference tables")]
-pub struct APDArgs {
+pub struct VariantsArgs {
     #[arg(short = 'i', long)]
     /// Optional input fasta
     input_file: Option<PathBuf>,
@@ -211,8 +211,8 @@ pub fn align_sequences<'a>(query: &'a [u8], reference: &'a [u8]) -> (Vec<u8>, Ve
     )
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
-    let args = APDArgs::parse();
+pub fn variants_of_interest_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
+    // let args = APDArgs::parse();
     let delim = args.output_delimiter.unwrap_or(",".to_owned());
 
     //read in input file (dais input, ref input, muts input)

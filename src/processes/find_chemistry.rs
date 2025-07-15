@@ -9,7 +9,7 @@ use zoe::prelude::*;
 
 #[derive(Debug, Parser)]
 #[command(about = "Get relevant IRMA configuration and modules for the current experiment.")]
-pub struct CheckChemArgs {
+pub struct FindChemArgs {
     #[arg(short = 's', long)]
     /// Name of sample
     pub sample: String,
@@ -40,7 +40,7 @@ pub struct CheckChemArgs {
     pub irma_config_path: Option<PathBuf>,
 }
 
-impl CheckChemArgs {
+impl FindChemArgs {
     /// Function for ensuring that specific IRMA configs are only used with the
     /// proper experiment. Secondary, Sensitive, and UTR must be matched with a
     /// Flu experiment.
@@ -176,7 +176,7 @@ impl ValueEnum for IRMAConfig {
 
 /// Selects the correct config file based on experiment, custom config path, and
 /// length of sequences
-fn get_config_path(args: &CheckChemArgs, seq_len: Option<usize>) -> String {
+fn get_config_path(args: &FindChemArgs, seq_len: Option<usize>) -> String {
     if args.irma_config == IRMAConfig::Custom {
         return args
             .irma_config_path
@@ -295,7 +295,7 @@ fn get_average_line_length(fastq: &PathBuf) -> Result<Option<usize>, std::io::Er
 }
 
 /// Takes user input arguments and prepares them for output
-fn parse_chemistry_args(args: &CheckChemArgs) -> Result<ChemistryOutput, std::io::Error> {
+fn parse_chemistry_args(args: &FindChemArgs) -> Result<ChemistryOutput, std::io::Error> {
     let line_length = get_average_line_length(&args.fastq)?;
 
     let irma_custom = get_config_path(args, line_length);
@@ -309,8 +309,8 @@ fn parse_chemistry_args(args: &CheckChemArgs) -> Result<ChemistryOutput, std::io
     Ok(out)
 }
 
-fn main() -> Result<(), std::io::Error> {
-    let args = CheckChemArgs::parse();
+pub fn find_chemistry_process(args: FindChemArgs) -> Result<(), std::io::Error> {
+    //let args = CheckChemArgs::parse();
     // handle input validation to ensure valid combinations of
     if let Err(e) = args.validate() {
         eprintln!("Error: {}", e);
