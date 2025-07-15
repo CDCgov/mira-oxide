@@ -557,7 +557,7 @@ fn generate_sankey_plot(input_directory: &PathBuf) -> Result<Plot, Box<dyn Error
         "#0099C6",
     ); // cyan
     // Process records to create nodes and links
-    let mut initial_reads = 0;
+    let mut _initial_reads = 0;
     let mut pass_qc = 0;
     let mut fail_qc = 0;
     let mut no_match = 0;
@@ -567,7 +567,7 @@ fn generate_sankey_plot(input_directory: &PathBuf) -> Result<Plot, Box<dyn Error
 
     for (record, reads) in &records {
         match record.as_str() {
-            "1-initial" => initial_reads = *reads,
+            "1-initial" => _initial_reads = *reads,
             "2-failQC" => fail_qc = *reads,
             "2-passQC" => pass_qc = *reads,
             "3-nomatch" => no_match = *reads,
