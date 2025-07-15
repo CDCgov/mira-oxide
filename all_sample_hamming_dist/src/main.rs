@@ -31,7 +31,7 @@ struct ValidSeq {
     sequence: Nucleotides,
 }
 
-fn main() {
+fn main() -> Result<(), std::io::Error> {
     let args = APDArgs::parse();
     let delim = args.output_delimiter.unwrap_or(',');
 
@@ -71,29 +71,27 @@ fn main() {
                     sequence,
                 }
               }))
-        .collect::<Result<Vec<_>, _>>()
-        .unwrap_or_die("Could not process other data.");
+        .collect::<Result<Vec<_>, _>>()?;
 
-    //write out header
-    let mut buffer = "sequences".to_string();
-    let mut header_hold: Vec<String> = Vec::new();
+    write!(&mut writer, "sequences")?;
     for query_header in all_sequences.iter().map(|f| f.name.as_str()) {
-        buffer.push(delim);
-        buffer.push_str(query_header);
-        header_hold.push(query_header.to_string());
+        write!(&mut writer, "{delim}{query_header}")?;
     }
-    writeln!(&mut writer, "{buffer}").unwrap_or_fail();
+    writeln!(&mut writer)?;
 
-    //Initialize vectors to store headers and sequences
     let mut row = vec![0; all_sequences.len()];
+    // This can be made more efficient by caching the matrix
     for ValidSeq { name, sequence } in all_sequences.iter() {
         for (i, seq2) in all_sequences.iter().map(|v| &v.sequence).enumerate() {
             row[i] = sequence.distance_hamming(seq2);
         }
-        write!(&mut writer, "{name} ",).unwrap_or_fail();
+        write!(&mut writer, "{name}",)?;
         for r in row.iter() {
-            write!(&mut writer, " {r}").unwrap_or_fail();
+            // There were spaces in the original
+            write!(&mut writer, "{delim} {r}")?;
         }
-        writeln!(&mut writer).unwrap_or_fail();
+        writeln!(&mut writer)?;
     }
+
+    Ok(())
 }
