@@ -79,16 +79,26 @@ fn main() -> Result<(), std::io::Error> {
     }
     writeln!(&mut writer)?;
 
-    let mut row = vec![0; all_sequences.len()];
-    // This can be made more efficient by caching the matrix
-    for ValidSeq { name, sequence } in all_sequences.iter() {
-        for (i, seq2) in all_sequences.iter().map(|v| &v.sequence).enumerate() {
-            row[i] = sequence.distance_hamming(seq2);
+    let n = all_sequences.len();
+    let mut matrix_cache = Vec::with_capacity(n * (n + 1) / 2);
+    for (r, sequence) in all_sequences.iter().map(|v| &v.sequence).enumerate() {
+        for (c, seq2) in all_sequences.iter().map(|v| &v.sequence).enumerate() {
+            if r <= c {
+                matrix_cache.push(sequence.distance_hamming(seq2));
+            }
         }
-        write!(&mut writer, "{name}",)?;
-        for r in row.iter() {
-            // There were spaces in the original
-            write!(&mut writer, "{delim} {r}")?;
+    }
+
+    for (r, sequence_name) in all_sequences.iter().map(|v| &v.name).enumerate() {
+        write!(&mut writer, "{sequence_name}")?;
+        for c in 0..n {
+            let index = if r <= c {
+                r * n - r * (r + 1) / 2 + c
+            } else {
+                c * n - c * (c + 1) / 2 + r
+            };
+            // This space was in the original
+            write!(&mut writer, "{delim} {dist}", dist = matrix_cache[index])?;
         }
         writeln!(&mut writer)?;
     }
