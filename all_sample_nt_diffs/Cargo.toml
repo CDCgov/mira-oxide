@@ -1,9 +1,0 @@
-[package]
-name = "all_sample_nt_diffs"
-version = "0.1.0"
-edition = "2024"
-
-[dependencies]
-clap.workspace = true
-either.workspace = true
-zoe.workspace = true

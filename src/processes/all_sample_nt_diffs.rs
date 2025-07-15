@@ -14,7 +14,7 @@ use zoe::{
 #[command(
     about = "Tool for calculating hamming distances between all samples within a given fasta file"
 )]
-pub struct APDArgs {
+pub struct NTDiffsArgs {
     #[arg(short = 'i', long)]
     /// Input fasta
     input_fasta: Option<PathBuf>,
@@ -34,8 +34,8 @@ struct ValidSeq {
     sequence: Nucleotides,
 }
 
-fn main() {
-    let args = APDArgs::parse();
+pub fn all_sample_nt_diffs_process(args: NTDiffsArgs) {
+    //let args = NTDiffsArgs::parse();
     let delim = args.output_delimiter.unwrap_or(',');
 
     //read in fasta file

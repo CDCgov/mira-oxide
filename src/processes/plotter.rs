@@ -51,9 +51,9 @@ fn get_segment_color(segment_name: &str) -> &'static str {
     }
 }
 
-#[derive(Parser)]
+#[derive(Debug, Parser)]
 #[command(version, about = "Generate plotly plots for IRMA output")]
-struct Args {
+pub struct PlotterArgs {
     #[arg(short = 'i', long, help = "Required")]
     irma_dir: PathBuf,
 
@@ -784,9 +784,9 @@ fn add_node(
     }
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
+pub fn plotter_process(args: PlotterArgs) -> Result<(), Box<dyn Error>> {
     // Check for correct number of arguments
-    let args = Args::parse();
+    //let args = PlotterArgs::parse();
 
     // Get the input directory and output file path from the command line arguments
     let input_directory = args.irma_dir;

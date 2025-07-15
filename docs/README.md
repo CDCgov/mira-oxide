@@ -49,7 +49,8 @@ s1_2,A/duck/Bangladesh/19097/2013,EPI_ISL_151729,A_PB1,HK4801,PB1,A:296:.,H:99:.
 s1_2,A/duck/Bangladesh/19097/2013,EPI_ISL_151729,A_PB1,HK4801,PB1,C:297:.,H:99:.,amino acid information missing
 ```
 
-
 ----------------------------------------------------------------------------------
-## Mutations of Interest Package Version 0.3.0 
+
+## Mutations of Interest Package Version 0.3.0
+
 ![Alt text](../assets/images/coming_soon.png)

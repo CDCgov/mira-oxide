@@ -11,7 +11,7 @@ use zoe::{data::fasta::FastaNT, distance::dna::NucleotidesDistance, prelude::*};
 #[command(
     about = "Tool for calculating hamming distances between all samples within a given fasta file"
 )]
-pub struct APDArgs {
+pub struct HammingArgs {
     #[arg(short = 'i', long)]
     /// Input fasta
     input_fasta: Option<PathBuf>,
@@ -31,8 +31,8 @@ struct ValidSeq {
     sequence: Nucleotides,
 }
 
-fn main() -> Result<(), std::io::Error> {
-    let args = APDArgs::parse();
+pub fn all_sample_hd_process(args: HammingArgs) -> Result<(), std::io::Error> {
+    //let args = APDArgs::parse();
     let delim = args.output_delimiter.unwrap_or(',');
 
     //read in fasta file
