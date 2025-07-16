@@ -24,15 +24,15 @@ use zoe::{
 pub struct VariantsArgs {
     #[arg(short = 'i', long)]
     /// Optional input fasta
-    input_file: Option<PathBuf>,
+    input_file: PathBuf,
 
     #[arg(short = 'r', long)]
     /// Optional input fasta
-    ref_file: Option<PathBuf>,
+    ref_file: PathBuf,
 
     #[arg(short = 'm', long)]
     /// Optional input fasta
-    muts_file: Option<PathBuf>,
+    muts_file: PathBuf,
 
     #[arg(short = 'o', long)]
     /// Optional output delimited file
@@ -40,7 +40,7 @@ pub struct VariantsArgs {
 
     #[arg(short = 'd', long, default_value = ",")]
     /// Use the provider delimiter for separating fields. Default is ','
-    output_delimiter: Option<String>,
+    output_delimiter: String,
 }
 
 // input files *must* be tab-separated
@@ -213,16 +213,16 @@ pub fn align_sequences<'a>(query: &'a [u8], reference: &'a [u8]) -> (Vec<u8>, Ve
 
 pub fn variants_of_interest_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
     // let args = APDArgs::parse();
-    let delim = args.output_delimiter.unwrap_or(",".to_owned());
+    let delim = args.output_delimiter;
 
     //read in input file (dais input, ref input, muts input)
-    let muts_reader = create_reader(args.muts_file)?;
+    let muts_reader = create_reader(Some(args.muts_file))?;
     let muts_interest: Vec<MutsOfInterestInput> = read_tsv(muts_reader, false)?;
 
-    let dais_reader = create_reader(args.input_file)?;
+    let dais_reader = create_reader(Some(args.input_file))?;
     let dais: Vec<DaisInput> = read_tsv(dais_reader, false)?;
 
-    let ref_reader = create_reader(args.ref_file)?;
+    let ref_reader = create_reader(Some(args.ref_file))?;
     let refs: Vec<RefInput> = read_tsv(ref_reader, true)?;
 
     let mut writer = if let Some(ref file_path) = args.output_xsv {
