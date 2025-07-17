@@ -1,8 +1,8 @@
 use clap::Parser;
 use either::Either;
 use std::{
-    fs::OpenOptions,
-    io::{BufReader, BufWriter, Write, stdin, stdout},
+    fs::{File, OpenOptions},
+    io::{BufReader, BufWriter, Stdin, Write, stdin, stdout},
     path::PathBuf,
 };
 use zoe::{data::fasta::FastaNT, distance::dna::NucleotidesDistance, prelude::*};
@@ -31,7 +31,7 @@ struct ValidSeq {
     sequence: Nucleotides,
 }
 
-pub fn all_sample_hd_process(args: HammingArgs) -> Result<(), std::io::Error> {
+pub fn all_sample_hd_process(args: HammingArgs) -> std::io::Result<BufReader<Either<File, Stdin>>> {
     //let args = APDArgs::parse();
     let delim = args.output_delimiter.unwrap_or(',');
 
