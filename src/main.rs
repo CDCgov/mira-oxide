@@ -27,7 +27,7 @@ enum Commands {
     /// Plotter
     Plotter(PlotterArgs),
     /// Prepare MIRA report
-    PrepareMiraReports(ReportArgs),
+    PrepareMiraReports(ReportsArgs),
 }
 
 fn main() {
@@ -47,6 +47,9 @@ fn main() {
         Commands::NTDiffs(cmd_args) => all_sample_nt_diffs_process(cmd_args),
         Commands::Plotter(cmd_args) => {
             plotter_process(cmd_args).expect(&format!("{module}::Plotter"))
+        }
+        Commands::PrepareMiraReports(cmd_args) => {
+            prepare_mira_reports_process(cmd_args).expect(&format!("{module}::PrepareMiraReports"))
         }
         _ => {
             eprintln!("mira-oxide: unrecognized command {:?}", args.command);

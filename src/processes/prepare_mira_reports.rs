@@ -12,7 +12,7 @@ use std::{
 
 #[derive(Debug, Parser)]
 #[command(about = "Package for aggregating MIRA outputs into json files")]
-pub struct ReportArgs {
+pub struct ReportsArgs {
     #[arg(short = 'i', long)]
     /// Optional input fasta
     irma_path: Option<PathBuf>,
@@ -115,8 +115,8 @@ fn read_yaml<R: std::io::Read>(reader: R) -> Result<QCConfig, Box<dyn std::error
     Ok(config)
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let args = APDArgs::parse();
+pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), std::io::Error> {
+    let args = ReportsArgs::parse();
 
     // Read in samplesheet
     let samplesheet_path = create_reader(args.samplesheet)?;
