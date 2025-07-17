@@ -1,7 +1,7 @@
 #![allow(unreachable_patterns)]
 use crate::processes::{
     all_sample_hd::*, all_sample_nt_diffs::*, find_chemistry::*, plotter::*,
-    variants_of_interest::*,
+    prepare_mira_reports::*, variants_of_interest::*,
 };
 use clap::{Parser, Subcommand};
 use zoe::prelude::OrFail;
@@ -26,6 +26,8 @@ enum Commands {
     NTDiffs(NTDiffsArgs),
     /// Plotter
     Plotter(PlotterArgs),
+    /// Prepare MIRA report
+    PrepareMiraReports(ReportArgs),
 }
 
 fn main() {

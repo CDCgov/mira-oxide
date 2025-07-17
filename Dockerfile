@@ -11,8 +11,10 @@ COPY ca.crt /root/ca.crt
 # Put certs in /etc/ssl/certs location
 RUN cat /root/ca.crt >> /etc/ssl/certs/ca-certificates.crt
 
-RUN apk update && apk add --no-cache build-base
+RUN apk update && apk add --no-cache build-base \
+    openssl-dev
 
+#set workdir
 WORKDIR /app
 
 # Copy all scripts to docker images
@@ -26,11 +28,8 @@ FROM alpine:latest as deploy
 WORKDIR /app
 
 COPY --from=builder \
-    /app/target/release/mutations_of_interest_table \
-    /app/target/release/all_sample_nt_diffs \
-    /app/target/release/all_sample_hamming_dist \
-    /app/target/release/plots \
-    /app/target/release/check_chemistry /app/
+    /app/target/release/mira-oxide \
+    /app/
 
 # Create working directory variable
 ENV WORKDIR=/data
