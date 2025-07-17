@@ -2,6 +2,7 @@
 use clap::Parser;
 use csv::ReaderBuilder;
 use either::Either;
+use polars::prelude::*;
 use serde::{self, Deserialize, de::DeserializeOwned};
 use std::{
     error::Error,
@@ -15,23 +16,23 @@ use std::{
 pub struct ReportsArgs {
     #[arg(short = 'i', long)]
     /// Optional input fasta
-    irma_path: Option<PathBuf>,
+    irma_path: PathBuf,
 
     #[arg(short = 's', long)]
     /// Optional input fasta
-    samplesheet: Option<PathBuf>,
+    samplesheet: PathBuf,
 
     #[arg(short = 'q', long)]
     /// Optional input fasta
-    qc_yaml: Option<PathBuf>,
+    qc_yaml: PathBuf,
 
     #[arg(short = 'p', long)]
     /// Optional input fasta
-    platform: Option<String>,
+    platform: String,
 
     #[arg(short = 'w', long)]
     /// Optional output delimited file
-    workdir_path: Option<PathBuf>,
+    workdir_path: PathBuf,
 
     #[arg(short = 'c', long, default_value = ",")]
     /// Use the provider delimiter for separating fields. Default is ','
@@ -89,22 +90,14 @@ fn create_reader(path: Option<PathBuf>) -> std::io::Result<BufReader<Either<File
     Ok(reader)
 }
 
-fn read_csv<T: DeserializeOwned, R: std::io::Read>(
-    reader: R,
-    has_headers: bool,
-) -> Result<Vec<T>, Box<dyn std::error::Error>> {
-    let mut rdr = ReaderBuilder::new()
-        .has_headers(has_headers)
-        .delimiter(b',')
-        .from_reader(reader);
+fn read_csv_to_dataframe(file_path: &PathBuf) -> Result<DataFrame, Box<dyn Error>> {
+    // Read the CSV file into a DataFrame
+    let df = CsvReader::from_path(file_path)?
+        .infer_schema(None)
+        .has_header(true)
+        .finish()?;
 
-    let mut records = Vec::new();
-    for result in rdr.deserialize() {
-        let record: T = result?;
-        records.push(record);
-    }
-
-    Ok(records)
+    Ok(df)
 }
 
 fn read_yaml<R: std::io::Read>(reader: R) -> Result<QCConfig, Box<dyn std::error::Error>> {
@@ -115,19 +108,17 @@ fn read_yaml<R: std::io::Read>(reader: R) -> Result<QCConfig, Box<dyn std::error
     Ok(config)
 }
 
-pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), std::io::Error> {
-    let args = ReportsArgs::parse();
-
+pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Error>> {
     // Read in samplesheet
-    let samplesheet_path = create_reader(args.samplesheet)?;
-    let samplesheet: Vec<Samplesheet> = read_csv(samplesheet_path, false)?;
+    let samplesheet = read_csv_to_dataframe(&args.samplesheet)?;
 
     // Read in qc yaml
-    let qc_yaml_path = create_reader(args.qc_yaml)?;
+    let qc_yaml_path = create_reader(Some(args.qc_yaml))?;
     let qc_config: QCConfig = read_yaml(qc_yaml_path)?;
 
     //println!("{:?}", samplesheet);
-    //println!("{:?}", qc_config);
+    println!("{:?}", qc_config);
+    println!("{:?}", samplesheet);
 
     Ok(())
 }

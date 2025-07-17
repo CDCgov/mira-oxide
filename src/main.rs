@@ -42,7 +42,7 @@ fn main() {
             find_chemistry_process(cmd_args).unwrap_or_die(&format!("{module}::FindChemistry"))
         }
         Commands::Hamming(cmd_args) => {
-            all_sample_hd_process(cmd_args).unwrap_or_die(&format!("{module}::Hamming"))
+            all_sample_hd_process(cmd_args).unwrap_or_die(&format!("{module}::Hamming"));
         }
         Commands::NTDiffs(cmd_args) => all_sample_nt_diffs_process(cmd_args),
         Commands::Plotter(cmd_args) => {
