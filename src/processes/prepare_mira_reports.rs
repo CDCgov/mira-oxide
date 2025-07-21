@@ -92,16 +92,6 @@ fn create_reader(path: Option<PathBuf>) -> std::io::Result<BufReader<Either<File
     Ok(reader)
 }
 
-fn read_csv_to_dataframe(file_path: &PathBuf) -> Result<DataFrame, Box<dyn Error>> {
-    // Read the CSV file into a DataFrame
-    let df = CsvReader::from_path(file_path)?
-        .infer_schema(None)
-        .has_header(true)
-        .finish()?;
-
-    Ok(df)
-}
-
 fn read_yaml<R: std::io::Read>(reader: R) -> Result<QCConfig, Box<dyn std::error::Error>> {
     let mut contents = String::new();
     let mut buf_reader = BufReader::new(reader);
@@ -118,8 +108,9 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     let qc_yaml_path = create_reader(Some(args.qc_yaml))?;
     let qc_config: QCConfig = read_yaml(qc_yaml_path)?;
 
-    //cov df
+    //read in all dfs
     let mut cov_df = coverage_df(&args.irma_path)?;
+    let mut reads_df = readcount_df(&args.irma_path)?;
 
     /*
     let output_file = "./output_df.csv"; // Adjust the path as needed
@@ -132,6 +123,7 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     println!("{:?}", samplesheet);
     println!("{:?}", qc_config);
     println!("{:?}", cov_df);
+    println!("{:?}", reads_df);
 
     Ok(())
 }
