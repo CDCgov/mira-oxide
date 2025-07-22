@@ -1,7 +1,7 @@
 use glob::glob;
 use polars::prelude::*;
 use std::error::Error;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 ///reads any csv into a df
 pub fn read_csv_to_dataframe(file_path: &PathBuf) -> Result<DataFrame, Box<dyn Error>> {
@@ -15,11 +15,11 @@ pub fn read_csv_to_dataframe(file_path: &PathBuf) -> Result<DataFrame, Box<dyn E
 }
 
 ///Read in the coverage files made by irma and convert to df
-pub fn coverage_df(irma_path: &PathBuf) -> Result<DataFrame, Box<dyn Error>> {
+pub fn coverage_df(irma_path: impl AsRef<Path>) -> Result<DataFrame, Box<dyn Error>> {
     // Define the pattern to match text files
     let pattern = format!(
         "{}/*/IRMA/*/tables/*coverage.txt",
-        irma_path.to_string_lossy()
+        irma_path.as_ref().to_string_lossy()
     );
 
     // Initialize an empty DataFrame to hold the combined data
@@ -43,7 +43,7 @@ pub fn coverage_df(irma_path: &PathBuf) -> Result<DataFrame, Box<dyn Error>> {
                     None => Some(df),
                 };
             }
-            Err(e) => println!("Error reading file: {}", e),
+            Err(e) => println!("Error reading file: {e}"),
         }
     }
 
@@ -56,11 +56,11 @@ pub fn coverage_df(irma_path: &PathBuf) -> Result<DataFrame, Box<dyn Error>> {
 }
 
 ///Read in the read count files made by irma and convert to df
-pub fn readcount_df(irma_path: &PathBuf) -> Result<DataFrame, Box<dyn Error>> {
+pub fn readcount_df(irma_path: impl AsRef<Path>) -> Result<DataFrame, Box<dyn Error>> {
     // Define the pattern to match text files
     let pattern = format!(
         "{}/*/IRMA/*/tables/READ_COUNTS.txt",
-        irma_path.to_string_lossy()
+        irma_path.as_ref().to_string_lossy()
     );
 
     // Initialize an empty DataFrame to hold the combined data
@@ -84,7 +84,7 @@ pub fn readcount_df(irma_path: &PathBuf) -> Result<DataFrame, Box<dyn Error>> {
                     None => Some(df),
                 };
             }
-            Err(e) => println!("Error reading file: {}", e),
+            Err(e) => println!("Error reading file: {e}"),
         }
     }
     println!(
@@ -122,7 +122,7 @@ pub fn read_record2type(record: &str) -> Vec<String> {
 
 /// Processes the DataFrame to extract sample types based on the `Record` column.
 pub fn dash_irma_sample_type(reads_df: &DataFrame) -> Result<DataFrame, PolarsError> {
-    println!("{:?}", reads_df);
+    println!("{reads_df:?}");
 
     // Filter rows where the first character of the 'Record' column is '4'
     let mask = reads_df
@@ -134,7 +134,7 @@ pub fn dash_irma_sample_type(reads_df: &DataFrame) -> Result<DataFrame, PolarsEr
     let type_df = reads_df.filter(&mask)?;
 
     // Create new columns: 'vtype', 'ref_type', 'subtype'
-    let new_cols = vec!["vtype", "ref_type", "subtype"];
+    let new_cols = ["vtype", "ref_type", "subtype"];
     let mut new_columns = Vec::new();
 
     for (n, col_name) in new_cols.iter().enumerate() {
@@ -167,7 +167,7 @@ pub fn dash_irma_sample_type(reads_df: &DataFrame) -> Result<DataFrame, PolarsEr
     new_columns.push(Series::new("Reference", reference_col));
 
     // Create a new DataFrame with the selected columns
-    let mut new_df = DataFrame::new(new_columns)?;
+    let new_df = DataFrame::new(new_columns)?;
     //new_df = new_df.select(&["Sample", "vtype", "ref_type", "subtype"])?;
     Ok(new_df)
 }
