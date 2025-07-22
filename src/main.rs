@@ -1,9 +1,9 @@
 #![allow(unreachable_patterns)]
-use clap::{Parser, Subcommand};
-use mira_oxide::processes::{
+use crate::processes::{
     all_sample_hd::*, all_sample_nt_diffs::*, find_chemistry::*, plotter::*,
     prepare_mira_reports::*, variants_of_interest::*,
 };
+use clap::{Parser, Subcommand};
 use zoe::prelude::OrFail;
 
 #[derive(Parser)]
@@ -57,3 +57,6 @@ fn main() {
         }
     }
 }
+
+pub mod processes;
+pub mod utils;
