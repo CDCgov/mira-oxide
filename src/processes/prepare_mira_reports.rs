@@ -109,21 +109,21 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     let qc_config: QCConfig = read_yaml(qc_yaml_path)?;
 
     //read in all dfs
-    let mut cov_df = coverage_df(&args.irma_path)?;
-    let mut reads_df = readcount_df(&args.irma_path)?;
-
+    let cov_df = coverage_df(&args.irma_path)?;
+    let reads_df = readcount_df(&args.irma_path)?;
+    let vtype_df = dash_irma_sample_type(&reads_df)?;
     /*
-    let output_file = "./output_df.csv"; // Adjust the path as needed
+       let output_file = "./output_df.csv"; // Adjust the path as needed
 
-    CsvWriter::new(std::fs::File::create(output_file)?)
-        .has_header(true)
-        .finish(&mut cov_df)?;
-     */
-
+       CsvWriter::new(std::fs::File::create(output_file)?)
+           .has_header(true)
+           .finish(&mut reads_df)?;
+    */
     println!("{:?}", samplesheet);
-    println!("{:?}", qc_config);
-    println!("{:?}", cov_df);
+    //println!("{:?}", qc_config);
+    //println!("{:?}", cov_df);
     println!("{:?}", reads_df);
+    println!("{:?}", vtype_df);
 
     Ok(())
 }
