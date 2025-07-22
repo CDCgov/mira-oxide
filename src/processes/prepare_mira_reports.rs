@@ -121,7 +121,7 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     */
     println!("{samplesheet:?}");
     //println!("{:?}", qc_config);
-    //println!("{:?}", cov_df);
+    println!("{:?}", cov_df);
     println!("{reads_df:?}");
     println!("{vtype_df:?}");
 
