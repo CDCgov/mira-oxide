@@ -96,7 +96,7 @@ fn read_yaml<R: std::io::Read>(reader: R) -> Result<QCConfig, Box<dyn std::error
     let mut contents = String::new();
     let mut buf_reader = BufReader::new(reader);
     buf_reader.read_to_string(&mut contents)?;
-    let config: QCConfig = serde_yaml::from_str(&contents)?;
+    let config: QCConfig = serde_yaml_ng::from_str(&contents)?;
     Ok(config)
 }
 
