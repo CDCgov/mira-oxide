@@ -14,6 +14,21 @@ pub fn read_csv_to_dataframe(file_path: &PathBuf) -> Result<DataFrame, Box<dyn E
     Ok(df)
 }
 
+/// Extract the sample name from the file path
+fn extract_sample_name(path: &PathBuf) -> Result<String, Box<dyn Error>> {
+    let parent_dir = path.parent().and_then(|p| p.parent());
+    if let Some(parent_dir) = parent_dir {
+        let sample = parent_dir
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .to_string();
+        Ok(sample)
+    } else {
+        Err("Failed to extract sample name from path.".into())
+    }
+}
+
 ///Read in the coverage files made by irma and convert to df
 pub fn coverage_df(irma_path: impl AsRef<Path>) -> Result<DataFrame, Box<dyn Error>> {
     // Define the pattern to match text files
@@ -29,13 +44,17 @@ pub fn coverage_df(irma_path: impl AsRef<Path>) -> Result<DataFrame, Box<dyn Err
     for entry in glob(&pattern).expect("Failed to read glob pattern") {
         match entry {
             Ok(path) => {
-                // Read the CSV file into a DataFrame
+                let sample = extract_sample_name(&path)?;
                 let file_path = path.to_str().unwrap();
 
-                let df = CsvReader::from_path(file_path)?
+                let mut df = CsvReader::from_path(file_path)?
                     .has_header(true)
                     .with_delimiter(b'\t')
                     .finish()?;
+
+                // Add the "Sample" column to the DataFrame
+                let sample_series = Series::new("Sample", vec![sample; df.height()]);
+                df = df.hstack(&[sample_series])?;
 
                 // Combine the DataFrame with the existing one
                 combined_cov_df = match combined_cov_df {
@@ -70,13 +89,17 @@ pub fn readcount_df(irma_path: impl AsRef<Path>) -> Result<DataFrame, Box<dyn Er
     for entry in glob(&pattern).expect("Failed to read glob pattern") {
         match entry {
             Ok(path) => {
-                // Read the CSV file into a DataFrame
+                let sample = extract_sample_name(&path)?;
                 let file_path = path.to_str().unwrap();
 
-                let df = CsvReader::from_path(file_path)?
+                let mut df = CsvReader::from_path(file_path)?
                     .has_header(true)
                     .with_delimiter(b'\t')
                     .finish()?;
+
+                // Add the "Sample" column to the DataFrame
+                let sample_series = Series::new("Sample", vec![sample; df.height()]);
+                df = df.hstack(&[sample_series])?;
 
                 // Combine the DataFrame with the existing one
                 combined_reads_df = match combined_reads_df {
@@ -122,7 +145,7 @@ pub fn read_record2type(record: &str) -> Vec<String> {
 
 /// Processes the DataFrame to extract sample types based on the `Record` column.
 pub fn dash_irma_sample_type(reads_df: &DataFrame) -> Result<DataFrame, PolarsError> {
-    println!("{reads_df:?}");
+    //println!("{reads_df:?}");
 
     // Filter rows where the first character of the 'Record' column is '4'
     let mask = reads_df
@@ -132,6 +155,7 @@ pub fn dash_irma_sample_type(reads_df: &DataFrame) -> Result<DataFrame, PolarsEr
         .map(|record| record.map(|r| r.starts_with('4')))
         .collect::<ChunkedArray<BooleanType>>();
     let type_df = reads_df.filter(&mask)?;
+    // Filter the DataFrame where "Records" column contains '4' anywhere in the string
 
     // Create new columns: 'vtype', 'ref_type', 'subtype'
     let new_cols = ["vtype", "ref_type", "subtype"];
@@ -167,7 +191,7 @@ pub fn dash_irma_sample_type(reads_df: &DataFrame) -> Result<DataFrame, PolarsEr
     new_columns.push(Series::new("Reference", reference_col));
 
     // Create a new DataFrame with the selected columns
-    let new_df = DataFrame::new(new_columns)?;
+    let mut new_df = DataFrame::new(new_columns)?;
     //new_df = new_df.select(&["Sample", "vtype", "ref_type", "subtype"])?;
     Ok(new_df)
 }

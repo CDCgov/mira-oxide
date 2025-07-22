@@ -17,6 +17,8 @@ plotly = { git = "https://github.com/plotly/plotly.rs.git", branch = "main" }
 polars = { version = "0.33", default-features = false, features = [
     "csv",
     "lazy",
+    "fmt",
+    "fmt_no_tty",
 ] }
 
 zoe = { version = "0.0.19", default-features = false, features = [
