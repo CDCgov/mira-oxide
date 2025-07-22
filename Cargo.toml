@@ -14,7 +14,10 @@ glob = "0.3.2"
 ordered-float = "5.0.0"
 #plotly = "0.12.1"
 plotly = { git = "https://github.com/plotly/plotly.rs.git", branch = "main" }
-polars = { version = "0.33", features = ["csv","lazy"] }
+polars = { version = "0.33", default-features = false, features = [
+    "csv",
+    "lazy",
+] }
 
 zoe = { version = "0.0.19", default-features = false, features = [
     "multiversion",
