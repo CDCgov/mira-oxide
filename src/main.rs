@@ -35,9 +35,8 @@ fn main() {
     let module = module_path!();
 
     match args.command {
-        Commands::VariantsOfInterest(cmd_args) => {
-            variants_of_interest_process(cmd_args).expect(&format!("{module}::VariantsOfInterest"))
-        }
+        Commands::VariantsOfInterest(cmd_args) => variants_of_interest_process(cmd_args)
+            .unwrap_or_else(|_| panic!("{module}::VariantsOfInterest")),
         Commands::FindChemistry(cmd_args) => {
             find_chemistry_process(cmd_args).unwrap_or_die(&format!("{module}::FindChemistry"))
         }
@@ -46,11 +45,10 @@ fn main() {
         }
         Commands::NTDiffs(cmd_args) => all_sample_nt_diffs_process(cmd_args),
         Commands::Plotter(cmd_args) => {
-            plotter_process(cmd_args).expect(&format!("{module}::Plotter"))
+            plotter_process(cmd_args).unwrap_or_else(|_| panic!("{module}::Plotter"))
         }
-        Commands::PrepareMiraReports(cmd_args) => {
-            prepare_mira_reports_process(cmd_args).expect(&format!("{module}::PrepareMiraReports"))
-        }
+        Commands::PrepareMiraReports(cmd_args) => prepare_mira_reports_process(cmd_args)
+            .unwrap_or_else(|_| panic!("{module}::PrepareMiraReports")),
         _ => {
             eprintln!("mira-oxide: unrecognized command {:?}", args.command);
             std::process::exit(1)

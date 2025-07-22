@@ -162,7 +162,7 @@ fn generate_plot_coverage(input_directory: &PathBuf) -> Result<Plot, Box<dyn Err
 
     // Set the figure title
     let layout = Layout::new()
-        .title(&format!(
+        .title(format!(
             "Coverage | {}",
             input_directory
                 .file_name()
@@ -201,14 +201,14 @@ fn generate_plot_coverage_seg(input_directory: &PathBuf) -> Result<Plot, Box<dyn
     let mut file_paths = Vec::new();
 
     // First, count files and collect paths
-    for entry in glob(&format!(
+    for path in (glob(&format!(
         "{}/tables/*coverage.txt",
         input_directory.display()
-    ))? {
-        if let Ok(path) = entry {
-            //file_count += 1;
-            file_paths.push(path);
-        }
+    ))?)
+    .flatten()
+    {
+        //file_count += 1;
+        file_paths.push(path);
     }
 
     // Calculate grid dimensions for subplots
@@ -216,46 +216,44 @@ fn generate_plot_coverage_seg(input_directory: &PathBuf) -> Result<Plot, Box<dyn
     let cols = 2; //(file_count + rows - 1) / rows; // Ceiling division
 
     // Load variant data into a HashMap keyed by segment name
+    // TODO: consider a struct with named fields
     let mut variants_data: HashMap<String, Vec<(u32, String, String, u32, u32, f32)>> =
         HashMap::new();
 
     // Look for variant files with matching prefixes in the directory
-    for entry in glob(&format!(
+    for variant_path in (glob(&format!(
         "{}/tables/*variants.txt",
         input_directory.display()
-    ))? {
-        if let Ok(variant_path) = entry {
-            let file = File::open(&variant_path)?;
+    ))?)
+    .flatten()
+    {
+        let file = File::open(&variant_path)?;
 
-            // Create a TSV reader
-            let mut rdr = ReaderBuilder::new()
-                .delimiter(b'\t')
-                .has_headers(true)
-                .from_reader(file);
+        // Create a TSV reader
+        let mut rdr = ReaderBuilder::new()
+            .delimiter(b'\t')
+            .has_headers(true)
+            .from_reader(file);
 
-            for result in rdr.records() {
-                let record = result?;
-                if record.len() >= 8 {
-                    let segment_name = record[0].to_string();
-                    let position: u32 = record[1].parse()?;
-                    let consensus_allele: String = record[3].to_string();
-                    let minority_allele: String = record[4].to_string();
-                    let consensus_count: u32 = record[5].parse()?;
-                    let minority_count: u32 = record[6].parse()?;
-                    let minority_frequency: f32 = record[8].parse()?;
+        for result in rdr.records() {
+            let record = result?;
+            if record.len() >= 8 {
+                let segment_name = record[0].to_string();
+                let position: u32 = record[1].parse()?;
+                let consensus_allele: String = record[3].to_string();
+                let minority_allele: String = record[4].to_string();
+                let consensus_count: u32 = record[5].parse()?;
+                let minority_count: u32 = record[6].parse()?;
+                let minority_frequency: f32 = record[8].parse()?;
 
-                    variants_data
-                        .entry(segment_name)
-                        .or_insert_with(Vec::new)
-                        .push((
-                            position,
-                            consensus_allele,
-                            minority_allele,
-                            consensus_count,
-                            minority_count,
-                            minority_frequency,
-                        ));
-                }
+                variants_data.entry(segment_name).or_default().push((
+                    position,
+                    consensus_allele,
+                    minority_allele,
+                    consensus_count,
+                    minority_count,
+                    minority_frequency,
+                ));
             }
         }
     }
@@ -356,7 +354,7 @@ fn generate_plot_coverage_seg(input_directory: &PathBuf) -> Result<Plot, Box<dyn
             // Create trace for minority values with consistent color (but with transparency)
             let minority_trace = Scatter::new(variant_positions, minority_values)
                 .mode(Mode::Markers)
-                .name(&format!("{}", segment_name))
+                .name(&segment_name)
                 .marker(
                     plotly::common::Marker::new()
                         .color(segment_color)
@@ -383,7 +381,7 @@ fn generate_plot_coverage_seg(input_directory: &PathBuf) -> Result<Plot, Box<dyn
                 .columns(cols)
                 .pattern(GridPattern::Independent),
         )
-        .title(&format!(
+        .title(format!(
             "Segment Coverage | {}",
             input_directory
                 .file_name()
@@ -505,17 +503,15 @@ fn generate_sankey_plot(input_directory: &PathBuf) -> Result<Plot, Box<dyn Error
 
     // Process data and build node map first
     let mut records = Vec::new();
-    for line in lines {
-        if let Ok(line) = line {
-            let parts: Vec<&str> = line.split('\t').collect();
-            if parts.len() >= 3 {
-                let record = parts[0];
-                let reads: u32 = parts[1].parse().unwrap_or(0);
+    for line in lines.map_while(Result::ok) {
+        let parts: Vec<&str> = line.split('\t').collect();
+        if parts.len() >= 3 {
+            let record = parts[0];
+            let reads: u32 = parts[1].parse().unwrap_or(0);
 
-                // Skip "NA" values and 0 reads
-                if parts[1] != "NA" && reads > 0 {
-                    records.push((record.to_string(), reads));
-                }
+            // Skip "NA" values and 0 reads
+            if parts[1] != "NA" && reads > 0 {
+                records.push((record.to_string(), reads));
             }
         }
     }
@@ -733,7 +729,7 @@ fn generate_sankey_plot(input_directory: &PathBuf) -> Result<Plot, Box<dyn Error
 
     // Set layout
     let layout = Layout::new()
-        .title(&format!(
+        .title(format!(
             "Read Assignment | {}",
             input_directory
                 .file_name()
