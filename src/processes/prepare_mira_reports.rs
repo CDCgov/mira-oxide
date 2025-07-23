@@ -3,8 +3,6 @@ use crate::utils::dataframes::*;
 use clap::Parser;
 use csv::ReaderBuilder;
 use either::Either;
-use glob::glob;
-use polars::prelude::*;
 use serde::{self, Deserialize, de::DeserializeOwned};
 use std::{
     error::Error,
@@ -26,15 +24,15 @@ pub struct ReportsArgs {
 
     #[arg(short = 'q', long)]
     /// Optional input fasta
-    qc_yaml: PathBuf,
+    qc_yaml: Option<PathBuf>,
 
     #[arg(short = 'p', long)]
     /// Optional input fasta
-    platform: String,
+    platform: Option<String>,
 
     #[arg(short = 'w', long)]
     /// Optional output delimited file
-    workdir_path: PathBuf,
+    workdir_path: Option<PathBuf>,
 
     #[arg(short = 'c', long, default_value = ",")]
     /// Use the provider delimiter for separating fields. Default is ','
@@ -42,7 +40,14 @@ pub struct ReportsArgs {
 }
 
 #[derive(Deserialize, Debug)]
-pub struct Samplesheet {
+pub struct SamplesheetI {
+    sample_id: String,
+    sample_type: String,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct SamplesheetO {
+    barcode: String,
     sample_id: String,
     sample_type: String,
 }
@@ -81,17 +86,6 @@ struct QCConfig {
     ont_rsv: QCSettings,
 }
 
-fn create_reader(path: Option<PathBuf>) -> std::io::Result<BufReader<Either<File, Stdin>>> {
-    let reader = if let Some(ref file_path) = path {
-        let file = OpenOptions::new().read(true).open(file_path)?;
-        BufReader::new(Either::Left(file))
-    } else {
-        BufReader::new(Either::Right(stdin()))
-    };
-
-    Ok(reader)
-}
-
 fn read_yaml<R: std::io::Read>(reader: R) -> Result<QCConfig, Box<dyn std::error::Error>> {
     let mut contents = String::new();
     let mut buf_reader = BufReader::new(reader);
@@ -102,28 +96,22 @@ fn read_yaml<R: std::io::Read>(reader: R) -> Result<QCConfig, Box<dyn std::error
 
 pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Error>> {
     // Read in samplesheet
-    let samplesheet = read_csv_to_dataframe(&args.samplesheet)?;
+    let samplesheet_path = create_reader(Some(args.samplesheet))?;
+    let samplesheet: Vec<SamplesheetO> = read_csv(samplesheet_path, false)?;
 
     // Read in qc yaml
-    let qc_yaml_path = create_reader(Some(args.qc_yaml))?;
+    let qc_yaml_path = create_reader(args.qc_yaml)?;
     let qc_config: QCConfig = read_yaml(qc_yaml_path)?;
 
-    //read in all dfs
-    let cov_df = coverage_df(&args.irma_path)?;
-    let reads_df = readcount_df(&args.irma_path)?;
-    let vtype_df = dash_irma_sample_type(&reads_df)?;
-    /*
-       let output_file = "./output_df.csv"; // Adjust the path as needed
+    //Read in data
+    let coverage_data = coverage_data_collection(&args.irma_path)?;
+    let read_data = reads_data_collection(&args.irma_path)?;
+    let vtype_data = dash_irma_sample_type(read_data);
 
-       CsvWriter::new(std::fs::File::create(output_file)?)
-           .has_header(true)
-           .finish(&mut reads_df)?;
-    */
     println!("{samplesheet:?}");
-    //println!("{:?}", qc_config);
-    println!("{:?}", cov_df);
-    println!("{reads_df:?}");
-    println!("{vtype_df:?}");
+    println!("{qc_config:?}");
+    println!("Coverage data: {coverage_data:?}");
+    println!("Reads data: {vtype_data:?}");
 
     Ok(())
 }

@@ -1,21 +1,89 @@
+use csv::ReaderBuilder;
+use either::Either;
 use glob::glob;
-use polars::prelude::*;
-use std::error::Error;
-use std::path::{Path, PathBuf};
+use serde::{self, Deserialize, de::DeserializeOwned};
+use std::{
+    error::Error,
+    fs::{File, OpenOptions},
+    io::{BufReader, Stdin, stdin},
+    path::{Path, PathBuf},
+};
 
-///reads any csv into a df
-pub fn read_csv_to_dataframe(file_path: &PathBuf) -> Result<DataFrame, Box<dyn Error>> {
-    // Read the CSV file into a DataFrame
-    let df = CsvReader::from_path(file_path)?
-        .infer_schema(None)
-        .has_header(true)
-        .finish()?;
+// Coverage struct
+#[derive(Deserialize, Debug)]
+pub struct CoverageData {
+    #[serde(rename = "Reference_Name")]
+    reference_name: String,
+    #[serde(rename = "Position")]
+    position: String,
+    #[serde(rename = "Coverage Depth")]
+    coverage_depth: String,
+    #[serde(rename = "Consensus")]
+    consensus: String,
+    #[serde(rename = "Deletions")]
+    deletions: String,
+    #[serde(rename = "Ambiguous")]
+    ambiguous: String,
+    #[serde(rename = "Consensus_Count")]
+    consensus_count: String,
+    #[serde(rename = "Consensus_Average_Quality")]
+    consensus_avg_quality: String,
+    sample_id: Option<String>,
+}
 
-    Ok(df)
+// Reads struct
+#[derive(Deserialize, Debug)]
+pub struct ReadsData {
+    #[serde(rename = "Record")]
+    record: String,
+    #[serde(rename = "Reads")]
+    reads: String,
+    #[serde(rename = "Patterns")]
+    patterns: String,
+    #[serde(rename = "PairsAndWidows")]
+    pairs_and_windows: String,
+    sample_id: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ProcessedRecord {
+    pub sample_id: Option<String>, // Optional field
+    pub vtype: String,
+    pub ref_type: String,
+    pub subtype: String,
+}
+
+pub fn create_reader(path: Option<PathBuf>) -> std::io::Result<BufReader<Either<File, Stdin>>> {
+    let reader = if let Some(ref file_path) = path {
+        let file = OpenOptions::new().read(true).open(file_path)?;
+        BufReader::new(Either::Left(file))
+    } else {
+        BufReader::new(Either::Right(stdin()))
+    };
+
+    Ok(reader)
+}
+
+pub fn read_csv<T: DeserializeOwned, R: std::io::Read>(
+    reader: R,
+    has_headers: bool,
+) -> Result<Vec<T>, Box<dyn std::error::Error>> {
+    let mut rdr = ReaderBuilder::new()
+        .has_headers(has_headers)
+        .delimiter(b',')
+        .from_reader(reader);
+
+    let mut records = Vec::new();
+    for result in rdr.deserialize() {
+        let record: T = result?;
+        records.push(record);
+    }
+
+    Ok(records)
 }
 
 /// Extract the sample name from the file path
-fn extract_sample_name(path: &PathBuf) -> Result<String, Box<dyn Error>> {
+fn extract_sample_name(path: &Path) -> Result<String, Box<dyn Error>> {
     let parent_dir = path.parent().and_then(|p| p.parent());
     if let Some(parent_dir) = parent_dir {
         let sample = parent_dir
@@ -29,169 +97,142 @@ fn extract_sample_name(path: &PathBuf) -> Result<String, Box<dyn Error>> {
     }
 }
 
-///Read in the coverage files made by irma and convert to df
-pub fn coverage_df(irma_path: impl AsRef<Path>) -> Result<DataFrame, Box<dyn Error>> {
+/// Read tab-delimited data and include the sample name
+fn process_cov_txt_with_sample<R: std::io::Read>(
+    reader: R,
+    has_headers: bool,
+    sample_id: String,
+) -> Result<Vec<CoverageData>, Box<dyn std::error::Error>> {
+    let mut rdr = ReaderBuilder::new()
+        .has_headers(has_headers)
+        .delimiter(b'\t')
+        .from_reader(reader);
+
+    let mut records: Vec<CoverageData> = Vec::new();
+    for result in rdr.deserialize() {
+        let mut record: CoverageData = result?;
+        record.sample_id = Some(sample_id.clone()); // Add the sample_id to the record
+        records.push(record);
+    }
+
+    Ok(records)
+}
+
+/// Read in the coverage files made by IRMA and convert to a vector of CoverageData
+pub fn coverage_data_collection(
+    irma_path: &PathBuf,
+) -> Result<Vec<CoverageData>, Box<dyn std::error::Error>> {
     // Define the pattern to match text files
     let pattern = format!(
         "{}/*/IRMA/*/tables/*coverage.txt",
-        irma_path.as_ref().to_string_lossy()
+        irma_path.to_string_lossy()
     );
 
-    // Initialize an empty DataFrame to hold the combined data
-    let mut combined_cov_df: Option<DataFrame> = None;
+    // Initialize an empty vector to hold the combined data
+    let mut cov_data: Vec<CoverageData> = Vec::new();
 
     // Iterate over all files matching the pattern
     for entry in glob(&pattern).expect("Failed to read glob pattern") {
         match entry {
             Ok(path) => {
                 let sample = extract_sample_name(&path)?;
-                let file_path = path.to_str().unwrap();
+                let file = File::open(&path)?;
+                let reader = BufReader::new(file);
 
-                let mut df = CsvReader::from_path(file_path)?
-                    .has_header(true)
-                    .with_delimiter(b'\t')
-                    .finish()?;
-
-                // Add the "Sample" column to the DataFrame
-                let sample_series = Series::new("Sample", vec![sample; df.height()]);
-                df = df.hstack(&[sample_series])?;
-
-                // Combine the DataFrame with the existing one
-                combined_cov_df = match combined_cov_df {
-                    Some(existing_df) => Some(existing_df.vstack(&df)?),
-                    None => Some(df),
-                };
+                // Read the data from the file and include the sample name
+                let mut records = process_cov_txt_with_sample(reader, true, sample)?;
+                cov_data.append(&mut records); // Append the records to the combined data
             }
             Err(e) => println!("Error reading file: {e}"),
         }
     }
-
-    // Return the combined DataFrame or an error if no data was found
-    if let Some(df) = combined_cov_df {
-        Ok(df)
-    } else {
-        Err("No files found or no data to combine.".into())
-    }
+    Ok(cov_data)
 }
 
-///Read in the read count files made by irma and convert to df
-pub fn readcount_df(irma_path: impl AsRef<Path>) -> Result<DataFrame, Box<dyn Error>> {
+/// Read tab-delimited data and include the sample name
+fn process_reads_txt_with_sample<R: std::io::Read>(
+    reader: R,
+    has_headers: bool,
+    sample_id: String,
+) -> Result<Vec<ReadsData>, Box<dyn std::error::Error>> {
+    let mut rdr = ReaderBuilder::new()
+        .has_headers(has_headers)
+        .delimiter(b'\t')
+        .from_reader(reader);
+
+    let mut records: Vec<ReadsData> = Vec::new();
+    for result in rdr.deserialize() {
+        let mut record: ReadsData = result?;
+        record.sample_id = Some(sample_id.clone()); // Add the sample_id to the record
+        records.push(record);
+    }
+
+    Ok(records)
+}
+
+pub fn reads_data_collection(
+    irma_path: &PathBuf,
+) -> Result<Vec<ReadsData>, Box<dyn std::error::Error>> {
     // Define the pattern to match text files
     let pattern = format!(
         "{}/*/IRMA/*/tables/READ_COUNTS.txt",
-        irma_path.as_ref().to_string_lossy()
+        irma_path.to_string_lossy()
     );
 
-    // Initialize an empty DataFrame to hold the combined data
-    let mut combined_reads_df: Option<DataFrame> = None;
+    // Initialize an empty vector to hold the combined data
+    let mut reads_data: Vec<ReadsData> = Vec::new();
 
     // Iterate over all files matching the pattern
     for entry in glob(&pattern).expect("Failed to read glob pattern") {
         match entry {
             Ok(path) => {
                 let sample = extract_sample_name(&path)?;
-                let file_path = path.to_str().unwrap();
+                let file = File::open(&path)?;
+                let reader = BufReader::new(file);
 
-                let mut df = CsvReader::from_path(file_path)?
-                    .has_header(true)
-                    .with_delimiter(b'\t')
-                    .finish()?;
-
-                // Add the "Sample" column to the DataFrame
-                let sample_series = Series::new("Sample", vec![sample; df.height()]);
-                df = df.hstack(&[sample_series])?;
-
-                // Combine the DataFrame with the existing one
-                combined_reads_df = match combined_reads_df {
-                    Some(existing_df) => Some(existing_df.vstack(&df)?),
-                    None => Some(df),
-                };
+                // Read the data from the file and include the sample name
+                let mut records = process_reads_txt_with_sample(reader, true, sample)?;
+                reads_data.append(&mut records); // Append the records to the combined data
             }
             Err(e) => println!("Error reading file: {e}"),
         }
     }
-    println!(
-        "inside: {:?}",
-        combined_reads_df
-            .clone()
-            .expect("REASON")
-            .get_column_names()
-    );
-
-    // Return the combined DataFrame or an error if no data was found
-    if let Some(df) = combined_reads_df {
-        Ok(df)
-    } else {
-        Err("No files found or no data to combine.".into())
-    }
+    Ok(reads_data)
 }
 
-/// Parses a record string into vtype, ref_type, and subtype.
-pub fn read_record2type(record: &str) -> Vec<String> {
+fn read_record2type(record: &str) -> (String, String, String) {
     let parts: Vec<&str> = record.split('_').collect();
     if parts.len() >= 2 {
-        let vtype = parts[0][2..].to_string();
+        let vtype = parts[0][2..].to_string(); // Remove the first two characters
         let ref_type = parts[1].to_string();
         let subtype = if ref_type == "HA" || ref_type == "NA" {
             parts.last().unwrap_or(&"").to_string()
         } else {
             "".to_string()
         };
-        vec![vtype, ref_type, subtype]
+        (vtype, ref_type, subtype)
     } else {
-        vec![record[2..].to_string(); 3]
+        let fallback = record[2..].to_string();
+        (fallback.clone(), fallback.clone(), fallback.clone())
     }
 }
 
-/// Processes the DataFrame to extract sample types based on the `Record` column.
-pub fn dash_irma_sample_type(reads_df: &DataFrame) -> Result<DataFrame, PolarsError> {
-    //println!("{reads_df:?}");
+pub fn dash_irma_sample_type(reads_data: Vec<ReadsData>) -> Vec<ProcessedRecord> {
+    let mut processed_records = Vec::new();
 
-    // Filter rows where the first character of the 'Record' column is '4'
-    let mask = reads_df
-        .column("Record")?
-        .utf8()?
-        .into_iter()
-        .map(|record| record.map(|r| r.starts_with('4')))
-        .collect::<ChunkedArray<BooleanType>>();
-    let type_df = reads_df.filter(&mask)?;
-    // Filter the DataFrame where "Records" column contains '4' anywhere in the string
-
-    // Create new columns: 'vtype', 'ref_type', 'subtype'
-    let new_cols = ["vtype", "ref_type", "subtype"];
-    let mut new_columns = Vec::new();
-
-    for (n, col_name) in new_cols.iter().enumerate() {
-        let col = type_df
-            .column("Record")?
-            .utf8()?
-            .into_iter()
-            .map(|record| {
-                record.map(|r| {
-                    let types = read_record2type(r);
-                    types[n].clone()
-                })
-            })
-            .collect::<Vec<Option<String>>>();
-        new_columns.push(Series::new(col_name, col));
+    for data in reads_data.iter() {
+        // Filter records where the first character of 'record' is '4'
+        if data.record.starts_with('4') {
+            let (vtype, ref_type, subtype) = read_record2type(&data.record);
+            let processed_record = ProcessedRecord {
+                sample_id: data.sample_id.clone(),
+                vtype,
+                ref_type,
+                subtype,
+            };
+            processed_records.push(processed_record);
+        }
     }
 
-    // Add the 'Reference' column
-    let reference_col = type_df
-        .column("Record")?
-        .utf8()?
-        .into_iter()
-        .map(|record| {
-            record.map(|r| {
-                let parts: Vec<&str> = r.split('_').collect();
-                parts[0][2..].to_string()
-            })
-        })
-        .collect::<Vec<Option<String>>>();
-    new_columns.push(Series::new("Reference", reference_col));
-
-    // Create a new DataFrame with the selected columns
-    let mut new_df = DataFrame::new(new_columns)?;
-    //new_df = new_df.select(&["Sample", "vtype", "ref_type", "subtype"])?;
-    Ok(new_df)
+    processed_records
 }
