@@ -5,7 +5,7 @@ use serde::{self, Deserialize, de::DeserializeOwned};
 use std::{
     error::Error,
     fs::{File, OpenOptions},
-    io::{BufReader, Stdin, stdin},
+    io::{BufReader, Read, Stdin, stdin},
     path::{Path, PathBuf},
 };
 
@@ -53,6 +53,30 @@ pub struct ProcessedRecord {
     pub subtype: String,
 }
 
+// Alleles struct
+#[derive(Deserialize, Debug)]
+pub struct AllelesData {
+    #[serde(rename = "Reference_Name")]
+    reference_name: String,
+    #[serde(rename = "HMM_Position")]
+    hmm_position: Option<String>,
+    #[serde(rename = "Position")]
+    position: String,
+    #[serde(rename = "Total")]
+    total: String,
+    #[serde(rename = "Consensus_Allele")]
+    consensus_allele: String,
+    #[serde(rename = "Minority_Allele")]
+    minority_allele: String,
+    #[serde(rename = "Consensus_Count")]
+    consensus_count: String,
+    #[serde(rename = "Minority_Count")]
+    minority_count: String,
+    #[serde(rename = "Minority_Frequency")]
+    minority_frequency: String,
+    sample_id: Option<String>,
+}
+
 pub fn create_reader(path: Option<PathBuf>) -> std::io::Result<BufReader<Either<File, Stdin>>> {
     let reader = if let Some(ref file_path) = path {
         let file = OpenOptions::new().read(true).open(file_path)?;
@@ -97,21 +121,51 @@ fn extract_sample_name(path: &Path) -> Result<String, Box<dyn Error>> {
     }
 }
 
+// Define a trait for structs that have a `sample_id` field
+trait HasSampleId {
+    fn set_sample_id(&mut self, sample_id: String);
+}
+
+// Implement the trait for CoverageData
+impl HasSampleId for CoverageData {
+    fn set_sample_id(&mut self, sample_id: String) {
+        self.sample_id = Some(sample_id);
+    }
+}
+
+// Implement the trait for ReadsData
+impl HasSampleId for ReadsData {
+    fn set_sample_id(&mut self, sample_id: String) {
+        self.sample_id = Some(sample_id);
+    }
+}
+
+// Implement the trait for AllelesData
+impl HasSampleId for AllelesData {
+    fn set_sample_id(&mut self, sample_id: String) {
+        self.sample_id = Some(sample_id);
+    }
+}
+
 /// Read tab-delimited data and include the sample name
-fn process_cov_txt_with_sample<R: std::io::Read>(
+fn process_txt_with_sample<R, T>(
     reader: R,
     has_headers: bool,
     sample_id: String,
-) -> Result<Vec<CoverageData>, Box<dyn std::error::Error>> {
+) -> Result<Vec<T>, Box<dyn std::error::Error>>
+where
+    R: Read,
+    T: for<'de> Deserialize<'de> + HasSampleId,
+{
     let mut rdr = ReaderBuilder::new()
         .has_headers(has_headers)
         .delimiter(b'\t')
         .from_reader(reader);
 
-    let mut records: Vec<CoverageData> = Vec::new();
+    let mut records: Vec<T> = Vec::new();
     for result in rdr.deserialize() {
-        let mut record: CoverageData = result?;
-        record.sample_id = Some(sample_id.clone()); // Add the sample_id to the record
+        let mut record: T = result?;
+        record.set_sample_id(sample_id.clone());
         records.push(record);
     }
 
@@ -140,34 +194,13 @@ pub fn coverage_data_collection(
                 let reader = BufReader::new(file);
 
                 // Read the data from the file and include the sample name
-                let mut records = process_cov_txt_with_sample(reader, true, sample)?;
+                let mut records: Vec<CoverageData> = process_txt_with_sample(reader, true, sample)?;
                 cov_data.append(&mut records); // Append the records to the combined data
             }
             Err(e) => println!("Error reading file: {e}"),
         }
     }
     Ok(cov_data)
-}
-
-/// Read tab-delimited data and include the sample name
-fn process_reads_txt_with_sample<R: std::io::Read>(
-    reader: R,
-    has_headers: bool,
-    sample_id: String,
-) -> Result<Vec<ReadsData>, Box<dyn std::error::Error>> {
-    let mut rdr = ReaderBuilder::new()
-        .has_headers(has_headers)
-        .delimiter(b'\t')
-        .from_reader(reader);
-
-    let mut records: Vec<ReadsData> = Vec::new();
-    for result in rdr.deserialize() {
-        let mut record: ReadsData = result?;
-        record.sample_id = Some(sample_id.clone()); // Add the sample_id to the record
-        records.push(record);
-    }
-
-    Ok(records)
 }
 
 pub fn reads_data_collection(
@@ -191,7 +224,7 @@ pub fn reads_data_collection(
                 let reader = BufReader::new(file);
 
                 // Read the data from the file and include the sample name
-                let mut records = process_reads_txt_with_sample(reader, true, sample)?;
+                let mut records: Vec<ReadsData> = process_txt_with_sample(reader, true, sample)?;
                 reads_data.append(&mut records); // Append the records to the combined data
             }
             Err(e) => println!("Error reading file: {e}"),
@@ -203,7 +236,7 @@ pub fn reads_data_collection(
 fn read_record2type(record: &str) -> (String, String, String) {
     let parts: Vec<&str> = record.split('_').collect();
     if parts.len() >= 2 {
-        let vtype = parts[0][2..].to_string(); // Remove the first two characters
+        let vtype = parts[0][2..].to_string();
         let ref_type = parts[1].to_string();
         let subtype = if ref_type == "HA" || ref_type == "NA" {
             parts.last().unwrap_or(&"").to_string()
@@ -217,7 +250,7 @@ fn read_record2type(record: &str) -> (String, String, String) {
     }
 }
 
-pub fn dash_irma_sample_type(reads_data: Vec<ReadsData>) -> Vec<ProcessedRecord> {
+pub fn create_vtype_data(reads_data: Vec<ReadsData>) -> Vec<ProcessedRecord> {
     let mut processed_records = Vec::new();
 
     for data in reads_data.iter() {
@@ -235,4 +268,34 @@ pub fn dash_irma_sample_type(reads_data: Vec<ReadsData>) -> Vec<ProcessedRecord>
     }
 
     processed_records
+}
+
+pub fn allele_data_collection(
+    irma_path: &PathBuf,
+) -> Result<Vec<AllelesData>, Box<dyn std::error::Error>> {
+    // Define the pattern to match text files
+    let pattern = format!(
+        "{}/*/IRMA/*/tables/*variants.txt",
+        irma_path.to_string_lossy()
+    );
+
+    // Initialize an empty vector to hold the combined data
+    let mut reads_data: Vec<AllelesData> = Vec::new();
+
+    // Iterate over all files matching the pattern
+    for entry in glob(&pattern).expect("Failed to read glob pattern") {
+        match entry {
+            Ok(path) => {
+                let sample = extract_sample_name(&path)?;
+                let file = File::open(&path)?;
+                let reader = BufReader::new(file);
+
+                // Read the data from the file and include the sample name
+                let mut records: Vec<AllelesData> = process_txt_with_sample(reader, true, sample)?;
+                reads_data.append(&mut records); // Append the records to the combined data
+            }
+            Err(e) => println!("Error reading file: {e}"),
+        }
+    }
+    Ok(reads_data)
 }
