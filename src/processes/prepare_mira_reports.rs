@@ -108,13 +108,15 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     let read_data = reads_data_collection(&args.irma_path)?;
     let vtype_data = create_vtype_data(read_data);
     let allele_data = allele_data_collection(&args.irma_path)?;
+    let indel_data = indels_data_collection(&args.irma_path)?;
 
     println!("{samplesheet:?}");
     println!("{qc_config:?}");
     println!("Coverage data: {coverage_data:?}");
     //println!("Reads data: {read_data:?}");
     println!("Reads data: {vtype_data:?}");
-    println!("Reads data: {allele_data:?}");
+    println!("Allele data: {allele_data:?}");
+    println!("Indel data: {indel_data:?}");
 
     Ok(())
 }
