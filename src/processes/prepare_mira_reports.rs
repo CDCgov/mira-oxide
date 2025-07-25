@@ -120,12 +120,12 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
 
     // Write the structs to JSON files
     let reads_columns = vec![
-        "sample_id",
+        "Sample",
         "Record",
         "Reads",
         "Patterns",
         "PairsAndWidows",
-        "stage",
+        "Stage",
     ];
     write_structs_to_split_json_file("read_data.json", &read_data, reads_columns)?;
 

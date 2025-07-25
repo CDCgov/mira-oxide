@@ -36,6 +36,7 @@ pub struct CoverageData {
 // Reads struct
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ReadsData {
+    #[serde(rename = "Sample")]
     sample_id: Option<String>,
     #[serde(rename = "Record")]
     record: String,
@@ -45,6 +46,7 @@ pub struct ReadsData {
     patterns: String,
     #[serde(rename = "PairsAndWidows")]
     pairs_and_windows: String,
+    #[serde(rename = "Stage")]
     stage: Option<String>,
 }
 
@@ -270,6 +272,12 @@ pub fn reads_data_collection(
 
                 // Read the data from the file and include the sample name
                 let mut records: Vec<ReadsData> = process_txt_with_sample(reader, true, sample)?;
+                for line in &mut records {
+                    if let Some(first_char) = line.record.chars().next() {
+                        line.stage = Some(first_char.to_string());
+                    }
+                }
+
                 reads_data.append(&mut records);
             }
             Err(e) => println!("Error reading file: {e}"),
