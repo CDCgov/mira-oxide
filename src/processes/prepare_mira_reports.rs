@@ -1,5 +1,5 @@
 #![allow(dead_code, unused_imports)]
-use crate::utils::data_ingest::*;
+use crate::utils::{data_ingest::*, writing_outputs::*};
 use clap::Parser;
 use csv::ReaderBuilder;
 use either::Either;
@@ -106,17 +106,28 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     //Read in data
     let coverage_data = coverage_data_collection(&args.irma_path)?;
     let read_data = reads_data_collection(&args.irma_path)?;
-    let vtype_data = create_vtype_data(read_data);
+    let vtype_data = create_vtype_data(&read_data);
     let allele_data = allele_data_collection(&args.irma_path)?;
     let indel_data = indels_data_collection(&args.irma_path)?;
 
-    println!("{samplesheet:?}");
-    println!("{qc_config:?}");
-    println!("Coverage data: {coverage_data:?}");
+    //println!("{samplesheet:?}");
+    //println!("{qc_config:?}");
+    //println!("Coverage data: {coverage_data:?}");
     //println!("Reads data: {read_data:?}");
-    println!("Reads data: {vtype_data:?}");
-    println!("Allele data: {allele_data:?}");
-    println!("Indel data: {indel_data:?}");
+    //println!("Reads data: {vtype_data:?}");
+    //println!("Allele data: {allele_data:?}");
+    //println!("Indel data: {indel_data:?}");
+
+    // Write the structs to JSON files
+    let reads_columns = vec![
+        "sample_id",
+        "Record",
+        "Reads",
+        "Patterns",
+        "PairsAndWidows",
+        "stage",
+    ];
+    write_structs_to_split_json_file("read_data.json", &read_data, reads_columns)?;
 
     Ok(())
 }

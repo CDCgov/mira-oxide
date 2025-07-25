@@ -1,7 +1,7 @@
 use csv::ReaderBuilder;
 use either::Either;
 use glob::glob;
-use serde::{self, Deserialize, de::DeserializeOwned};
+use serde::{self, Deserialize, Serialize, de::DeserializeOwned};
 use std::{
     error::Error,
     fs::{File, OpenOptions},
@@ -12,7 +12,7 @@ use std::{
 //////Structs to hold data
 
 // Coverage struct
-#[derive(Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct CoverageData {
     #[serde(rename = "Reference_Name")]
     reference_name: String,
@@ -34,20 +34,21 @@ pub struct CoverageData {
 }
 
 // Reads struct
-#[derive(Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct ReadsData {
+    sample_id: Option<String>,
     #[serde(rename = "Record")]
     record: String,
     #[serde(rename = "Reads")]
-    reads: String,
+    reads: i32,
     #[serde(rename = "Patterns")]
     patterns: String,
     #[serde(rename = "PairsAndWidows")]
     pairs_and_windows: String,
-    sample_id: Option<String>,
+    stage: Option<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Serialize, Debug, Clone)]
 pub struct ProcessedRecord {
     pub sample_id: Option<String>, // Optional field
     pub vtype: String,
@@ -56,7 +57,7 @@ pub struct ProcessedRecord {
 }
 
 // Alleles struct
-#[derive(Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct AllelesData {
     #[serde(rename = "Reference_Name")]
     reference_name: String,
@@ -80,7 +81,7 @@ pub struct AllelesData {
 }
 
 // Indel struct
-#[derive(Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct IndelsData {
     #[serde(rename = "Reference_Name")]
     reference_name: String,
@@ -296,7 +297,7 @@ fn read_record2type(record: &str) -> (String, String, String) {
 }
 
 /// Converting info for read data into vtype
-pub fn create_vtype_data(reads_data: Vec<ReadsData>) -> Vec<ProcessedRecord> {
+pub fn create_vtype_data(reads_data: &Vec<ReadsData>) -> Vec<ProcessedRecord> {
     let mut processed_records = Vec::new();
 
     for data in reads_data.iter() {
