@@ -1,7 +1,5 @@
-// filepath: /home/qgx6/dev/mira-oxide/di_stats/src/main.rs
 use clap::Parser;
 use glob::glob;
-use regex::Regex;
 use serde::Deserialize;
 use std::error::Error;
 use std::path::{Path, PathBuf};
@@ -70,13 +68,11 @@ fn di_stat(cov_file: &Path, length: usize) -> Result<(f64, f64), Box<dyn Error>>
 
 /// Calculate 5p and 3p DI stats for an entire assembly directory.
 fn di_stat_assembly(assembly_dir: &Path) -> Result<(), Box<dyn Error>> {
-    let run_id_pattern = Regex::new(r"/(?P<id>[0-9]{6}_[A-Za-z0-9]{6}_.+)/assemblies")?;
-    let seg_pattern = Regex::new(r"tables/(?P<seg>.+)-")?;
-
-    let run_id = run_id_pattern
-        .captures(assembly_dir.to_str().unwrap_or_default())
-        .and_then(|caps| caps.name("id"))
-        .map_or("null", |m| m.as_str());
+    let run_id = assembly_dir
+        .parent()
+        .and_then(|p| p.file_name())
+        .and_then(|s| s.to_str())
+        .unwrap_or("null");
 
     let path_pattern = format!("{}/*", assembly_dir.to_str().unwrap_or_default());
 
@@ -87,10 +83,8 @@ fn di_stat_assembly(assembly_dir: &Path) -> Result<(), Box<dyn Error>> {
 
             for cov_path in glob(&cov_pattern)?.filter_map(Result::ok) {
                 let cov_str = cov_path.to_str().unwrap_or_default();
-                if let Some(seg_match) = seg_pattern.captures(cov_str) {
-                    let seg = &seg_match["seg"];
+                if let Some(seg) = cov_str.split("tables/").nth(1).and_then(|s| s.split('-').next()) {
                     match di_stat(&cov_path, 300) {
-
                         Ok((prime5, prime3)) => {
                             println!("{}\t{}\t{}\t{}\t{}", run_id, sample_id, seg, prime5, prime3);
                         }
