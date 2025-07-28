@@ -7,6 +7,7 @@ pub fn write_structs_to_split_json_file<T: Serialize>(
     file_path: &str,
     data: &Vec<T>,
     columns: Vec<&str>,
+    headers: Vec<&str>,
 ) -> Result<(), Box<dyn Error>> {
     // Create the "split-oriented" JSON structure
     let split_json = json!({
@@ -16,11 +17,12 @@ pub fn write_structs_to_split_json_file<T: Serialize>(
             // Serialize each struct into a JSON value
             let serialized = serde_json::to_value(item).unwrap();
             let object = serialized.as_object().unwrap();
-            println!("{object:?}");
 
             // Extract fields in the order specified by `columns`
-            columns.iter().map(|&column| {
-                if let Some(value) = object.get(column) {
+            //TODO add in float handling
+            //TODO: fix header vs column nme situation
+            headers.iter().map(|&headers| {
+                if let Some(value) = object.get(headers) {
                     if value.is_f64() {
                         // float precision set to 3 decimal places
                         if let Some(f) = value.as_f64() {

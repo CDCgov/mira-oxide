@@ -85,6 +85,8 @@ pub struct AllelesData {
 // Indel struct
 #[derive(Serialize, Deserialize, Debug)]
 pub struct IndelsData {
+    #[serde(rename = "Sample")]
+    sample_id: Option<String>,
     #[serde(rename = "Reference_Name")]
     reference_name: String,
     #[serde(rename = "HMM_Position")]
@@ -113,7 +115,6 @@ pub struct IndelsData {
     paired_ub: String,
     #[serde(rename = "QualityUB")]
     quality_ub: Option<String>,
-    sample_id: Option<String>,
 }
 
 ////// Imp for the process_txt_with_sample_function

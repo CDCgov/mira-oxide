@@ -119,7 +119,7 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     //println!("Indel data: {indel_data:?}");
 
     // Write the structs to JSON files
-    let reads_columns = vec![
+    let reads_headers = vec![
         "Sample",
         "Record",
         "Reads",
@@ -127,7 +127,49 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
         "PairsAndWidows",
         "Stage",
     ];
-    write_structs_to_split_json_file("read_data.json", &read_data, reads_columns)?;
+    let reads_columns = vec![
+        "sample_id",
+        "record",
+        "reads",
+        "patterns",
+        "pairs_and_windows",
+        "stage",
+    ];
+    write_structs_to_split_json_file(
+        "/home/xpa3/mira-oxide/test/read_data.json",
+        &read_data,
+        reads_columns,
+        reads_headers,
+    )?;
+
+    let indels_headers = vec![
+        "Sample",
+        "Upstream_Position",
+        "Reference_Name",
+        "Context",
+        "Length",
+        "Insert",
+        "Count",
+        "Total",
+        "Frequency",
+    ];
+    let indels_columns = vec![
+        "sample",
+        "sample_upstream_position",
+        "reference",
+        "context",
+        "length",
+        "insert",
+        "count",
+        "upstream_base_coverage",
+        "frequency",
+    ];
+    write_structs_to_split_json_file(
+        "/home/xpa3/mira-oxide/test/indel_data.json",
+        &indel_data,
+        indels_columns,
+        indels_headers,
+    )?;
 
     Ok(())
 }
