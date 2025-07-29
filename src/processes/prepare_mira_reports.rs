@@ -119,7 +119,7 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     //println!("Indel data: {indel_data:?}");
 
     // Write the structs to JSON files
-    let reads_headers = vec![
+    let reads_struct_values = vec![
         "Sample",
         "Record",
         "Reads",
@@ -138,11 +138,17 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     write_structs_to_split_json_file(
         "/home/xpa3/mira-oxide/test/read_data.json",
         &read_data,
-        reads_columns,
-        reads_headers,
+        &reads_columns,
+        &reads_struct_values,
+    )?;
+    write_structs_to_csv_file(
+        "/home/xpa3/mira-oxide/test/read_data.csv",
+        &read_data,
+        &reads_columns,
+        &reads_struct_values,
     )?;
 
-    let indels_headers = vec![
+    let indels_struct_values = vec![
         "Sample",
         "Upstream_Position",
         "Reference_Name",
@@ -167,8 +173,8 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     write_structs_to_split_json_file(
         "/home/xpa3/mira-oxide/test/indel_data.json",
         &indel_data,
-        indels_columns,
-        indels_headers,
+        &indels_columns,
+        &indels_struct_values,
     )?;
 
     Ok(())
