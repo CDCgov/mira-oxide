@@ -48,6 +48,10 @@ pub struct ReadsData {
     pub pairs_and_windows: String,
     #[serde(rename = "Stage")]
     pub stage: Option<String>,
+    #[serde(rename = "Run_ID")]
+    pub run_id: Option<String>,
+    #[serde(rename = "Instrument")]
+    pub instrument: Option<String>,
 }
 
 #[derive(Serialize, Debug, Clone)]
@@ -274,6 +278,8 @@ pub fn reads_data_collection(
                 // Read the data from the file and include the sample name
                 let mut records: Vec<ReadsData> = process_txt_with_sample(reader, true, sample)?;
                 for line in &mut records {
+                    line.run_id = Some("test".to_string());
+                    line.instrument = Some("ont".to_string());
                     if let Some(first_char) = line.record.chars().next() {
                         line.stage = Some(first_char.to_string());
                     }

@@ -1,9 +1,10 @@
 use crate::utils::data_ingest::ReadsData;
-use arrow::array::{ArrayRef, Int32Array, StringArray};
+use arrow::array::{ArrayRef, Float32Array, Int32Array, StringArray};
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::ipc::writer::FileWriter;
 use arrow::record_batch::RecordBatch;
 use csv::Writer;
+use parquet::arrow::ArrowWriter;
 use serde::Serialize;
 use serde_json::{Value, json};
 use std::sync::Arc;
@@ -98,55 +99,80 @@ where
     data.iter().map(extractor).collect()
 }
 
+pub fn extract_string_fields_as_float<T, F>(data: Vec<T>, extractor: F) -> Vec<f32>
+where
+    F: Fn(&T) -> &str,
+{
+    data.iter()
+        .map(|item| {
+            let field = extractor(item);
+            if field.is_empty() {
+                0.0
+            } else {
+                field.parse::<f32>().unwrap_or(0.0)
+            }
+        })
+        .collect()
+}
+
+pub fn extract_string_fields_as_int<T, F>(data: Vec<T>, extractor: F) -> Vec<i32>
+where
+    F: Fn(&T) -> &str,
+{
+    data.iter()
+        .map(|item| {
+            let field = extractor(item);
+            if field.is_empty() {
+                0
+            } else {
+                field.parse::<i32>().unwrap_or(0)
+            }
+        })
+        .collect()
+}
+
 pub fn write_reads_to_parquet(
     reads_data: &Vec<ReadsData>,
     output_file: &str,
 ) -> Result<(), Box<dyn Error>> {
+    println!("START");
     //Convert values in struct to vector of values
     let sample_ids_vec: Vec<Option<String>> =
         extract_field(reads_data.clone(), |item| item.sample_id.clone());
-    println!("data {sample_ids_vec:?}");
-    let record_vec: Vec<String> = extract_field(reads_data.clone(), |item| item.record.clone());
-    let reads_vec: Vec<i32> = extract_field(reads_data.clone(), |item| item.reads);
-    let patterns_vec: Vec<String> = extract_field(reads_data.clone(), |item| item.patterns.clone());
-    let pairs_and_windows_vec: Vec<String> =
-        extract_field(reads_data.clone(), |item| item.pairs_and_windows.clone());
-    let stages_vec: Vec<Option<String>> =
-        extract_field(reads_data.clone(), |item| item.stage.clone());
-
-    // Print the extracted fields
-    //println!("Sample IDs: {:?}", sample_ids_vec);
-    //println!("Records: {:?}", record_vec);
-    //println!("Reads: {:?}", reads_vec);
-    //println!("Patterns: {:?}", patterns_vec);
-    //println!("Pairs and Windows: {:?}", pairs_and_windows_vec);
-    //println!("Stages: {:?}", stages_vec);
+    let record_vec = extract_field(reads_data.clone(), |item| item.record.clone());
+    let reads_vec = extract_field(reads_data.clone(), |item| item.reads);
+    let patterns_vec = extract_string_fields_as_float(reads_data.clone(), |item| &item.patterns);
+    let pairs_and_windows_vec =
+        extract_string_fields_as_float(reads_data.clone(), |item| &item.pairs_and_windows);
+    let stages_vec = extract_string_fields_as_int(reads_data.clone(), |item| {
+        item.stage.as_deref().unwrap_or("")
+    });
+    let runid_vec = extract_field(reads_data.clone(), |item| item.run_id.clone());
+    println!("runid_vec {runid_vec:?}");
+    let instrument_vec = extract_field(reads_data.clone(), |item| item.instrument.clone());
 
     // Convert the vectors into Arrow columns
     let sample_array: ArrayRef = Arc::new(StringArray::from(sample_ids_vec));
     let record_array: ArrayRef = Arc::new(StringArray::from(record_vec));
     let reads_array: ArrayRef = Arc::new(Int32Array::from(reads_vec));
-    let patterns_array: ArrayRef = Arc::new(StringArray::from(patterns_vec));
-    let pairs_and_windows_array: ArrayRef = Arc::new(StringArray::from(pairs_and_windows_vec));
-    let stage_array: ArrayRef = Arc::new(StringArray::from(stages_vec));
-    println!("Sample IDs: {:?}", sample_array);
-    println!("Records: {:?}", record_array);
-    println!("Reads: {:?}", reads_array);
-    //println!("Patterns: {:?}", patterns_vec);
-    //println!("Pairs and Windows: {:?}", pairs_and_windows_vec);
-    //println!("Stages: {:?}", stages_vec);
+    let patterns_array: ArrayRef = Arc::new(Float32Array::from(patterns_vec));
+    let pairs_and_windows_array: ArrayRef = Arc::new(Float32Array::from(pairs_and_windows_vec));
+    let stage_array: ArrayRef = Arc::new(Int32Array::from(stages_vec));
+    let runid_array: ArrayRef = Arc::new(StringArray::from(runid_vec));
+    let instrument_array: ArrayRef = Arc::new(StringArray::from(instrument_vec));
 
     // Define the schema for the Arrow IPC file
     let fields = vec![
         Field::new("sample_id", DataType::Utf8, true),
         Field::new("record", DataType::Utf8, true),
-        Field::new("reads", DataType::Int32, true), // Fixed: Use Int32 for reads
-        Field::new("patterns", DataType::Utf8, true),
-        Field::new("pairs_and_windows", DataType::Utf8, true),
-        Field::new("stage", DataType::Utf8, true),
+        Field::new("readcount", DataType::Int32, true),
+        Field::new("patterns", DataType::Float32, true),
+        Field::new("pairsandwindows", DataType::Float32, true),
+        Field::new("stagenum", DataType::Int32, true),
+        Field::new("runid", DataType::Utf8, true),
+        Field::new("machine", DataType::Utf8, true),
     ];
     let schema = Arc::new(Schema::new(fields));
-    println!("SCHEMA {schema:?}");
 
     // Create a RecordBatch
     let record_batch = RecordBatch::try_new(
@@ -158,14 +184,16 @@ pub fn write_reads_to_parquet(
             patterns_array,
             pairs_and_windows_array,
             stage_array,
+            runid_array,
+            instrument_array,
         ],
     )?;
 
-    //Write the RecordBatch to an Arrow IPC file
+    // Write the RecordBatch to a Parquet file
     let file = File::create(output_file)?;
-    let mut writer = FileWriter::try_new(file, &schema)?;
+    let mut writer = ArrowWriter::try_new(file, schema.clone(), None)?;
     writer.write(&record_batch)?;
-    writer.finish()?;
+    writer.close()?;
 
     println!("RECORD BATCH {record_batch:?}");
 

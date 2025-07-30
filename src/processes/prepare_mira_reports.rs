@@ -127,6 +127,8 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
         "Patterns",
         "PairsAndWidows",
         "Stage",
+        "Run_ID",
+        "Instrument",
     ];
     let reads_columns = vec![
         "sample_id",
@@ -135,6 +137,8 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
         "patterns",
         "pairs_and_windows",
         "stage",
+        "run_id",
+        "instrument",
     ];
     write_structs_to_split_json_file(
         "/home/xpa3/mira-oxide/test/read_data.json",
