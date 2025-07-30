@@ -34,20 +34,20 @@ pub struct CoverageData {
 }
 
 // Reads struct
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ReadsData {
     #[serde(rename = "Sample")]
-    sample_id: Option<String>,
+    pub sample_id: Option<String>,
     #[serde(rename = "Record")]
-    record: String,
+    pub record: String,
     #[serde(rename = "Reads")]
-    reads: i32,
+    pub reads: i32,
     #[serde(rename = "Patterns")]
-    patterns: String,
+    pub patterns: String,
     #[serde(rename = "PairsAndWidows")]
-    pairs_and_windows: String,
+    pub pairs_and_windows: String,
     #[serde(rename = "Stage")]
-    stage: Option<String>,
+    pub stage: Option<String>,
 }
 
 #[derive(Serialize, Debug, Clone)]

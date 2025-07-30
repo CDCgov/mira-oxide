@@ -4,6 +4,7 @@ use clap::Parser;
 use csv::ReaderBuilder;
 use either::Either;
 use serde::{self, Deserialize, de::DeserializeOwned};
+use std::sync::Arc;
 use std::{
     error::Error,
     fs::{File, OpenOptions},
@@ -176,6 +177,9 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
         &indels_columns,
         &indels_struct_values,
     )?;
+
+    // Write fields to pq if flag given
+    write_reads_to_parquet(&read_data, "/home/xpa3/mira-oxide/test/read_data.parquet")?;
 
     Ok(())
 }
