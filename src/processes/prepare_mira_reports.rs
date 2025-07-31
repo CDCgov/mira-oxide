@@ -104,7 +104,7 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     let qc_yaml_path = create_reader(args.qc_yaml)?;
     let qc_config: QCConfig = read_yaml(qc_yaml_path)?;
 
-    //Read in data
+    //Read in IRMA data
     let coverage_data = coverage_data_collection(&args.irma_path)?;
     let read_data = reads_data_collection(&args.irma_path)?;
     let vtype_data = create_vtype_data(&read_data);
@@ -119,7 +119,7 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     //println!("Allele data: {allele_data:?}");
     //println!("Indel data: {indel_data:?}");
 
-    // Write the structs to JSON files
+    // Write the structs to JSON files and CSV files
     let reads_struct_values = vec![
         "Sample",
         "Record",
@@ -182,7 +182,7 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
         &indels_struct_values,
     )?;
 
-    // Write fields to pq if flag given
+    // Write fields to parq if flag given
     write_reads_to_parquet(&read_data, "/home/xpa3/mira-oxide/test/read_data.parquet")?;
 
     Ok(())

@@ -9,9 +9,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
-//////Structs to hold data
-
-// Coverage struct
+/////////////// Structs to hold data ///////////////
+/// Coverage struct
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CoverageData {
     #[serde(rename = "Reference_Name")]
@@ -33,7 +32,7 @@ pub struct CoverageData {
     sample_id: Option<String>,
 }
 
-// Reads struct
+/// Reads struct
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ReadsData {
     #[serde(rename = "Sample")]
@@ -54,6 +53,7 @@ pub struct ReadsData {
     pub instrument: Option<String>,
 }
 
+/// vtype struct
 #[derive(Serialize, Debug, Clone)]
 pub struct ProcessedRecord {
     pub sample_id: Option<String>, // Optional field
@@ -62,7 +62,7 @@ pub struct ProcessedRecord {
     pub subtype: String,
 }
 
-// Alleles struct
+/// Alleles struct
 #[derive(Serialize, Deserialize, Debug)]
 pub struct AllelesData {
     #[serde(rename = "Reference_Name")]
@@ -86,7 +86,7 @@ pub struct AllelesData {
     sample_id: Option<String>,
 }
 
-// Indel struct
+/// Indel struct
 #[derive(Serialize, Deserialize, Debug)]
 pub struct IndelsData {
     #[serde(rename = "Sample")]
@@ -121,8 +121,8 @@ pub struct IndelsData {
     quality_ub: Option<String>,
 }
 
-////// Imp for the process_txt_with_sample_function
-// Define a trait for structs that have a `sample_id` field
+/////////////// Imp for the process_txt_with_sample_function ///////////////
+/// Define a trait for structs that have a `sample_id` field
 trait HasSampleId {
     fn set_sample_id(&mut self, sample_id: String);
 }
@@ -155,7 +155,7 @@ impl HasSampleId for IndelsData {
     }
 }
 
-////// Functions
+/////////////// Data reading functions ///////////////
 /// Creating a reader for processing files
 pub fn create_reader(path: Option<PathBuf>) -> std::io::Result<BufReader<Either<File, Stdin>>> {
     let reader = if let Some(ref file_path) = path {
@@ -227,7 +227,7 @@ where
     Ok(records)
 }
 
-/// Read in the coverage files made by IRMA and convert to a vector of CoverageData
+/// Read in the coverage files made by IRMA and save to a vector of CoverageData
 pub fn coverage_data_collection(
     irma_path: &PathBuf,
 ) -> Result<Vec<CoverageData>, Box<dyn std::error::Error>> {
@@ -256,7 +256,7 @@ pub fn coverage_data_collection(
     Ok(cov_data)
 }
 
-///Collecting read data
+///  Collect read data created by IRMA and save to vector of ReadsData
 pub fn reads_data_collection(
     irma_path: &PathBuf,
 ) -> Result<Vec<ReadsData>, Box<dyn std::error::Error>> {
@@ -293,46 +293,7 @@ pub fn reads_data_collection(
     Ok(reads_data)
 }
 
-/// Breaking up the records column into three string for the create_vtype_data function
-fn read_record2type(record: &str) -> (String, String, String) {
-    let parts: Vec<&str> = record.split('_').collect();
-    if parts.len() >= 2 {
-        let vtype = parts[0][2..].to_string();
-        let ref_type = parts[1].to_string();
-        let subtype = if ref_type == "HA" || ref_type == "NA" {
-            parts.last().unwrap_or(&"").to_string()
-        } else {
-            "".to_string()
-        };
-        (vtype, ref_type, subtype)
-    } else {
-        let fallback = record[2..].to_string();
-        (fallback.clone(), fallback.clone(), fallback.clone())
-    }
-}
-
-/// Converting info for read data into vtype
-pub fn create_vtype_data(reads_data: &Vec<ReadsData>) -> Vec<ProcessedRecord> {
-    let mut processed_records = Vec::new();
-
-    for data in reads_data.iter() {
-        // Filter records where the first character of 'record' is '4'
-        if data.record.starts_with('4') {
-            let (vtype, ref_type, subtype) = read_record2type(&data.record);
-            let processed_record = ProcessedRecord {
-                sample_id: data.sample_id.clone(),
-                vtype,
-                ref_type,
-                subtype,
-            };
-            processed_records.push(processed_record);
-        }
-    }
-
-    processed_records
-}
-
-///Collecting allele data
+/// Collecting allele data created by IRMA and and save to vector of AllelesData
 pub fn allele_data_collection(
     irma_path: &PathBuf,
 ) -> Result<Vec<AllelesData>, Box<dyn std::error::Error>> {
@@ -361,7 +322,8 @@ pub fn allele_data_collection(
     Ok(reads_data)
 }
 
-///Collecting indel data
+/// Collect indel data and save to vector of IndelsData
+/// Note that insertions and deletions are being added  to the same Vec<Indelsdata>
 pub fn indels_data_collection(
     irma_path: &PathBuf,
 ) -> Result<Vec<IndelsData>, Box<dyn std::error::Error>> {
@@ -408,4 +370,44 @@ pub fn indels_data_collection(
         }
     }
     Ok(reads_data)
+}
+
+/////////////// Functions for manipulating data ///////////////
+/// Breaking up the records column into three string for the create_vtype_data function
+fn read_record2type(record: &str) -> (String, String, String) {
+    let parts: Vec<&str> = record.split('_').collect();
+    if parts.len() >= 2 {
+        let vtype = parts[0][2..].to_string();
+        let ref_type = parts[1].to_string();
+        let subtype = if ref_type == "HA" || ref_type == "NA" {
+            parts.last().unwrap_or(&"").to_string()
+        } else {
+            "".to_string()
+        };
+        (vtype, ref_type, subtype)
+    } else {
+        let fallback = record[2..].to_string();
+        (fallback.clone(), fallback.clone(), fallback.clone())
+    }
+}
+
+/// Converting info for read data into vtype
+pub fn create_vtype_data(reads_data: &Vec<ReadsData>) -> Vec<ProcessedRecord> {
+    let mut processed_records = Vec::new();
+
+    for data in reads_data.iter() {
+        // Filter records where the first character of 'record' is '4'
+        if data.record.starts_with('4') {
+            let (vtype, ref_type, subtype) = read_record2type(&data.record);
+            let processed_record = ProcessedRecord {
+                sample_id: data.sample_id.clone(),
+                vtype,
+                ref_type,
+                subtype,
+            };
+            processed_records.push(processed_record);
+        }
+    }
+
+    processed_records
 }

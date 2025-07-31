@@ -10,6 +10,7 @@ use serde_json::{Value, json};
 use std::sync::Arc;
 use std::{error::Error, fs::File};
 
+/////////////// Functions to write to json and csv files ///////////////
 /// Function to serialize a vector of structs into split-oriented JSON with precision and indexing
 pub fn write_structs_to_split_json_file<T: Serialize>(
     file_path: &str,
@@ -63,7 +64,6 @@ pub fn write_structs_to_csv_file<T: Serialize>(
 ) -> Result<(), Box<dyn Error>> {
     let mut csv_writer = Writer::from_path(file_path)?;
 
-    // Write custom headers to the CSV file
     csv_writer.write_record(columns)?;
 
     for line in data {
@@ -90,8 +90,9 @@ pub fn write_structs_to_csv_file<T: Serialize>(
     Ok(())
 }
 
-/// Write parquet
-///
+/////////////// Functions to write parquet files out ///////////////
+/// Functions to convert values in a vecxtor of structs to vector
+/// Some perform type converions
 pub fn extract_field<T, U, F>(data: Vec<T>, extractor: F) -> Vec<U>
 where
     F: Fn(&T) -> U,
@@ -131,11 +132,11 @@ where
         .collect()
 }
 
+/// Write the reads data to parquet file.
 pub fn write_reads_to_parquet(
     reads_data: &Vec<ReadsData>,
     output_file: &str,
 ) -> Result<(), Box<dyn Error>> {
-    println!("START");
     //Convert values in struct to vector of values
     let sample_ids_vec: Vec<Option<String>> =
         extract_field(reads_data.clone(), |item| item.sample_id.clone());
@@ -148,7 +149,6 @@ pub fn write_reads_to_parquet(
         item.stage.as_deref().unwrap_or("")
     });
     let runid_vec = extract_field(reads_data.clone(), |item| item.run_id.clone());
-    println!("runid_vec {runid_vec:?}");
     let instrument_vec = extract_field(reads_data.clone(), |item| item.instrument.clone());
 
     // Convert the vectors into Arrow columns
@@ -164,7 +164,7 @@ pub fn write_reads_to_parquet(
     // Define the schema for the Arrow IPC file
     let fields = vec![
         Field::new("sample_id", DataType::Utf8, true),
-        Field::new("record", DataType::Utf8, true),
+        Field::new("stage", DataType::Utf8, true),
         Field::new("readcount", DataType::Int32, true),
         Field::new("patterns", DataType::Float32, true),
         Field::new("pairsandwindows", DataType::Float32, true),
@@ -194,8 +194,6 @@ pub fn write_reads_to_parquet(
     let mut writer = ArrowWriter::try_new(file, schema.clone(), None)?;
     writer.write(&record_batch)?;
     writer.close()?;
-
-    println!("RECORD BATCH {record_batch:?}");
 
     Ok(())
 }
