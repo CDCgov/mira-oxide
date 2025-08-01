@@ -466,7 +466,7 @@ pub fn indels_data_collection(
     Ok(reads_data)
 }
 
-/// Read in IRMA amended consensus fasta files to FastaNT struct from zoe crate
+/// Read in IRMA amended consensus fasta files to SeqData struct
 pub fn amended_consensus_data_collection(
     irma_path: &PathBuf,
     organism: &str,
@@ -573,3 +573,115 @@ pub fn create_vtype_data(reads_data: &Vec<ReadsData>) -> Vec<ProcessedRecord> {
 }
 
 /////////////// Data reading functions for DAIS-ribosome ///////////////
+/// Read tab-delimited data a withouot including sample name
+pub fn process_txt<R, T>(reader: R, has_headers: bool) -> Result<Vec<T>, Box<dyn std::error::Error>>
+where
+    R: Read,
+    T: for<'de> Deserialize<'de>,
+{
+    let mut rdr = ReaderBuilder::new()
+        .has_headers(has_headers)
+        .delimiter(b'\t')
+        .from_reader(reader);
+
+    let mut records: Vec<T> = Vec::new();
+    for result in rdr.deserialize() {
+        let record: T = result?;
+        records.push(record);
+    }
+
+    Ok(records)
+}
+
+/// Read in dais-ribosome ins file fto InsertionData struct
+pub fn dias_insertion_data_collection(
+    dais_path: &PathBuf,
+) -> Result<Vec<InsertionData>, Box<dyn std::error::Error>> {
+    // Construct the glob pattern for matching files
+    //If using * situation, you will have to use glob
+    let pattern = format!(
+        "{}/aggregate_outputs/dais-ribosome/*.ins",
+        dais_path.to_string_lossy()
+    );
+
+    let mut dais_ins_data: Vec<InsertionData> = Vec::new();
+
+    // Use the glob crate to find all matching files
+    for entry in glob(&pattern)? {
+        match entry {
+            Ok(path) => {
+                let file = File::open(&path)?;
+                let reader = BufReader::new(file);
+                let mut records: Vec<InsertionData> = process_txt(reader, false)?;
+                dais_ins_data.append(&mut records);
+            }
+            Err(e) => {
+                eprintln!("Error processing file: {e}");
+            }
+        }
+    }
+
+    Ok(dais_ins_data)
+}
+
+/// Read in dais-ribosome ins file fto DeletionsData struct
+pub fn dias_deletion_data_collection(
+    dais_path: &PathBuf,
+) -> Result<Vec<DeletionsData>, Box<dyn std::error::Error>> {
+    // Construct the glob pattern for matching files
+    //If using * situation, you will have to use glob
+    let pattern = format!(
+        "{}/aggregate_outputs/dais-ribosome/*.del",
+        dais_path.to_string_lossy()
+    );
+
+    let mut dais_del_data: Vec<DeletionsData> = Vec::new();
+
+    // Use the glob crate to find all matching files
+    for entry in glob(&pattern)? {
+        match entry {
+            Ok(path) => {
+                let file = File::open(&path)?;
+                let reader = BufReader::new(file);
+                let mut records: Vec<DeletionsData> = process_txt(reader, false)?;
+                dais_del_data.append(&mut records);
+            }
+            Err(e) => {
+                eprintln!("Error processing file: {e}");
+            }
+        }
+    }
+
+    Ok(dais_del_data)
+}
+
+/// Read in dais-ribosome ins file fto DeletionsData struct
+pub fn dias_sequence_data_collection(
+    dais_path: &PathBuf,
+) -> Result<Vec<DaisSeqData>, Box<dyn std::error::Error>> {
+    // Construct the glob pattern for matching files
+    //If using * situation, you will have to use glob
+    let pattern = format!(
+        "{}/aggregate_outputs/dais-ribosome/*.seq",
+        dais_path.to_string_lossy()
+    );
+
+    let mut dais_seq_data: Vec<DaisSeqData> = Vec::new();
+
+    // Use the glob crate to find all matching files
+    for entry in glob(&pattern)? {
+        match entry {
+            Ok(path) => {
+                let file = File::open(&path)?;
+                let reader = BufReader::new(file);
+                let mut records: Vec<DaisSeqData> = process_txt(reader, false)?;
+                dais_seq_data.append(&mut records);
+            }
+            Err(e) => {
+                eprintln!("Error processing file: {e}");
+            }
+        }
+    }
+
+    Ok(dais_seq_data)
+}

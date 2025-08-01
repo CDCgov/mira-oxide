@@ -112,6 +112,11 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     let indel_data = indels_data_collection(&args.irma_path)?;
     let seq_data = amended_consensus_data_collection(&args.irma_path, "flu");
 
+    //Read in DAIS-ribosome data
+    let dais_ins_data = dias_insertion_data_collection(&args.irma_path);
+    let dais_del_data = dias_deletion_data_collection(&args.irma_path);
+    let dais_seq_data = dias_sequence_data_collection(&args.irma_path);
+
     //println!("{samplesheet:?}");
     //println!("{qc_config:?}");
     //println!("Coverage data: {coverage_data:?}");
@@ -120,6 +125,9 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     //println!("Allele data: {allele_data:?}");
     //println!("Indel data: {indel_data:?}");
     //println!("Seq data: {seq_data:#?}");
+    //println!("dais ins data: {dais_ins_data:#?}");
+    //println!("dais del data: {dais_del_data:#?}");
+    //println!("dais seq data: {dais_seq_data:#?}");
 
     // Write the structs to JSON files and CSV files
     let reads_struct_values = vec![
