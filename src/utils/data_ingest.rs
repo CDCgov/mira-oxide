@@ -9,7 +9,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-/////////////// Structs to hold data ///////////////
+/////////////// Structs to hold IRMA data ///////////////
 /// Coverage struct
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CoverageData {
@@ -127,6 +127,94 @@ pub struct SeqData {
     sequence: String,
 }
 
+/////////////// Structs to hold dais-ribosome data ///////////////
+/// Insertion Data
+#[derive(Serialize, Deserialize, Debug)]
+pub struct InsertionData {
+    #[serde(rename = "ID")]
+    sample_id: Option<String>,
+    #[serde(rename = "C_type")]
+    ctype: Option<String>,
+    #[serde(rename = "Ref_ID")]
+    reference: String,
+    #[serde(rename = "Protein")]
+    protein: String,
+    #[serde(rename = "Upstream_aa")]
+    upstream_aa_position: String,
+    #[serde(rename = "Inserted_nucleotides")]
+    inserted_nucleotides: String,
+    #[serde(rename = "Inserted_residues")]
+    inserted_residues: String,
+    #[serde(rename = "Upstream_nt")]
+    upstream_nt: String,
+    #[serde(rename = "Codon_shift")]
+    in_frame: String,
+}
+
+/// Deletions Data
+#[derive(Serialize, Deserialize, Debug)]
+pub struct DeletionsData {
+    #[serde(rename = "ID")]
+    sample_id: Option<String>,
+    #[serde(rename = "C_type")]
+    ctype: Option<String>,
+    #[serde(rename = "Ref_ID")]
+    reference: String,
+    #[serde(rename = "Protein")]
+    protein: String,
+    #[serde(rename = "VH")]
+    vh: Option<String>,
+    #[serde(rename = "Del_AA_start")]
+    del_start_aa_position: Option<String>,
+    #[serde(rename = "Del_AA_end")]
+    del_end_aa_position: Option<String>,
+    #[serde(rename = "Del_AA_len")]
+    del_aa_length: String,
+    #[serde(rename = "In_frame")]
+    in_frame: String,
+    #[serde(rename = "CDS_ID")]
+    cds_id: Option<String>,
+    #[serde(rename = "Del_CDS_start")]
+    del_start_cds_position: String,
+    #[serde(rename = "Del_CDS_end")]
+    del_end_cds_position: String,
+    #[serde(rename = "Del_CDS_len")]
+    del_cds_length: Option<String>,
+}
+
+/// Sequence Data
+#[derive(Serialize, Deserialize, Debug)]
+pub struct DaisSeqData {
+    #[serde(rename = "ID")]
+    sample_id: Option<String>,
+    #[serde(rename = "C_type")]
+    ctype: Option<String>,
+    #[serde(rename = "Ref_ID")]
+    reference: String,
+    #[serde(rename = "Protein")]
+    protein: String,
+    #[serde(rename = "VH")]
+    vh: Option<String>,
+    #[serde(rename = "AA_seq")]
+    aa_seq: Option<String>,
+    #[serde(rename = "AA_aln")]
+    aa_aln: Option<String>,
+    #[serde(rename = "CDS_ID")]
+    cds_id: Option<String>,
+    #[serde(rename = "Insertion")]
+    insertion: String,
+    #[serde(rename = "Shift_Insert")]
+    insertions_shift_frame: String,
+    #[serde(rename = "CDS_seq")]
+    cds_sequence: String,
+    #[serde(rename = "CDS_aln")]
+    aligned_cds_sequence: String,
+    #[serde(rename = "Query_nt_coordinates")]
+    reference_nt_positions: String,
+    #[serde(rename = "CDS_nt_coordinates")]
+    sample_nt_positions: String,
+}
+
 /////////////// Imp for the process_txt_with_sample_function ///////////////
 /// Define a trait for structs that have a `sample_id` field
 trait HasSampleId {
@@ -161,7 +249,7 @@ impl HasSampleId for IndelsData {
     }
 }
 
-/////////////// Data reading functions ///////////////
+/////////////// Data reading functions for IRMA///////////////
 /// Creating a reader for processing files
 pub fn create_reader(path: Option<PathBuf>) -> std::io::Result<BufReader<Either<File, Stdin>>> {
     let reader = if let Some(ref file_path) = path {
@@ -444,7 +532,7 @@ pub fn amended_consensus_data_collection(
     Ok(seq_data)
 }
 
-/////////////// Functions for manipulating data ///////////////
+/////////////// Functions for manipulating IRMA data ///////////////
 /// Breaking up the records column into three string for the create_vtype_data function
 fn read_record2type(record: &str) -> (String, String, String) {
     let parts: Vec<&str> = record.split('_').collect();
@@ -483,3 +571,5 @@ pub fn create_vtype_data(reads_data: &Vec<ReadsData>) -> Vec<ProcessedRecord> {
 
     processed_records
 }
+
+/////////////// Data reading functions for DAIS-ribosome ///////////////
