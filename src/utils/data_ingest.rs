@@ -5,7 +5,7 @@ use serde::{self, Deserialize, Serialize, de::DeserializeOwned};
 use std::{
     error::Error,
     fs::{File, OpenOptions},
-    io::{BufReader, Read, Stdin, stdin},
+    io::{BufRead, BufReader, Read, Stdin, stdin},
     path::{Path, PathBuf},
 };
 
@@ -119,6 +119,12 @@ pub struct IndelsData {
     paired_ub: String,
     #[serde(rename = "QualityUB")]
     quality_ub: Option<String>,
+}
+
+#[derive(Debug)]
+pub struct SeqData {
+    name: String,
+    sequence: String,
 }
 
 /////////////// Imp for the process_txt_with_sample_function ///////////////
@@ -370,6 +376,72 @@ pub fn indels_data_collection(
         }
     }
     Ok(reads_data)
+}
+
+/// Read in IRMA amended consensus fasta files to FastaNT struct from zoe crate
+pub fn amended_consensus_data_collection(
+    irma_path: &PathBuf,
+    organism: &str,
+) -> Result<Vec<SeqData>, Box<dyn std::error::Error>> {
+    // Determine the glob pattern based on the organism
+    let pattern = if organism == "flu" {
+        format!(
+            "{}/*/IRMA/*/amended_consensus/*fa",
+            irma_path.to_string_lossy()
+        )
+    } else {
+        format!(
+            "{}/*/IRMA/*/amended_consensus/*pad.fa",
+            irma_path.to_string_lossy()
+        )
+    };
+
+    let mut seq_data: Vec<SeqData> = Vec::new();
+
+    // Iterate over all files matching the pattern
+    for entry in glob(&pattern).expect("Failed to read glob pattern") {
+        match entry {
+            Ok(path) => {
+                let sample = extract_sample_name(&path)?; // Extract sample name
+                let file = File::open(&path)?;
+                let reader = BufReader::new(file);
+
+                // Parse the file line by line (assuming FASTA format)
+                let mut current_name = String::new();
+                let mut current_sequence = String::new();
+
+                for line in reader.lines() {
+                    let line = line?;
+                    if line.starts_with('>') {
+                        // If there's an existing sequence, save it
+                        if !current_name.is_empty() {
+                            seq_data.push(SeqData {
+                                name: current_name.clone(),
+                                sequence: current_sequence.clone().into(),
+                            });
+                        }
+                        // Start a new sequence
+                        current_name = line[1..].to_string(); // Remove '>'
+                        current_sequence.clear();
+                    } else {
+                        // Append to the current sequence
+                        current_sequence.push_str(&line);
+                    }
+                }
+
+                // Save the last sequence
+                if !current_name.is_empty() {
+                    seq_data.push(SeqData {
+                        name: current_name,
+                        sequence: current_sequence,
+                    });
+                }
+            }
+            Err(e) => println!("Error reading file: {e}"),
+        }
+    }
+
+    Ok(seq_data)
 }
 
 /////////////// Functions for manipulating data ///////////////

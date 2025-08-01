@@ -110,6 +110,7 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     let vtype_data = create_vtype_data(&read_data);
     let allele_data = allele_data_collection(&args.irma_path)?;
     let indel_data = indels_data_collection(&args.irma_path)?;
+    let seq_data = amended_consensus_data_collection(&args.irma_path, "flu");
 
     //println!("{samplesheet:?}");
     //println!("{qc_config:?}");
@@ -118,6 +119,7 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     //println!("Reads data: {vtype_data:?}");
     //println!("Allele data: {allele_data:?}");
     //println!("Indel data: {indel_data:?}");
+    //println!("Seq data: {seq_data:#?}");
 
     // Write the structs to JSON files and CSV files
     let reads_struct_values = vec![

@@ -1,7 +1,6 @@
 use crate::utils::data_ingest::ReadsData;
 use arrow::array::{ArrayRef, Float32Array, Int32Array, StringArray};
 use arrow::datatypes::{DataType, Field, Schema};
-use arrow::ipc::writer::FileWriter;
 use arrow::record_batch::RecordBatch;
 use csv::Writer;
 use parquet::arrow::ArrowWriter;
