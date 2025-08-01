@@ -29,11 +29,11 @@ pub struct ReportsArgs {
 
     #[arg(short = 'p', long)]
     /// Optional input fasta
-    platform: Option<String>,
+    platform: String,
 
     #[arg(short = 'w', long)]
     /// Optional output delimited file
-    workdir_path: Option<PathBuf>,
+    workdir_path: PathBuf,
 
     #[arg(short = 'c', long, default_value = ",")]
     /// Use the provider delimiter for separating fields. Default is ','
@@ -116,6 +116,7 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     let dais_ins_data = dias_insertion_data_collection(&args.irma_path);
     let dais_del_data = dias_deletion_data_collection(&args.irma_path);
     let dais_seq_data = dias_sequence_data_collection(&args.irma_path);
+    let dais_ref_data = dias_ref_seq_data_collection(&args.workdir_path, "flu");
 
     //println!("{samplesheet:?}");
     //println!("{qc_config:?}");
@@ -128,6 +129,7 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     //println!("dais ins data: {dais_ins_data:#?}");
     //println!("dais del data: {dais_del_data:#?}");
     //println!("dais seq data: {dais_seq_data:#?}");
+    println!("dais seq data: {dais_ref_data:#?}");
 
     // Write the structs to JSON files and CSV files
     let reads_struct_values = vec![

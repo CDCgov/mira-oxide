@@ -655,7 +655,7 @@ pub fn dias_deletion_data_collection(
     Ok(dais_del_data)
 }
 
-/// Read in dais-ribosome ins file fto DeletionsData struct
+/// Read in dais-ribosome ins file fto DaisSeqData struct
 pub fn dias_sequence_data_collection(
     dais_path: &PathBuf,
 ) -> Result<Vec<DaisSeqData>, Box<dyn std::error::Error>> {
@@ -664,6 +664,39 @@ pub fn dias_sequence_data_collection(
     let pattern = format!(
         "{}/aggregate_outputs/dais-ribosome/*.seq",
         dais_path.to_string_lossy()
+    );
+
+    let mut dais_seq_data: Vec<DaisSeqData> = Vec::new();
+
+    // Use the glob crate to find all matching files
+    for entry in glob(&pattern)? {
+        match entry {
+            Ok(path) => {
+                let file = File::open(&path)?;
+                let reader = BufReader::new(file);
+                let mut records: Vec<DaisSeqData> = process_txt(reader, false)?;
+                dais_seq_data.append(&mut records);
+            }
+            Err(e) => {
+                eprintln!("Error processing file: {e}");
+            }
+        }
+    }
+
+    Ok(dais_seq_data)
+}
+
+/// Read in dais-ribosome ins file fto DaisSeqData struct
+pub fn dias_ref_seq_data_collection(
+    dais_path: &PathBuf,
+    organism: &str,
+) -> Result<Vec<DaisSeqData>, Box<dyn std::error::Error>> {
+    // Construct the glob pattern for matching files
+    //If using * situation, you will have to use glob
+    let pattern = format!(
+        "{}/data/references/*{}.seq",
+        dais_path.to_string_lossy(),
+        organism
     );
 
     let mut dais_seq_data: Vec<DaisSeqData> = Vec::new();
