@@ -196,9 +196,9 @@ pub struct DaisSeqData {
     #[serde(rename = "VH")]
     vh: Option<String>,
     #[serde(rename = "AA_seq")]
-    aa_seq: Option<String>,
+    aa_seq: String,
     #[serde(rename = "AA_aln")]
-    aa_aln: Option<String>,
+    aa_aln: String,
     #[serde(rename = "CDS_ID")]
     cds_id: Option<String>,
     #[serde(rename = "Insertion")]
