@@ -115,6 +115,8 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     let vtype_data = create_vtype_data(&read_data);
     let allele_data = allele_data_collection(&args.irma_path)?;
     let indel_data = indels_data_collection(&args.irma_path)?;
+    let ref_lengths = get_reference_lens(&args.irma_path);
+    //TODO: feed in organism from argument
     let seq_data = amended_consensus_data_collection(&args.irma_path, "flu");
 
     //Read in DAIS-ribosome data
@@ -133,7 +135,8 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     //println!("dais ins data: {dais_ins_data:#?}");
     //println!("dais del data: {dais_del_data:#?}");
     //println!("dais seq data: {dais_seq_data:#?}");
-    //println!("dais seq data: {dais_ref_data:#?}");
+    //println!("dais ref data: {dais_ref_data:#?}");
+    println!("ref length data: {ref_lengths:#?}");
 
     /////////////// Write the structs to JSON files and CSV files ///////////////
     // Writing out coverage data

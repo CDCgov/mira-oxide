@@ -3,8 +3,9 @@ use either::Either;
 use glob::glob;
 use serde::{self, Deserialize, Serialize, de::DeserializeOwned};
 use std::{
+    collections::HashMap,
     error::Error,
-    fs::{File, OpenOptions},
+    fs::{self, File, OpenOptions},
     io::{self, BufRead, BufReader, Read, Stdin, stdin},
     path::{Path, PathBuf},
 };
@@ -139,6 +140,12 @@ pub struct IndelsData {
 pub struct SeqData {
     name: String,
     sequence: String,
+}
+
+#[derive(Debug)]
+pub struct RefLengthData {
+    name: String,
+    length: usize,
 }
 
 /////////////// Structs to hold dais-ribosome data ///////////////
@@ -593,6 +600,63 @@ pub fn create_vtype_data(reads_data: &Vec<ReadsData>) -> Vec<ProcessedRecord> {
     }
 
     processed_records
+}
+
+/// Collect the reference lengths from the IRMA outputs
+pub fn get_reference_lens(
+    irma_path: &PathBuf,
+) -> Result<Vec<RefLengthData>, Box<dyn std::error::Error>> {
+    // Determine the glob pattern based on the organism
+    let pattern = format!(
+        "{}/*/IRMA/*/intermediate/0-ITERATIVE-REFERENCES/R0*ref",
+        irma_path.to_string_lossy()
+    );
+
+    let mut ref_len_data: Vec<RefLengthData> = Vec::new();
+
+    // Iterate over all files matching the pattern
+    for entry in glob(&pattern).expect("Failed to read glob pattern") {
+        match entry {
+            Ok(path) => {
+                let file = File::open(&path)?;
+                let reader = BufReader::new(file);
+
+                // Parse the file line by line (assuming FASTA format)
+                let mut ref_name = String::new();
+                let mut current_sequence = String::new();
+
+                for line in reader.lines() {
+                    let line = line?;
+                    if line.starts_with('>') {
+                        // If there's an existing sequence, save its length
+                        if !ref_name.is_empty() {
+                            ref_len_data.push(RefLengthData {
+                                name: ref_name.clone(),
+                                length: current_sequence.len(),
+                            });
+                        }
+                        // Start a new sequence
+                        ref_name = line[1..].to_string(); // Remove '>'
+                        current_sequence.clear();
+                    } else {
+                        // Append to the current sequence
+                        current_sequence.push_str(&line);
+                    }
+                }
+
+                // Save the last sequence's length
+                if !ref_name.is_empty() {
+                    ref_len_data.push(RefLengthData {
+                        name: ref_name,
+                        length: current_sequence.len(),
+                    });
+                }
+            }
+            Err(e) => println!("Error reading file: {e}"),
+        }
+    }
+
+    Ok(ref_len_data)
 }
 
 /////////////// Data reading functions for DAIS-ribosome ///////////////
