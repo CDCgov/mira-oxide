@@ -18,19 +18,19 @@ pub struct CoverageData {
     #[serde(rename = "Reference_Name")]
     pub reference_name: String,
     #[serde(rename = "Position")]
-    pub position: String,
+    pub position: i32,
     #[serde(rename = "Coverage Depth")]
-    pub coverage_depth: String,
+    pub coverage_depth: i32,
     #[serde(rename = "Consensus")]
     pub consensus: String,
     #[serde(rename = "Deletions")]
-    pub deletions: String,
+    pub deletions: i32,
     #[serde(rename = "Ambiguous")]
-    pub ambiguous: String,
+    pub ambiguous: i32,
     #[serde(rename = "Consensus_Count")]
-    pub consensus_count: String,
+    pub consensus_count: i32,
     #[serde(rename = "Consensus_Average_Quality")]
-    pub consensus_avg_quality: String,
+    pub consensus_avg_quality: f64,
     #[serde(rename = "Run_ID")]
     pub run_id: Option<String>,
     #[serde(rename = "Instrument")]
@@ -70,25 +70,26 @@ pub struct ProcessedRecord {
 /// Alleles struct
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AllelesData {
+    #[serde(rename = "Sample")]
+    pub sample_id: Option<String>,
     #[serde(rename = "Reference_Name")]
-    pub reference_name: String,
+    pub reference: String,
     #[serde(rename = "HMM_Position")]
-    pub reference_position: Option<String>,
+    pub reference_position: Option<i32>,
     #[serde(rename = "Position")]
-    pub position: String,
+    pub sample_position: i32,
     #[serde(rename = "Total")]
-    pub total: String,
+    pub coverage: i32,
     #[serde(rename = "Consensus_Allele")]
     pub consensus_allele: String,
     #[serde(rename = "Minority_Allele")]
     pub minority_allele: String,
     #[serde(rename = "Consensus_Count")]
-    pub consensus_count: String,
+    pub consensus_count: i32,
     #[serde(rename = "Minority_Count")]
-    pub minority_count: String,
+    pub minority_count: i32,
     #[serde(rename = "Minority_Frequency")]
-    pub minority_frequency: String,
-    pub sample_id: Option<String>,
+    pub minority_frequency: f64,
     #[serde(rename = "Run_ID")]
     pub run_id: Option<String>,
     #[serde(rename = "Instrument")]
@@ -429,6 +430,7 @@ pub fn allele_data_collection(
 
                 // Read the data from the file and include the sample name
                 let mut records: Vec<AllelesData> = process_txt_with_sample(reader, true, sample)?;
+                records.retain(|record| record.minority_frequency >= 0.05);
                 reads_data.append(&mut records);
             }
             Err(e) => println!("Error reading file: {e}"),

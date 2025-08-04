@@ -125,10 +125,8 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
 
     //TODO: remove these at end
     //println!("{samplesheet:?}");
-    //println!("{qc_config:?}");
-    //println!("Coverage data: {coverage_data:?}");
-    //println!("Reads data: {read_data:?}");
-    //println!("Reads data: {vtype_data:?}");
+    //println!("{qc_config:?}")
+    //println!("cov data: {coverage_data:?}");
     //println!("Allele data: {allele_data:?}");
     //println!("Indel data: {indel_data:?}");
     //println!("Seq data: {seq_data:#?}");
@@ -176,7 +174,7 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
         &coverage_struct_values,
     )?;
 
-    /// Writing out reads data
+    // Writing out reads data
     let reads_struct_values = vec![
         "Sample",
         "Record",
@@ -194,18 +192,65 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
         "stage",
     ];
     write_structs_to_split_json_file(
-        "/home/xpa3/mira-oxide/test/read_data.json",
+        "/home/xpa3/mira-oxide/test/reads.json",
         &read_data,
         &reads_columns,
         &reads_struct_values,
     )?;
     write_structs_to_csv_file(
-        "/home/xpa3/mira-oxide/test/read_data.csv",
+        "/home/xpa3/mira-oxide/test/reads.csv",
         &read_data,
         &reads_columns,
         &reads_struct_values,
     )?;
 
+    // Writing out vtype data (json only)
+    let vtype_columns = vec!["sample_id", "vtype", "ref_type", "subtype"];
+    write_structs_to_split_json_file(
+        "/home/xpa3/mira-oxide/test/vtype.json",
+        &vtype_data,
+        &vtype_columns,
+        &vtype_columns,
+    )?;
+
+    // Writing out allele csv and josn file
+    let allele_struct_values = vec![
+        "Sample",
+        "Upstream_Position",
+        "Reference_Name",
+        "Context",
+        "Length",
+        "Insert",
+        "Count",
+        "Total",
+        "Frequency",
+    ];
+    let allele_columns = vec![
+        "sample",
+        "sample_upstream_position",
+        "reference",
+        "context",
+        "length",
+        "insert",
+        "count",
+        "upstream_base_coverage",
+        "frequency",
+    ];
+    write_structs_to_split_json_file(
+        "/home/xpa3/mira-oxide/test/alleles.json",
+        &allele_data,
+        &allele_columns,
+        &allele_struct_values,
+    )?;
+
+    write_structs_to_csv_file(
+        "/home/xpa3/mira-oxide/test/alleles.csv",
+        &allele_data,
+        &allele_columns,
+        &allele_struct_values,
+    )?;
+
+    // Writing out indel csv and josn file
     let indels_struct_values = vec![
         "Sample",
         "Upstream_Position",
@@ -229,7 +274,14 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
         "frequency",
     ];
     write_structs_to_split_json_file(
-        "/home/xpa3/mira-oxide/test/indel_data.json",
+        "/home/xpa3/mira-oxide/test/indels.json",
+        &indel_data,
+        &indels_columns,
+        &indels_struct_values,
+    )?;
+
+    write_structs_to_csv_file(
+        "/home/xpa3/mira-oxide/test/indels.csv",
         &indel_data,
         &indels_columns,
         &indels_struct_values,
