@@ -5,14 +5,16 @@ use serde::{self, Deserialize, Serialize, de::DeserializeOwned};
 use std::{
     error::Error,
     fs::{File, OpenOptions},
-    io::{BufRead, BufReader, Read, Stdin, stdin},
+    io::{self, BufRead, BufReader, Read, Stdin, stdin},
     path::{Path, PathBuf},
 };
 
 /////////////// Structs to hold IRMA data ///////////////
 /// Coverage struct
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct CoverageData {
+    #[serde(rename = "Sample")]
+    sample_id: Option<String>,
     #[serde(rename = "Reference_Name")]
     reference_name: String,
     #[serde(rename = "Position")]
@@ -29,7 +31,10 @@ pub struct CoverageData {
     consensus_count: String,
     #[serde(rename = "Consensus_Average_Quality")]
     consensus_avg_quality: String,
-    sample_id: Option<String>,
+    #[serde(rename = "Run_ID")]
+    pub run_id: Option<String>,
+    #[serde(rename = "Instrument")]
+    pub instrument: Option<String>,
 }
 
 /// Reads struct
@@ -251,15 +256,15 @@ impl HasSampleId for IndelsData {
 
 /////////////// Data reading functions for IRMA///////////////
 /// Creating a reader for processing files
-pub fn create_reader(path: Option<PathBuf>) -> std::io::Result<BufReader<Either<File, Stdin>>> {
-    let reader = if let Some(ref file_path) = path {
-        let file = OpenOptions::new().read(true).open(file_path)?;
-        BufReader::new(Either::Left(file))
+pub fn create_reader(path: PathBuf) -> io::Result<BufReader<Either<File, Stdin>>> {
+    if path.to_str() == Some("-") {
+        // If the path is "-", use stdin
+        Ok(BufReader::new(Either::Right(io::stdin())))
     } else {
-        BufReader::new(Either::Right(stdin()))
-    };
-
-    Ok(reader)
+        // Otherwise, open the file at the given path
+        let file = OpenOptions::new().read(true).open(path)?;
+        Ok(BufReader::new(Either::Left(file)))
+    }
 }
 
 /// Reads in csv file - currently only used for samplesheet
@@ -324,6 +329,8 @@ where
 /// Read in the coverage files made by IRMA and save to a vector of CoverageData
 pub fn coverage_data_collection(
     irma_path: &PathBuf,
+    platform: &str,
+    runid: &str,
 ) -> Result<Vec<CoverageData>, Box<dyn std::error::Error>> {
     let pattern = format!(
         "{}/*/IRMA/*/tables/*coverage.txt",
@@ -342,6 +349,10 @@ pub fn coverage_data_collection(
 
                 // Read the data from the file and include the sample name
                 let mut records: Vec<CoverageData> = process_txt_with_sample(reader, true, sample)?;
+                for line in &mut records {
+                    line.run_id = Some(runid.to_string());
+                    line.instrument = Some(platform.to_string());
+                }
                 cov_data.append(&mut records);
             }
             Err(e) => println!("Error reading file: {e}"),
@@ -353,6 +364,8 @@ pub fn coverage_data_collection(
 ///  Collect read data created by IRMA and save to vector of ReadsData
 pub fn reads_data_collection(
     irma_path: &PathBuf,
+    platform: &str,
+    runid: &str,
 ) -> Result<Vec<ReadsData>, Box<dyn std::error::Error>> {
     let pattern = format!(
         "{}/*/IRMA/*/tables/READ_COUNTS.txt",
@@ -372,8 +385,8 @@ pub fn reads_data_collection(
                 // Read the data from the file and include the sample name
                 let mut records: Vec<ReadsData> = process_txt_with_sample(reader, true, sample)?;
                 for line in &mut records {
-                    line.run_id = Some("test".to_string());
-                    line.instrument = Some("ont".to_string());
+                    line.run_id = Some(runid.to_string());
+                    line.instrument = Some(platform.to_string());
                     if let Some(first_char) = line.record.chars().next() {
                         line.stage = Some(first_char.to_string());
                     }

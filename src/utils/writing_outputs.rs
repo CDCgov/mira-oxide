@@ -27,19 +27,9 @@ pub fn write_structs_to_split_json_file<T: Serialize>(
             let object = serialized.as_object().unwrap();
 
             // Extract fields in the order specified by `columns`
-            //TODO add in float handling
-            struct_values.iter().map(|&struct_values| {
-                if let Some(value) = object.get(struct_values) {
-                    if value.is_f64() {
-                        // float precision set to 3 decimal places
-                        if let Some(f) = value.as_f64() {
-                            json!(format!("{:.3}", f))
-                        } else {
-                            value.clone()
-                        }
-                    } else {
-                        value.clone()
-                    }
+            struct_values.iter().map(|&struct_value| {
+                if let Some(value) = object.get(struct_value) {
+                    value.clone()
                 } else {
                     json!(null)
                 }
@@ -136,7 +126,7 @@ pub fn write_reads_to_parquet(
     reads_data: &Vec<ReadsData>,
     output_file: &str,
 ) -> Result<(), Box<dyn Error>> {
-    //Convert values in struct to vector of values
+    // Convert values in struct to vector of values
     let sample_ids_vec: Vec<Option<String>> =
         extract_field(reads_data.clone(), |item| item.sample_id.clone());
     let record_vec = extract_field(reads_data.clone(), |item| item.record.clone());

@@ -16,28 +16,32 @@ use std::{
 #[command(about = "Package for aggregating MIRA outputs into json files")]
 pub struct ReportsArgs {
     #[arg(short = 'i', long)]
-    /// Optional input fasta
+    /// The file path to the IRMA outputs
     irma_path: PathBuf,
 
     #[arg(short = 's', long)]
-    /// Optional input fasta
+    /// The filepath to the input samplesheet
     samplesheet: PathBuf,
 
     #[arg(short = 'q', long)]
-    /// Optional input fasta
-    qc_yaml: Option<PathBuf>,
+    /// The file path to the qc yaml
+    qc_yaml: PathBuf,
 
     #[arg(short = 'p', long)]
-    /// Optional input fasta
+    /// The platform used to generate the data
     platform: String,
 
+    #[arg(short = 'r', long)]
+    /// The run id
+    runid: String,
+
     #[arg(short = 'w', long)]
-    /// Optional output delimited file
+    /// The file path to the working directory
     workdir_path: PathBuf,
 
-    #[arg(short = 'c', long, default_value = ",")]
-    /// Use the provider delimiter for separating fields. Default is ','
-    irma_config: Option<PathBuf>,
+    #[arg(short = 'c', long, default_value = "default config")]
+    /// the irma config used for IRMA
+    irma_config: Option<String>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -96,8 +100,9 @@ fn read_yaml<R: std::io::Read>(reader: R) -> Result<QCConfig, Box<dyn std::error
 }
 
 pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Error>> {
+    /////////////// Read in all data ///////////////
     // Read in samplesheet
-    let samplesheet_path = create_reader(Some(args.samplesheet))?;
+    let samplesheet_path = create_reader(args.samplesheet)?;
     let samplesheet: Vec<SamplesheetO> = read_csv(samplesheet_path, false)?;
 
     // Read in qc yaml
@@ -105,8 +110,8 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     let qc_config: QCConfig = read_yaml(qc_yaml_path)?;
 
     //Read in IRMA data
-    let coverage_data = coverage_data_collection(&args.irma_path)?;
-    let read_data = reads_data_collection(&args.irma_path)?;
+    let coverage_data = coverage_data_collection(&args.irma_path, &args.platform, &args.runid)?;
+    let read_data = reads_data_collection(&args.irma_path, &args.platform, &args.runid)?;
     let vtype_data = create_vtype_data(&read_data);
     let allele_data = allele_data_collection(&args.irma_path)?;
     let indel_data = indels_data_collection(&args.irma_path)?;
@@ -118,6 +123,7 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     let dais_seq_data = dias_sequence_data_collection(&args.irma_path);
     let dais_ref_data = dias_ref_seq_data_collection(&args.workdir_path, "flu");
 
+    //TODO: remove these at end
     //println!("{samplesheet:?}");
     //println!("{qc_config:?}");
     //println!("Coverage data: {coverage_data:?}");
@@ -129,9 +135,48 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     //println!("dais ins data: {dais_ins_data:#?}");
     //println!("dais del data: {dais_del_data:#?}");
     //println!("dais seq data: {dais_seq_data:#?}");
-    println!("dais seq data: {dais_ref_data:#?}");
+    //println!("dais seq data: {dais_ref_data:#?}");
 
-    // Write the structs to JSON files and CSV files
+    /////////////// Write the structs to JSON files and CSV files ///////////////
+    // Writing out coverage data
+    let coverage_struct_values = vec![
+        "Sample",
+        "Reference_Name",
+        "Position",
+        "Coverage Depth",
+        "Consensus",
+        "Deletions",
+        "Ambiguous",
+        "Consensus_Count",
+        "Consensus_Average_Quality",
+    ];
+
+    let coverage_columns = vec![
+        "sample_id",
+        "reference",
+        "reference_position",
+        "depth",
+        "consensus",
+        "deletions",
+        "ambiguous",
+        "consensus_count",
+        "consensus_quality",
+    ];
+
+    write_structs_to_split_json_file(
+        "/home/xpa3/mira-oxide/test/coverage_data.json",
+        &coverage_data,
+        &coverage_columns,
+        &coverage_struct_values,
+    )?;
+    write_structs_to_csv_file(
+        "/home/xpa3/mira-oxide/test/coverage_data.csv",
+        &coverage_data,
+        &coverage_columns,
+        &coverage_struct_values,
+    )?;
+
+    /// Writing out reads data
     let reads_struct_values = vec![
         "Sample",
         "Record",
@@ -139,8 +184,6 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
         "Patterns",
         "PairsAndWidows",
         "Stage",
-        "Run_ID",
-        "Instrument",
     ];
     let reads_columns = vec![
         "sample_id",
@@ -149,8 +192,6 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
         "patterns",
         "pairs_and_windows",
         "stage",
-        "run_id",
-        "instrument",
     ];
     write_structs_to_split_json_file(
         "/home/xpa3/mira-oxide/test/read_data.json",
