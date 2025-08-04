@@ -9,6 +9,8 @@ use serde_json::{Value, json};
 use std::sync::Arc;
 use std::{error::Error, fs::File};
 
+use super::data_ingest::CoverageData;
+
 /////////////// Functions to write to json and csv files ///////////////
 /// Function to serialize a vector of structs into split-oriented JSON with precision and indexing
 pub fn write_structs_to_split_json_file<T: Serialize>(

@@ -14,23 +14,23 @@ use std::{
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct CoverageData {
     #[serde(rename = "Sample")]
-    sample_id: Option<String>,
+    pub sample_id: Option<String>,
     #[serde(rename = "Reference_Name")]
-    reference_name: String,
+    pub reference_name: String,
     #[serde(rename = "Position")]
-    position: String,
+    pub position: String,
     #[serde(rename = "Coverage Depth")]
-    coverage_depth: String,
+    pub coverage_depth: String,
     #[serde(rename = "Consensus")]
-    consensus: String,
+    pub consensus: String,
     #[serde(rename = "Deletions")]
-    deletions: String,
+    pub deletions: String,
     #[serde(rename = "Ambiguous")]
-    ambiguous: String,
+    pub ambiguous: String,
     #[serde(rename = "Consensus_Count")]
-    consensus_count: String,
+    pub consensus_count: String,
     #[serde(rename = "Consensus_Average_Quality")]
-    consensus_avg_quality: String,
+    pub consensus_avg_quality: String,
     #[serde(rename = "Run_ID")]
     pub run_id: Option<String>,
     #[serde(rename = "Instrument")]
@@ -68,62 +68,70 @@ pub struct ProcessedRecord {
 }
 
 /// Alleles struct
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AllelesData {
     #[serde(rename = "Reference_Name")]
-    reference_name: String,
+    pub reference_name: String,
     #[serde(rename = "HMM_Position")]
-    reference_position: Option<String>,
+    pub reference_position: Option<String>,
     #[serde(rename = "Position")]
-    position: String,
+    pub position: String,
     #[serde(rename = "Total")]
-    total: String,
+    pub total: String,
     #[serde(rename = "Consensus_Allele")]
-    consensus_allele: String,
+    pub consensus_allele: String,
     #[serde(rename = "Minority_Allele")]
-    minority_allele: String,
+    pub minority_allele: String,
     #[serde(rename = "Consensus_Count")]
-    consensus_count: String,
+    pub consensus_count: String,
     #[serde(rename = "Minority_Count")]
-    minority_count: String,
+    pub minority_count: String,
     #[serde(rename = "Minority_Frequency")]
-    minority_frequency: String,
-    sample_id: Option<String>,
+    pub minority_frequency: String,
+    pub sample_id: Option<String>,
+    #[serde(rename = "Run_ID")]
+    pub run_id: Option<String>,
+    #[serde(rename = "Instrument")]
+    pub instrument: Option<String>,
 }
 
 /// Indel struct
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct IndelsData {
     #[serde(rename = "Sample")]
-    sample_id: Option<String>,
+    pub sample_id: Option<String>,
     #[serde(rename = "Reference_Name")]
-    reference_name: String,
+    pub reference_name: String,
     #[serde(rename = "HMM_Position")]
-    reference_upstream_position: Option<String>,
+    pub reference_upstream_position: Option<String>,
     #[serde(rename = "Upstream_Position")]
-    sample_upstream_position: Option<String>,
+    pub sample_upstream_position: Option<String>,
     #[serde(rename = "Insert")]
-    insert: Option<String>,
+    pub insert: Option<String>,
     #[serde(rename = "Length")]
-    length: Option<String>,
+    pub length: Option<String>,
     #[serde(rename = "Context")]
-    context: String,
+    pub context: String,
     #[serde(rename = "Called")]
-    called: String,
+    pub called: String,
     #[serde(rename = "Count")]
-    count: String,
+    pub count: String,
     #[serde(rename = "Total")]
-    total: String,
+    pub total: String,
     #[serde(rename = "Frequency")]
-    frequency: String,
+    pub frequency: String,
     #[serde(rename = "Average_Quality")]
-    average_quality: Option<String>,
+    pub average_quality: Option<String>,
     #[serde(rename = "ConfidenceNotMacErr")]
-    confidence_not_mac_err: Option<String>,
+    pub confidence_not_mac_err: Option<String>,
     #[serde(rename = "PairedUB")]
-    paired_ub: String,
+    pub paired_ub: String,
     #[serde(rename = "QualityUB")]
-    quality_ub: Option<String>,
+    pub quality_ub: Option<String>,
+    #[serde(rename = "Run_ID")]
+    pub run_id: Option<String>,
+    #[serde(rename = "Instrument")]
+    pub instrument: Option<String>,
 }
 
 #[derive(Debug)]
@@ -137,87 +145,87 @@ pub struct SeqData {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct InsertionData {
     #[serde(rename = "ID")]
-    sample_id: Option<String>,
+    pub sample_id: Option<String>,
     #[serde(rename = "C_type")]
-    ctype: Option<String>,
+    pub ctype: Option<String>,
     #[serde(rename = "Ref_ID")]
-    reference: String,
+    pub reference: String,
     #[serde(rename = "Protein")]
-    protein: String,
+    pub protein: String,
     #[serde(rename = "Upstream_aa")]
-    upstream_aa_position: String,
+    pub upstream_aa_position: String,
     #[serde(rename = "Inserted_nucleotides")]
-    inserted_nucleotides: String,
+    pub inserted_nucleotides: String,
     #[serde(rename = "Inserted_residues")]
-    inserted_residues: String,
+    pub inserted_residues: String,
     #[serde(rename = "Upstream_nt")]
-    upstream_nt: String,
+    pub upstream_nt: String,
     #[serde(rename = "Codon_shift")]
-    in_frame: String,
+    pub in_frame: String,
 }
 
 /// Deletions Data
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DeletionsData {
     #[serde(rename = "ID")]
-    sample_id: Option<String>,
+    pub sample_id: Option<String>,
     #[serde(rename = "C_type")]
-    ctype: Option<String>,
+    pub ctype: Option<String>,
     #[serde(rename = "Ref_ID")]
-    reference: String,
+    pub reference: String,
     #[serde(rename = "Protein")]
-    protein: String,
+    pub protein: String,
     #[serde(rename = "VH")]
-    vh: Option<String>,
+    pub vh: Option<String>,
     #[serde(rename = "Del_AA_start")]
-    del_start_aa_position: Option<String>,
+    pub del_start_aa_position: Option<String>,
     #[serde(rename = "Del_AA_end")]
-    del_end_aa_position: Option<String>,
+    pub del_end_aa_position: Option<String>,
     #[serde(rename = "Del_AA_len")]
-    del_aa_length: String,
+    pub del_aa_length: String,
     #[serde(rename = "In_frame")]
-    in_frame: String,
+    pub in_frame: String,
     #[serde(rename = "CDS_ID")]
-    cds_id: Option<String>,
+    pub cds_id: Option<String>,
     #[serde(rename = "Del_CDS_start")]
-    del_start_cds_position: String,
+    pub del_start_cds_position: String,
     #[serde(rename = "Del_CDS_end")]
-    del_end_cds_position: String,
+    pub del_end_cds_position: String,
     #[serde(rename = "Del_CDS_len")]
-    del_cds_length: Option<String>,
+    pub del_cds_length: Option<String>,
 }
 
 /// Sequence Data
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DaisSeqData {
     #[serde(rename = "ID")]
-    sample_id: Option<String>,
+    pub sample_id: Option<String>,
     #[serde(rename = "C_type")]
-    ctype: Option<String>,
+    pub ctype: Option<String>,
     #[serde(rename = "Ref_ID")]
-    reference: String,
+    pub reference: String,
     #[serde(rename = "Protein")]
-    protein: String,
+    pub protein: String,
     #[serde(rename = "VH")]
-    vh: Option<String>,
+    pub vh: Option<String>,
     #[serde(rename = "AA_seq")]
-    aa_seq: String,
+    pub aa_seq: String,
     #[serde(rename = "AA_aln")]
-    aa_aln: String,
+    pub aa_aln: String,
     #[serde(rename = "CDS_ID")]
-    cds_id: Option<String>,
+    pub cds_id: Option<String>,
     #[serde(rename = "Insertion")]
-    insertion: String,
+    pub insertion: String,
     #[serde(rename = "Shift_Insert")]
-    insertions_shift_frame: String,
+    pub insertions_shift_frame: String,
     #[serde(rename = "CDS_seq")]
-    cds_sequence: String,
+    pub cds_sequence: String,
     #[serde(rename = "CDS_aln")]
-    aligned_cds_sequence: String,
+    pub aligned_cds_sequence: String,
     #[serde(rename = "Query_nt_coordinates")]
-    reference_nt_positions: String,
+    pub reference_nt_positions: String,
     #[serde(rename = "CDS_nt_coordinates")]
-    sample_nt_positions: String,
+    pub sample_nt_positions: String,
 }
 
 /////////////// Imp for the process_txt_with_sample_function ///////////////
