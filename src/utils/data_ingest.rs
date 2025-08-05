@@ -3,10 +3,10 @@ use either::Either;
 use glob::glob;
 use serde::{self, Deserialize, Serialize, de::DeserializeOwned};
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     error::Error,
-    fs::{self, File, OpenOptions},
-    io::{self, BufRead, BufReader, Read, Stdin, stdin},
+    fs::{File, OpenOptions},
+    io::{self, BufRead, BufReader, Read, Stdin},
     path::{Path, PathBuf},
 };
 
@@ -412,7 +412,7 @@ pub fn reads_data_collection(
 
 /// Collecting allele data created by IRMA and and save to vector of AllelesData
 pub fn allele_data_collection(
-    irma_path: &PathBuf,
+    irma_path: &Path,
 ) -> Result<Vec<AllelesData>, Box<dyn std::error::Error>> {
     let pattern = format!(
         "{}/*/IRMA/*/tables/*variants.txt",
@@ -514,7 +514,6 @@ pub fn amended_consensus_data_collection(
     for entry in glob(&pattern).expect("Failed to read glob pattern") {
         match entry {
             Ok(path) => {
-                let sample = extract_sample_name(&path)?; // Extract sample name
                 let file = File::open(&path)?;
                 let reader = BufReader::new(file);
 
@@ -529,11 +528,11 @@ pub fn amended_consensus_data_collection(
                         if !current_name.is_empty() {
                             seq_data.push(SeqData {
                                 name: current_name.clone(),
-                                sequence: current_sequence.clone().into(),
+                                sequence: current_sequence.clone(),
                             });
                         }
                         // Start a new sequence
-                        current_name = line[1..].to_string(); // Remove '>'
+                        current_name = line[1..].to_string();
                         current_sequence.clear();
                     } else {
                         // Append to the current sequence
