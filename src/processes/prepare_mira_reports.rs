@@ -131,10 +131,10 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
         }));
 
     //Read in DAIS-ribosome data
-    let dais_ins_data = dias_insertion_data_collection(&args.irma_path);
+    let dais_ins_data = dais_insertion_data_collection(&args.irma_path);
     let dais_del_data = dias_deletion_data_collection(&args.irma_path);
     let dais_seq_data = dias_sequence_data_collection(&args.irma_path);
-    let dais_ref_data = dias_ref_seq_data_collection(&args.workdir_path, "flu");
+    let dais_ref_data = dais_ref_seq_data_collection(&args.workdir_path, "flu");
 
     //TODO: remove these at end
     //println!("{samplesheet:?}");

@@ -338,13 +338,13 @@ where
 
 /// Read in the coverage files made by IRMA and save to a vector of CoverageData
 pub fn coverage_data_collection(
-    irma_path: &PathBuf,
+    irma_path: impl AsRef<Path>,
     platform: &str,
     runid: &str,
 ) -> Result<Vec<CoverageData>, Box<dyn std::error::Error>> {
     let pattern = format!(
         "{}/*/IRMA/*/tables/*coverage.txt",
-        irma_path.to_string_lossy()
+        irma_path.as_ref().display()
     );
 
     let mut cov_data: Vec<CoverageData> = Vec::new();
@@ -373,13 +373,13 @@ pub fn coverage_data_collection(
 
 ///  Collect read data created by IRMA and save to vector of ReadsData
 pub fn reads_data_collection(
-    irma_path: &PathBuf,
+    irma_path: impl AsRef<Path>,
     platform: &str,
     runid: &str,
 ) -> Result<Vec<ReadsData>, Box<dyn std::error::Error>> {
     let pattern = format!(
         "{}/*/IRMA/*/tables/READ_COUNTS.txt",
-        irma_path.to_string_lossy()
+        irma_path.as_ref().display()
     );
 
     let mut reads_data: Vec<ReadsData> = Vec::new();
@@ -443,15 +443,15 @@ pub fn allele_data_collection(
 /// Collect indel data and save to vector of IndelsData
 /// Note that insertions and deletions are being added  to the same Vec<Indelsdata>
 pub fn indels_data_collection(
-    irma_path: &PathBuf,
+    irma_path: impl AsRef<Path>,
 ) -> Result<Vec<IndelsData>, Box<dyn std::error::Error>> {
     let pattern1 = format!(
         "{}/*/IRMA/*/tables/*insertions.txt",
-        irma_path.to_string_lossy()
+        irma_path.as_ref().display()
     );
     let pattern2 = format!(
         "{}/*/IRMA/*/tables/*deletions.txt",
-        irma_path.to_string_lossy()
+        irma_path.as_ref().display()
     );
 
     let mut reads_data: Vec<IndelsData> = Vec::new();
@@ -492,19 +492,19 @@ pub fn indels_data_collection(
 
 /// Read in IRMA amended consensus fasta files to SeqData struct
 pub fn amended_consensus_data_collection(
-    irma_path: &PathBuf,
+    irma_path: impl AsRef<Path>,
     organism: &str,
 ) -> Result<Vec<SeqData>, Box<dyn std::error::Error>> {
     // Determine the glob pattern based on the organism
     let pattern = if organism == "flu" {
         format!(
             "{}/*/IRMA/*/amended_consensus/*fa",
-            irma_path.to_string_lossy()
+            irma_path.as_ref().display()
         )
     } else {
         format!(
             "{}/*/IRMA/*/amended_consensus/*pad.fa",
-            irma_path.to_string_lossy()
+            irma_path.as_ref().display()
         )
     };
 
@@ -597,11 +597,11 @@ pub fn create_vtype_data(reads_data: &Vec<ReadsData>) -> Vec<ProcessedRecord> {
 
 // Function to collect reference lengths from IRMA outputs
 pub fn get_reference_lens(
-    irma_path: &PathBuf,
+    irma_path: impl AsRef<Path>,
 ) -> Result<HashMap<String, usize>, Box<dyn std::error::Error>> {
     let pattern = format!(
         "{}/*/IRMA/*/intermediate/0-ITERATIVE-REFERENCES/R0*ref",
-        irma_path.to_string_lossy()
+        irma_path.as_ref().display()
     );
 
     let mut ref_len_map: HashMap<String, usize> = HashMap::new();
@@ -701,14 +701,14 @@ where
 }
 
 /// Read in dais-ribosome ins file fto InsertionData struct
-pub fn dias_insertion_data_collection(
-    dais_path: &PathBuf,
+pub fn dais_insertion_data_collection(
+    dais_path: impl AsRef<Path>,
 ) -> Result<Vec<InsertionData>, Box<dyn std::error::Error>> {
     // Construct the glob pattern for matching files
     //If using * situation, you will have to use glob
     let pattern = format!(
         "{}/aggregate_outputs/dais-ribosome/*.ins",
-        dais_path.to_string_lossy()
+        dais_path.as_ref().display()
     );
 
     let mut dais_ins_data: Vec<InsertionData> = Vec::new();
@@ -733,13 +733,13 @@ pub fn dias_insertion_data_collection(
 
 /// Read in dais-ribosome ins file fto DeletionsData struct
 pub fn dias_deletion_data_collection(
-    dais_path: &PathBuf,
+    dais_path: impl AsRef<Path>,
 ) -> Result<Vec<DeletionsData>, Box<dyn std::error::Error>> {
     // Construct the glob pattern for matching files
     //If using * situation, you will have to use glob
     let pattern = format!(
         "{}/aggregate_outputs/dais-ribosome/*.del",
-        dais_path.to_string_lossy()
+        dais_path.as_ref().display()
     );
 
     let mut dais_del_data: Vec<DeletionsData> = Vec::new();
@@ -764,13 +764,13 @@ pub fn dias_deletion_data_collection(
 
 /// Read in dais-ribosome ins file fto DaisSeqData struct
 pub fn dias_sequence_data_collection(
-    dais_path: &PathBuf,
+    dais_path: impl AsRef<Path>,
 ) -> Result<Vec<DaisSeqData>, Box<dyn std::error::Error>> {
     // Construct the glob pattern for matching files
     //If using * situation, you will have to use glob
     let pattern = format!(
         "{}/aggregate_outputs/dais-ribosome/*.seq",
-        dais_path.to_string_lossy()
+        dais_path.as_ref().display()
     );
 
     let mut dais_seq_data: Vec<DaisSeqData> = Vec::new();
@@ -794,15 +794,15 @@ pub fn dias_sequence_data_collection(
 }
 
 /// Read in dais-ribosome ins file fto DaisSeqData struct
-pub fn dias_ref_seq_data_collection(
-    dais_path: &PathBuf,
+pub fn dais_ref_seq_data_collection(
+    dais_path: impl AsRef<Path>,
     organism: &str,
 ) -> Result<Vec<DaisSeqData>, Box<dyn std::error::Error>> {
     // Construct the glob pattern for matching files
     //If using * situation, you will have to use glob
     let pattern = format!(
         "{}/data/references/*{}.seq",
-        dais_path.to_string_lossy(),
+        dais_path.as_ref().display(),
         organism
     );
 
