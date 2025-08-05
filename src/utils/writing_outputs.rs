@@ -6,6 +6,8 @@ use csv::Writer;
 use parquet::arrow::ArrowWriter;
 use serde::Serialize;
 use serde_json::{Value, json};
+use std::collections::HashMap;
+use std::io::Write;
 use std::sync::Arc;
 use std::{error::Error, fs::File};
 
@@ -81,6 +83,29 @@ pub fn write_structs_to_csv_file<T: Serialize>(
     Ok(())
 }
 
+/// make ref_data.json - has unique set up
+pub fn write_ref_data_json(
+    file_path: &str,
+    ref_lens: &HashMap<String, usize>,
+    segments: &Vec<String>,
+    segset: &Vec<String>,
+    segcolor: &HashMap<String, &str>,
+) -> Result<(), Box<dyn Error>> {
+    let json_data = json!({
+        "ref_lens": ref_lens,
+        "segments": segments,
+        "segset": segset,
+        "segcolor": segcolor,
+    });
+
+    // Write JSON to a file
+    let mut file = File::create(file_path)?;
+    file.write_all(serde_json::to_string_pretty(&json_data)?.as_bytes())?;
+
+    println!("Data written to ref_data.json");
+
+    Ok(())
+}
 /////////////// Functions to write parquet files out ///////////////
 /// Functions to convert values in a vecxtor of structs to vector
 /// Some perform type converions

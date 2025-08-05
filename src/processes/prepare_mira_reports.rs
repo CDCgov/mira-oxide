@@ -3,7 +3,8 @@ use crate::utils::{data_ingest::*, writing_outputs::*};
 use clap::Parser;
 use csv::ReaderBuilder;
 use either::Either;
-use serde::{self, Deserialize, de::DeserializeOwned};
+use serde::{self, Deserialize, Serialize, de::DeserializeOwned};
+use serde_json::json;
 use std::sync::Arc;
 use std::{
     error::Error,
@@ -115,9 +116,19 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     let vtype_data = create_vtype_data(&read_data);
     let allele_data = allele_data_collection(&args.irma_path)?;
     let indel_data = indels_data_collection(&args.irma_path)?;
-    let ref_lengths = get_reference_lens(&args.irma_path);
     //TODO: feed in organism from argument
     let seq_data = amended_consensus_data_collection(&args.irma_path, "flu");
+    let ref_lengths = match get_reference_lens(&args.irma_path) {
+        Ok(data) => data,
+        Err(e) => {
+            eprintln!("Error getting reference lengths: {e}");
+            return Err(e);
+        }
+    };
+    let (segments, segset, segcolor) =
+        return_seg_data(extract_field(coverage_data.clone(), |item| {
+            item.reference_name.clone()
+        }));
 
     //Read in DAIS-ribosome data
     let dais_ins_data = dias_insertion_data_collection(&args.irma_path);
@@ -136,7 +147,7 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     //println!("dais del data: {dais_del_data:#?}");
     //println!("dais seq data: {dais_seq_data:#?}");
     //println!("dais ref data: {dais_ref_data:#?}");
-    println!("ref length data: {ref_lengths:#?}");
+    //println!("ref length data: {ref_lengths:#?}");
 
     /////////////// Write the structs to JSON files and CSV files ///////////////
     // Writing out coverage data
@@ -288,6 +299,14 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
         &indel_data,
         &indels_columns,
         &indels_struct_values,
+    )?;
+
+    write_ref_data_json(
+        "/home/xpa3/mira-oxide/test/ref_data.json",
+        &ref_lengths,
+        &segments,
+        &segset,
+        &segcolor,
     )?;
 
     // Write fields to parq if flag given

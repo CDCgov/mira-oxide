@@ -3,7 +3,7 @@ use either::Either;
 use glob::glob;
 use serde::{self, Deserialize, Serialize, de::DeserializeOwned};
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     error::Error,
     fs::{self, File, OpenOptions},
     io::{self, BufRead, BufReader, Read, Stdin, stdin},
@@ -140,12 +140,6 @@ pub struct IndelsData {
 pub struct SeqData {
     name: String,
     sequence: String,
-}
-
-#[derive(Debug)]
-pub struct RefLengthData {
-    name: String,
-    length: usize,
 }
 
 /////////////// Structs to hold dais-ribosome data ///////////////
@@ -602,61 +596,88 @@ pub fn create_vtype_data(reads_data: &Vec<ReadsData>) -> Vec<ProcessedRecord> {
     processed_records
 }
 
-/// Collect the reference lengths from the IRMA outputs
+// Function to collect reference lengths from IRMA outputs
 pub fn get_reference_lens(
     irma_path: &PathBuf,
-) -> Result<Vec<RefLengthData>, Box<dyn std::error::Error>> {
-    // Determine the glob pattern based on the organism
+) -> Result<HashMap<String, usize>, Box<dyn std::error::Error>> {
     let pattern = format!(
         "{}/*/IRMA/*/intermediate/0-ITERATIVE-REFERENCES/R0*ref",
         irma_path.to_string_lossy()
     );
 
-    let mut ref_len_data: Vec<RefLengthData> = Vec::new();
+    let mut ref_len_map: HashMap<String, usize> = HashMap::new();
 
-    // Iterate over all files matching the pattern
-    for entry in glob(&pattern).expect("Failed to read glob pattern") {
+    for entry in glob(&pattern)? {
         match entry {
             Ok(path) => {
                 let file = File::open(&path)?;
                 let reader = BufReader::new(file);
 
-                // Parse the file line by line (assuming FASTA format)
                 let mut ref_name = String::new();
                 let mut current_sequence = String::new();
 
                 for line in reader.lines() {
                     let line = line?;
                     if line.starts_with('>') {
-                        // If there's an existing sequence, save its length
                         if !ref_name.is_empty() {
-                            ref_len_data.push(RefLengthData {
-                                name: ref_name.clone(),
-                                length: current_sequence.len(),
-                            });
+                            ref_len_map.insert(ref_name.clone(), current_sequence.len());
                         }
-                        // Start a new sequence
-                        ref_name = line[1..].to_string(); // Remove '>'
+                        ref_name = line[1..].to_string();
                         current_sequence.clear();
                     } else {
-                        // Append to the current sequence
                         current_sequence.push_str(&line);
                     }
                 }
 
-                // Save the last sequence's length
                 if !ref_name.is_empty() {
-                    ref_len_data.push(RefLengthData {
-                        name: ref_name,
-                        length: current_sequence.len(),
-                    });
+                    // Insert the last reference name and its length into the HashMap
+                    ref_len_map.insert(ref_name, current_sequence.len());
                 }
             }
             Err(e) => println!("Error reading file: {e}"),
         }
     }
 
-    Ok(ref_len_data)
+    Ok(ref_len_map)
+}
+
+// Function to process reference names and generate segments, segset, and segcolor
+pub fn return_seg_data(
+    reference_names: Vec<String>,
+) -> (Vec<String>, Vec<String>, HashMap<String, &'static str>) {
+    let mut segments: Vec<String> = reference_names.into_iter().collect();
+    segments.sort();
+    segments.dedup();
+
+    let color_palette = vec![
+        "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b", "#e377c2", "#7f7f7f",
+        "#bcbd22", "#17becf",
+    ];
+
+    let mut segset: Vec<String> = Vec::new();
+    for segment in &segments {
+        let parts: Vec<&str> = segment.split('_').collect();
+        if parts.len() > 1 {
+            segset.push(parts[1].to_string());
+        } else {
+            segset.push(segment.clone());
+        }
+    }
+
+    let segset: Vec<String> = segset
+        .into_iter()
+        .collect::<std::collections::HashSet<_>>()
+        .into_iter()
+        .collect();
+
+    let mut segcolor: HashMap<String, &str> = HashMap::new();
+    for (i, seg) in segset.iter().enumerate() {
+        if i < color_palette.len() {
+            segcolor.insert(seg.clone(), color_palette[i]);
+        }
+    }
+
+    (segments, segset, segcolor)
 }
 
 /////////////// Data reading functions for DAIS-ribosome ///////////////
