@@ -2,7 +2,10 @@ use crate::utils::data_ingest;
 use either::Either;
 use glob::glob;
 use serde::{self, Deserialize, Serialize, de::DeserializeOwned};
-use std::{collections::HashSet, error::Error};
+use std::{
+    collections::{HashMap, HashSet},
+    error::Error,
+};
 
 use super::data_ingest::DaisSeqData;
 
@@ -26,6 +29,46 @@ pub fn append_with_comma(base: &mut String, new_entry: &str) {
     }
 }
 
+// Function to process reference names and generate segments, segset, and segcolor
+pub fn return_seg_data(
+    reference_names: Vec<String>,
+) -> (Vec<String>, Vec<String>, HashMap<String, &'static str>) {
+    let mut segments: Vec<String> = reference_names.into_iter().collect();
+    segments.sort();
+    segments.dedup();
+
+    let color_palette = vec![
+        "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b", "#e377c2", "#7f7f7f",
+        "#bcbd22", "#17becf",
+    ];
+
+    let mut segset: Vec<String> = Vec::new();
+    for segment in &segments {
+        let parts: Vec<&str> = segment.split('_').collect();
+        if parts.len() > 1 {
+            segset.push(parts[1].to_string());
+        } else {
+            segset.push(segment.clone());
+        }
+    }
+
+    let segset: Vec<String> = segset
+        .into_iter()
+        .collect::<std::collections::HashSet<_>>()
+        .into_iter()
+        .collect();
+
+    let mut segcolor: HashMap<String, &str> = HashMap::new();
+    for (i, seg) in segset.iter().enumerate() {
+        if i < color_palette.len() {
+            segcolor.insert(seg.clone(), color_palette[i]);
+        }
+    }
+
+    (segments, segset, segcolor)
+}
+
+// Function to calculate the aa variants - this is specifically for flu right now
 pub fn compute_dais_variants(
     ref_seqs_data: &Vec<DaisSeqData>,
     sample_seqs_data: &Vec<DaisSeqData>,
