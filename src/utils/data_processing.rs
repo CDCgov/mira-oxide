@@ -1,15 +1,15 @@
-use crate::utils::data_ingest;
-use either::Either;
-use glob::glob;
-use serde::{self, Deserialize, Serialize, de::DeserializeOwned};
+use serde::{self, Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
     error::Error,
 };
 
-use super::data_ingest::DaisSeqData;
+use crate::processes::prepare_mira_reports::SamplesheetI;
+use crate::processes::prepare_mira_reports::SamplesheetO;
 
-/// Dais Variants
+use super::data_ingest::{DaisSeqData, ReadsData};
+
+/// Dais Variants Struct
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DaisVarsData {
     pub sample_id: Option<String>,
@@ -17,6 +17,89 @@ pub struct DaisVarsData {
     pub protein: String,
     pub aa_variant_count: i32,
     pub aa_variants: String,
+}
+
+// PassQC struct
+#[derive(Serialize, Deserialize, Debug)]
+pub struct QCCalcs {
+    pub sample_id: String,
+    pub percent_mapping: i32,
+}
+
+/////////////// Traits ///////////////
+/// check for sample type and if not there add ""
+pub trait HasSampleType {
+    fn sample_type(&self) -> String;
+}
+
+impl HasSampleType for SamplesheetI {
+    fn sample_type(&self) -> String {
+        self.sample_type.clone().unwrap_or_else(|| "".to_string())
+    }
+}
+
+impl HasSampleType for SamplesheetO {
+    fn sample_type(&self) -> String {
+        self.sample_type.clone().unwrap_or_else(|| "".to_string())
+    }
+}
+
+/// Check for sample id
+pub trait HasSampleId {
+    fn sample_id(&self) -> &String;
+}
+
+impl HasSampleId for SamplesheetI {
+    fn sample_id(&self) -> &String {
+        &self.sample_id
+    }
+}
+
+impl HasSampleId for SamplesheetO {
+    fn sample_id(&self) -> &String {
+        &self.sample_id
+    }
+}
+
+/// Functions to convert values in a vecxtor of structs to vector
+/// Some perform type converions
+pub fn extract_field<T, U, F>(data: Vec<T>, extractor: F) -> Vec<U>
+where
+    F: Fn(&T) -> U,
+{
+    data.iter().map(extractor).collect()
+}
+
+pub fn extract_string_fields_as_float<T, F>(data: Vec<T>, extractor: F) -> Vec<f32>
+where
+    F: Fn(&T) -> &str,
+{
+    data.iter()
+        .map(|item| {
+            let field = extractor(item);
+            if field.is_empty() {
+                0.0
+            } else {
+                field.parse::<f32>().unwrap_or(0.0)
+            }
+        })
+        .collect()
+}
+
+pub fn extract_string_fields_as_int<T, F>(data: Vec<T>, extractor: F) -> Vec<i32>
+where
+    F: Fn(&T) -> &str,
+{
+    data.iter()
+        .map(|item| {
+            let field = extractor(item);
+            if field.is_empty() {
+                0
+            } else {
+                field.parse::<i32>().unwrap_or(0)
+            }
+        })
+        .collect()
 }
 
 // Function to append a new string with a comma
@@ -29,6 +112,30 @@ pub fn append_with_comma(base: &mut String, new_entry: &str) {
     }
 }
 
+pub fn collect_negatives<T>(samples: &Vec<T>) -> Vec<String>
+where
+    T: Serialize + Clone,
+    T: HasSampleType + HasSampleId, // Custom trait to ensure T has a `sample_type` and sample_id field
+{
+    let negative_keywords = ["- control", "negative", "negative_control", "ntc"];
+
+    samples
+        .iter()
+        .filter_map(|item| {
+            let sample_type = item.sample_type().to_lowercase();
+            println!("{sample_type}");
+            if negative_keywords
+                .iter()
+                .any(|keyword| sample_type.contains(keyword))
+            {
+                Some(item.sample_id().clone())
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
 // Function to process reference names and generate segments, segset, and segcolor
 pub fn return_seg_data(
     reference_names: Vec<String>,
@@ -37,7 +144,7 @@ pub fn return_seg_data(
     segments.sort();
     segments.dedup();
 
-    let color_palette = vec![
+    let color_palette = [
         "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b", "#e377c2", "#7f7f7f",
         "#bcbd22", "#17becf",
     ];

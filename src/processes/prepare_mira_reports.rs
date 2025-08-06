@@ -45,17 +45,22 @@ pub struct ReportsArgs {
     irma_config: Option<String>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct SamplesheetI {
-    sample_id: String,
-    sample_type: String,
+    pub sample_id: String,
+    pub sample_type: Option<String>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct SamplesheetO {
-    barcode: String,
-    sample_id: String,
-    sample_type: String,
+    pub barcode: String,
+    pub sample_id: String,
+    pub sample_type: Option<String>,
+}
+
+enum Samplesheet {
+    Illumina(Vec<SamplesheetI>),
+    Other(Vec<SamplesheetO>),
 }
 
 #[derive(Debug, Deserialize)]
@@ -104,7 +109,20 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     /////////////// Read in all data ///////////////
     // Read in samplesheet
     let samplesheet_path = create_reader(args.samplesheet)?;
-    let samplesheet: Vec<SamplesheetO> = read_csv(samplesheet_path, false)?;
+    let samplesheet = if &args.platform == "illumina" {
+        let illumina_samplesheet: Vec<SamplesheetI> = read_csv(samplesheet_path, false)?;
+        Samplesheet::Illumina(illumina_samplesheet)
+    } else {
+        let other_samplesheet: Vec<SamplesheetO> = read_csv(samplesheet_path, false)?;
+        Samplesheet::Other(other_samplesheet)
+    };
+
+    // Get the negative controls from the samplesheet
+    let neg_control_list = match samplesheet {
+        Samplesheet::Illumina(ref sheet) => collect_negatives(sheet),
+        Samplesheet::Other(ref sheet) => collect_negatives(sheet),
+    };
+    //println!("negs: {neg_control_list:?}");
 
     // Read in qc yaml
     let qc_yaml_path = create_reader(args.qc_yaml)?;
@@ -137,7 +155,6 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     let dais_ref_data = dais_ref_seq_data_collection(&args.workdir_path, "flu")?;
 
     //TODO: remove these at end
-    //println!("{samplesheet:?}");
     //println!("{qc_config:?}")
     //println!("cov data: {coverage_data:?}");
     //println!("Allele data: {allele_data:?}");
@@ -153,7 +170,7 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     //TODO: circle back for the rsv and sc2 situations
     let dais_vars_data = compute_dais_variants(&dais_ref_data, &dais_seq_data)?;
 
-    println!("{dais_vars_data:?}");
+    //println!("{dais_vars_data:?}");
 
     /////////////// Write the structs to JSON files and CSV files ///////////////
     // Writing out coverage data

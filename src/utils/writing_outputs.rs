@@ -1,4 +1,5 @@
 use crate::utils::data_ingest::ReadsData;
+use crate::utils::data_processing::*;
 use arrow::array::{ArrayRef, Float32Array, Int32Array, StringArray};
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
@@ -105,46 +106,6 @@ pub fn write_ref_data_json(
     Ok(())
 }
 /////////////// Functions to write parquet files out ///////////////
-/// Functions to convert values in a vecxtor of structs to vector
-/// Some perform type converions
-pub fn extract_field<T, U, F>(data: Vec<T>, extractor: F) -> Vec<U>
-where
-    F: Fn(&T) -> U,
-{
-    data.iter().map(extractor).collect()
-}
-
-pub fn extract_string_fields_as_float<T, F>(data: Vec<T>, extractor: F) -> Vec<f32>
-where
-    F: Fn(&T) -> &str,
-{
-    data.iter()
-        .map(|item| {
-            let field = extractor(item);
-            if field.is_empty() {
-                0.0
-            } else {
-                field.parse::<f32>().unwrap_or(0.0)
-            }
-        })
-        .collect()
-}
-
-pub fn extract_string_fields_as_int<T, F>(data: Vec<T>, extractor: F) -> Vec<i32>
-where
-    F: Fn(&T) -> &str,
-{
-    data.iter()
-        .map(|item| {
-            let field = extractor(item);
-            if field.is_empty() {
-                0
-            } else {
-                field.parse::<i32>().unwrap_or(0)
-            }
-        })
-        .collect()
-}
 
 /// Write the reads data to parquet file.
 pub fn write_reads_to_parquet(

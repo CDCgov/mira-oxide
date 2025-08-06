@@ -232,33 +232,33 @@ pub struct DaisSeqData {
 
 /////////////// Imp for the process_txt_with_sample_function ///////////////
 /// Define a trait for structs that have a `sample_id` field
-trait HasSampleId {
+trait GetSampleId {
     fn set_sample_id(&mut self, sample_id: String);
 }
 
 // Implement the trait for CoverageData
-impl HasSampleId for CoverageData {
+impl GetSampleId for CoverageData {
     fn set_sample_id(&mut self, sample_id: String) {
         self.sample_id = Some(sample_id);
     }
 }
 
 // Implement the trait for ReadsData
-impl HasSampleId for ReadsData {
+impl GetSampleId for ReadsData {
     fn set_sample_id(&mut self, sample_id: String) {
         self.sample_id = Some(sample_id);
     }
 }
 
 // Implement the trait for AllelesData
-impl HasSampleId for AllelesData {
+impl GetSampleId for AllelesData {
     fn set_sample_id(&mut self, sample_id: String) {
         self.sample_id = Some(sample_id);
     }
 }
 
 // Implement the trait for IndelsData
-impl HasSampleId for IndelsData {
+impl GetSampleId for IndelsData {
     fn set_sample_id(&mut self, sample_id: String) {
         self.sample_id = Some(sample_id);
     }
@@ -319,7 +319,7 @@ fn process_txt_with_sample<R, T>(
 ) -> Result<Vec<T>, Box<dyn std::error::Error>>
 where
     R: Read,
-    T: for<'de> Deserialize<'de> + HasSampleId,
+    T: for<'de> Deserialize<'de> + GetSampleId,
 {
     let mut rdr = ReaderBuilder::new()
         .has_headers(has_headers)
