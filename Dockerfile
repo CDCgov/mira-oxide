@@ -11,32 +11,51 @@ COPY ca.crt /root/ca.crt
 # Put certs in /etc/ssl/certs location
 RUN cat /root/ca.crt >> /etc/ssl/certs/ca-certificates.crt
 
-RUN apk update && apk add --no-cache build-base
+# Install required packages, including bash
+RUN apk update && apk add --no-cache \
+    build-base \
+    openssl-dev \
+    bash
 
+# Set workdir
 WORKDIR /app
 
-# Copy all scripts to docker images
+# Copy all scripts and source code to the Docker image
 COPY . .
 
 # This build step will cache the dependencies
 RUN cargo build --release
 
-FROM alpine:latest as deploy
+####################################################################################################
+# DEPLOY IMAGE
+####################################################################################################
+FROM alpine:3.18
 
+# Required certs for apk update
+COPY ca.crt /root/ca.crt
+
+# Put certs in /etc/ssl/certs location
+RUN cat /root/ca.crt >> /etc/ssl/certs/ca-certificates.crt
+
+RUN apk update && apk add --no-cache bash
+
+# Set workdir
 WORKDIR /app
 
-COPY --from=builder \
-    /app/target/release/mutations_of_interest_table \
-    /app/target/release/all_sample_nt_diffs \
-    /app/target/release/all_sample_hamming_dist \
-    /app/target/release/plots \
-    /app/target/release/check_chemistry /app/
+# Copy the compiled binary from the builder stage
+COPY --from=builder /app/target/release/mira-oxide /app/
 
 # Create working directory variable
 ENV WORKDIR=/data
 
-# Set up volume directory in docker
+# Set up volume directory in Docker
 VOLUME ${WORKDIR}
 
 # Export project directory to PATH
-ENV PATH "$PATH:/app"
+ENV PATH="$PATH:/app"
+
+# Set bash as the default shell
+SHELL ["/bin/bash", "-c"]
+
+# Default command to run when the container starts
+CMD ["bash"]
