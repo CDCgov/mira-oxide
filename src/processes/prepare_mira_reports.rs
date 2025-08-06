@@ -1,5 +1,5 @@
 #![allow(dead_code, unused_imports)]
-use crate::utils::{data_ingest::*, writing_outputs::*};
+use crate::utils::{data_ingest::*, data_processing::*, writing_outputs::*};
 use clap::Parser;
 use csv::ReaderBuilder;
 use either::Either;
@@ -131,10 +131,10 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
         }));
 
     //Read in DAIS-ribosome data
-    let dais_ins_data = dais_insertion_data_collection(&args.irma_path);
-    let dais_del_data = dias_deletion_data_collection(&args.irma_path);
-    let dais_seq_data = dias_sequence_data_collection(&args.irma_path);
-    let dais_ref_data = dais_ref_seq_data_collection(&args.workdir_path, "flu");
+    let dais_ins_data = dais_insertion_data_collection(&args.irma_path)?;
+    let dais_del_data = dias_deletion_data_collection(&args.irma_path)?;
+    let dais_seq_data = dias_sequence_data_collection(&args.irma_path)?;
+    let dais_ref_data = dais_ref_seq_data_collection(&args.workdir_path, "flu")?;
 
     //TODO: remove these at end
     //println!("{samplesheet:?}");
@@ -148,6 +148,12 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     //println!("dais seq data: {dais_seq_data:#?}");
     //println!("dais ref data: {dais_ref_data:#?}");
     //println!("ref length data: {ref_lengths:#?}");
+
+    //Calculate AA variants for aavars.csv and dais_vars.json
+    //TODO: circle back for the rsv and sc2 situations
+    let dais_vars_data = compute_dais_variants(&dais_ref_data, &dais_seq_data)?;
+
+    println!("{dais_vars_data:?}");
 
     /////////////// Write the structs to JSON files and CSV files ///////////////
     // Writing out coverage data
@@ -227,7 +233,7 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
         &vtype_columns,
     )?;
 
-    // Writing out allele csv and josn file
+    // Writing out allele csv and json file
     let allele_struct_values = vec![
         "Sample",
         "Upstream_Position",
@@ -301,6 +307,7 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
         &indels_struct_values,
     )?;
 
+    // Write out ref_data.json
     write_ref_data_json(
         "/home/xpa3/mira-oxide/test/ref_data.json",
         &ref_lengths,
@@ -309,6 +316,29 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
         &segcolor,
     )?;
 
+    // write out the dais_vars.json and the {runid}_aavars.csv
+    let aavars_columns = vec![
+        "sample_id",
+        "reference_id",
+        "protein",
+        "aa_variant_count",
+        "aa_variants",
+    ];
+    write_structs_to_split_json_file(
+        "/home/xpa3/mira-oxide/test/dais_vars.json",
+        &dais_vars_data,
+        &aavars_columns,
+        &aavars_columns,
+    )?;
+
+    write_structs_to_csv_file(
+        &format!("/home/xpa3/mira-oxide/test/{}_aavars.csv", &args.runid),
+        &dais_vars_data,
+        &aavars_columns,
+        &aavars_columns,
+    )?;
+
+    /////////////// Write the structs to parquet files if flag invoked ///////////////
     // Write fields to parq if flag given
     write_reads_to_parquet(&read_data, "/home/xpa3/mira-oxide/test/read_data.parquet")?;
 

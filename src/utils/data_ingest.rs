@@ -197,7 +197,7 @@ pub struct DeletionsData {
     pub del_cds_length: Option<String>,
 }
 
-/// Sequence Data
+/// Dais Sequence Data
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DaisSeqData {
     #[serde(rename = "ID")]
