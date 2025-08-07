@@ -335,7 +335,7 @@ pub fn variants_of_interest_process(args: VariantsArgs) -> Result<(), Box<dyn Er
                             }
                         }
                     }
-                    if tail1.len() > 0 {
+                    if !tail1.is_empty() {
                         let mut codon_position: usize = 0;
                         for nt in 0..tail1.len() {
                             codon_position += 1;
@@ -347,8 +347,8 @@ pub fn variants_of_interest_process(args: VariantsArgs) -> Result<(), Box<dyn Er
                                 entry.nt_ref = tail1[nt] as char;
                                 entry.nt_mut = tail2[nt] as char;
                                 entry.aa_position = tail_index + 1;
-                                entry.aa_ref = '~' as char;
-                                entry.aa_mut = '~' as char;
+                                entry.aa_ref = '~';
+                                entry.aa_mut = '~';
 
                                 //aa difference moved forward in process;
                                 if entry.update_entry_from_alignment(
@@ -476,7 +476,7 @@ pub fn variants_of_interest_process(args: VariantsArgs) -> Result<(), Box<dyn Er
                             }
                         }
                     }
-                    if tail1.len() > 0 {
+                    if !tail1.is_empty() {
                         let mut codon_position: usize = 0;
                         for nt in 0..tail1.len() {
                             codon_position += 1;
@@ -488,8 +488,8 @@ pub fn variants_of_interest_process(args: VariantsArgs) -> Result<(), Box<dyn Er
                                 entry.nt_ref = tail1[nt] as char;
                                 entry.nt_mut = tail2[nt] as char;
                                 entry.aa_position = tail_index + 1;
-                                entry.aa_ref = '~' as char;
-                                entry.aa_mut = '~' as char;
+                                entry.aa_ref = '~';
+                                entry.aa_mut = '~';
 
                                 //aa difference moved forward in process;
                                 if entry.update_entry_from_alignment(

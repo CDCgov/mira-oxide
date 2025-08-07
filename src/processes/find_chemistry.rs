@@ -228,7 +228,7 @@ fn get_config_path(args: &FindChemArgs, seq_len: Option<usize>) -> String {
         .wd_path
         .to_str()
         .expect("Failed to convert work directory path to string");
-    format!("{}{}", wd_path, path_extension)
+    format!("{wd_path}{path_extension}")
 }
 
 #[derive(Debug)]
@@ -274,7 +274,7 @@ impl fmt::Display for ChemistryOutput {
 /// sequences, returns None
 fn get_average_line_length(fastq: &PathBuf) -> Result<Option<usize>, std::io::Error> {
     let sample_size = 5;
-    let file = File::open(&fastq)?;
+    let file = File::open(fastq)?;
     let buf_reader = BufReader::new(file);
     let fastq_reader = FastQReader::new(buf_reader);
 
@@ -313,7 +313,7 @@ pub fn find_chemistry_process(args: FindChemArgs) -> Result<(), std::io::Error> 
     //let args = CheckChemArgs::parse();
     // handle input validation to ensure valid combinations of
     if let Err(e) = args.validate() {
-        eprintln!("Error: {}", e);
+        eprintln!("Error: {e}");
         std::process::exit(1);
     }
     // parse the arguments into output format
