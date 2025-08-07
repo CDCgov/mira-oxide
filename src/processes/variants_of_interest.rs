@@ -110,9 +110,8 @@ pub struct Entry<'a> {
     subtype: &'a str,
     dais_ref: &'a str,
     protein: &'a str,
-    nt_ref: char,
-    nt_position: usize,
-    nt_mut: char,
+    ref_codon: String,
+    mut_codon: String,
     aa_ref: char,
     aa_position: usize,
     aa_mut: char,
@@ -239,7 +238,7 @@ pub fn variants_of_interest_process(args: VariantsArgs) -> Result<(), Box<dyn Er
     //header of output file
     writeln!(
         &mut writer,
-        "sample, reference_strain,gisaid_accession,ctype,dais_reference,protein,nt_mutation,aa_mutation,phenotypic_consequence",
+        "sample, reference_strain,gisaid_accession,ctype,dais_reference,protein,sample_codon,reference_codon,aa_mutation,phenotypic_consequence",
     )?;
 
     //Finding reference sequences in the same coordinate space to compare with
@@ -262,9 +261,8 @@ pub fn variants_of_interest_process(args: VariantsArgs) -> Result<(), Box<dyn Er
                         subtype: &dais_entry.subtype,
                         dais_ref: &dais_entry.ref_strain,
                         protein: &dais_entry.protein,
-                        nt_position: 0,
-                        nt_ref: 'N',
-                        nt_mut: 'N',
+                        ref_codon: "NNN".to_string(),
+                        mut_codon: "NNN".to_string(),
                         aa_position: 0,
                         aa_ref: 'X',
                         aa_mut: 'X',
@@ -272,7 +270,7 @@ pub fn variants_of_interest_process(args: VariantsArgs) -> Result<(), Box<dyn Er
                     };
 
                     let mut tail_index = 0;
-                    let (codons1, tail1) = nt_seq1.as_codons(); // TODO: fix tails
+                    let (codons1, tail1) = nt_seq1.as_codons();
                     let (codons2, tail2) = nt_seq2.as_codons();
 
                     for (index, (ref_codon, query_codon)) in codons1
@@ -290,11 +288,13 @@ pub fn variants_of_interest_process(args: VariantsArgs) -> Result<(), Box<dyn Er
                         for nt in 0..ref_codon.len() {
                             codon_position += 1;
 
-                            if ref_codon[nt] != query_codon[nt] {
-                                let nt_idex = ((index + 1) * 3) - (3 - codon_position);
-                                entry.nt_position = nt_idex;
-                                entry.nt_ref = ref_codon[nt] as char;
-                                entry.nt_mut = query_codon[nt] as char;
+                            if ref_codon != query_codon {
+                                entry.ref_codon = std::str::from_utf8(ref_codon)
+                                    .expect("Invalid UTF-8 sequence")
+                                    .to_string();
+                                entry.mut_codon = std::str::from_utf8(query_codon)
+                                    .expect("Invalid UTF-8 sequence")
+                                    .to_string();
                                 entry.aa_position = aa_index;
                                 entry.aa_ref = ref_aa as char;
                                 entry.aa_mut = query_aa as char;
@@ -313,9 +313,8 @@ pub fn variants_of_interest_process(args: VariantsArgs) -> Result<(), Box<dyn Er
                                         subtype,
                                         dais_ref,
                                         protein,
-                                        nt_ref,
-                                        nt_position,
-                                        nt_mut,
+                                        ref_codon,
+                                        mut_codon,
                                         aa_ref,
                                         aa_position,
                                         aa_mut,
@@ -327,7 +326,7 @@ pub fn variants_of_interest_process(args: VariantsArgs) -> Result<(), Box<dyn Er
                                         &mut writer,
                                         "{sample_id}{d}{ref_strain}{d}{gisaid_accession}{d}\
                                         {subtype}{d}{dais_ref}{d}{protein}{d}\
-                                        {nt_ref}:{nt_position}:{nt_mut}{d}\
+                                        {ref_codon}{d}{mut_codon}{d}\
                                         {aa_ref}:{aa_position}:{aa_mut}{d}\
                                         {phenotypic_consequences}",
                                     )?;
@@ -340,12 +339,14 @@ pub fn variants_of_interest_process(args: VariantsArgs) -> Result<(), Box<dyn Er
                         for nt in 0..tail1.len() {
                             codon_position += 1;
 
-                            if tail1[nt] != tail2[nt] {
+                            if tail1 != tail2 {
                                 let partial_codon = b'~';
-                                let nt_idex = ((tail_index + 1) * 3) - (3 - codon_position);
-                                entry.nt_position = nt_idex;
-                                entry.nt_ref = tail1[nt] as char;
-                                entry.nt_mut = tail2[nt] as char;
+                                entry.ref_codon = std::str::from_utf8(tail1)
+                                    .expect("Invalid UTF-8 sequence")
+                                    .to_string();
+                                entry.mut_codon = std::str::from_utf8(tail2)
+                                    .expect("Invalid UTF-8 sequence")
+                                    .to_string();
                                 entry.aa_position = tail_index + 1;
                                 entry.aa_ref = '~' as char;
                                 entry.aa_mut = '~' as char;
@@ -364,9 +365,8 @@ pub fn variants_of_interest_process(args: VariantsArgs) -> Result<(), Box<dyn Er
                                         subtype,
                                         dais_ref,
                                         protein,
-                                        nt_ref,
-                                        nt_position,
-                                        nt_mut,
+                                        ref_codon,
+                                        mut_codon,
                                         aa_ref,
                                         aa_position,
                                         aa_mut,
@@ -378,7 +378,7 @@ pub fn variants_of_interest_process(args: VariantsArgs) -> Result<(), Box<dyn Er
                                         &mut writer,
                                         "{sample_id}{d}{ref_strain}{d}{gisaid_accession}{d}\
                                     {subtype}{d}{dais_ref}{d}{protein}{d}\
-                                    {nt_ref}:{nt_position}:{nt_mut}{d}\
+                                    {ref_codon}{d}{mut_codon}{d}\
                                     {aa_ref}:{aa_position}:{aa_mut}{d}\
                                     {phenotypic_consequences}",
                                     )?;
@@ -403,9 +403,8 @@ pub fn variants_of_interest_process(args: VariantsArgs) -> Result<(), Box<dyn Er
                         subtype: &dais_entry.subtype,
                         dais_ref: &dais_entry.ref_strain,
                         protein: &dais_entry.protein,
-                        nt_position: 0,
-                        nt_ref: 'N',
-                        nt_mut: 'N',
+                        ref_codon: "NNN".to_string(),
+                        mut_codon: "NNN".to_string(),
                         aa_position: 0,
                         aa_ref: 'X',
                         aa_mut: 'X',
@@ -431,11 +430,13 @@ pub fn variants_of_interest_process(args: VariantsArgs) -> Result<(), Box<dyn Er
                         for nt in 0..ref_codon.len() {
                             codon_position += 1;
 
-                            if ref_codon[nt] != query_codon[nt] {
-                                let nt_idex = ((index + 1) * 3) - (3 - codon_position);
-                                entry.nt_position = nt_idex;
-                                entry.nt_ref = ref_codon[nt] as char;
-                                entry.nt_mut = query_codon[nt] as char;
+                            if ref_codon != query_codon {
+                                entry.ref_codon = std::str::from_utf8(ref_codon)
+                                    .expect("Invalid UTF-8 sequence")
+                                    .to_string();
+                                entry.mut_codon = std::str::from_utf8(query_codon)
+                                    .expect("Invalid UTF-8 sequence")
+                                    .to_string();
                                 entry.aa_position = aa_index;
                                 entry.aa_ref = ref_aa as char;
                                 entry.aa_mut = query_aa as char;
@@ -454,9 +455,8 @@ pub fn variants_of_interest_process(args: VariantsArgs) -> Result<(), Box<dyn Er
                                         subtype,
                                         dais_ref,
                                         protein,
-                                        nt_ref,
-                                        nt_position,
-                                        nt_mut,
+                                        ref_codon,
+                                        mut_codon,
                                         aa_ref,
                                         aa_position,
                                         aa_mut,
@@ -468,7 +468,7 @@ pub fn variants_of_interest_process(args: VariantsArgs) -> Result<(), Box<dyn Er
                                         &mut writer,
                                         "{sample_id}{d}{ref_strain}{d}{gisaid_accession}{d}\
                                         {subtype}{d}{dais_ref}{d}{protein}{d}\
-                                        {nt_ref}:{nt_position}:{nt_mut}{d}\
+                                        {ref_codon}{d}{mut_codon}{d}\
                                         {aa_ref}:{aa_position}:{aa_mut}{d}\
                                         {phenotypic_consequences}",
                                     )?;
@@ -481,12 +481,14 @@ pub fn variants_of_interest_process(args: VariantsArgs) -> Result<(), Box<dyn Er
                         for nt in 0..tail1.len() {
                             codon_position += 1;
 
-                            if tail1[nt] != tail2[nt] {
+                            if tail1 != tail2 {
                                 let partial_codon = b'~';
-                                let nt_idex = ((tail_index + 1) * 3) - (3 - codon_position);
-                                entry.nt_position = nt_idex;
-                                entry.nt_ref = tail1[nt] as char;
-                                entry.nt_mut = tail2[nt] as char;
+                                entry.ref_codon = std::str::from_utf8(tail1)
+                                    .expect("Invalid UTF-8 sequence")
+                                    .to_string();
+                                entry.mut_codon = std::str::from_utf8(tail2)
+                                    .expect("Invalid UTF-8 sequence")
+                                    .to_string();
                                 entry.aa_position = tail_index + 1;
                                 entry.aa_ref = '~' as char;
                                 entry.aa_mut = '~' as char;
@@ -505,9 +507,8 @@ pub fn variants_of_interest_process(args: VariantsArgs) -> Result<(), Box<dyn Er
                                         subtype,
                                         dais_ref,
                                         protein,
-                                        nt_ref,
-                                        nt_position,
-                                        nt_mut,
+                                        ref_codon,
+                                        mut_codon,
                                         aa_ref,
                                         aa_position,
                                         aa_mut,
@@ -519,7 +520,7 @@ pub fn variants_of_interest_process(args: VariantsArgs) -> Result<(), Box<dyn Er
                                         &mut writer,
                                         "{sample_id}{d}{ref_strain}{d}{gisaid_accession}{d}\
                                     {subtype}{d}{dais_ref}{d}{protein}{d}\
-                                    {nt_ref}:{nt_position}:{nt_mut}{d}\
+                                    {ref_codon}{d}{mut_codon}{d}\
                                     {aa_ref}:{aa_position}:{aa_mut}{d}\
                                     {phenotypic_consequences}",
                                     )?;
