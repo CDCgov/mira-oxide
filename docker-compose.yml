@@ -1,5 +1,4 @@
-x-rust-image: &rust-image mira-oxide/latest
-
+x-rust-image: &rust-image cdcgov/mira-oxide:latest
 x-data-volume: &data-volume
   type: bind
   source: /home/xpa3/mira-oxide/test
@@ -8,7 +7,7 @@ x-data-volume: &data-volume
 services:
   mira-oxide:
     container_name: mira-oxide
-    image: mira-oxide:latest
+    image: cdcgov/mira-oxide:latest
     build:
       context: .
       dockerfile: Dockerfile
