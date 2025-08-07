@@ -169,6 +169,11 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     //Calculate AA variants for aavars.csv and dais_vars.json
     //TODO: circle back for the rsv and sc2 situations
     let dais_vars_data = compute_dais_variants(&dais_ref_data, &dais_seq_data)?;
+    negative_qc_statement(
+        "/home/xpa3/mira-oxide/test/qc_statement.json",
+        &read_data,
+        &neg_control_list,
+    )?;
 
     //println!("{dais_vars_data:?}");
 

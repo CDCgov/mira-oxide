@@ -5,12 +5,20 @@ use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
 use csv::Writer;
 use parquet::arrow::ArrowWriter;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::io::Write;
 use std::sync::Arc;
 use std::{error::Error, fs::File};
+
+/////////////// Structs ///////////////
+// PassQC struct
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ReadQC {
+    pub sample_id: String,
+    pub percent_mapping: f64,
+}
 
 /////////////// Functions to write to json and csv files ///////////////
 /// Function to serialize a vector of structs into split-oriented JSON with precision and indexing
@@ -170,5 +178,68 @@ pub fn write_reads_to_parquet(
     writer.write(&record_batch)?;
     writer.close()?;
 
+    Ok(())
+}
+
+pub fn negative_qc_statement(
+    output_file: &str,
+    reads_data: &Vec<ReadsData>,
+    neg_control_list: &Vec<String>,
+) -> Result<(), Box<dyn Error>> {
+    let filtered_reads_data = filter_struct_by_ids(reads_data, neg_control_list.to_vec());
+
+    let mut results = Vec::new();
+
+    for sample in &filtered_reads_data {
+        if sample.record == "1-initial" {
+            // Find all corresponding "3-match" and "3-altmatch" records for the same sample_id
+            if let Some(sample_id) = &sample.sample_id {
+                let reads_stage_1 = sample.reads;
+
+                let total_reads_stage_3: i32 = filtered_reads_data
+                    .iter()
+                    .filter(|d| {
+                        d.sample_id == Some(sample_id.clone())
+                            && (d.record == "3-match" || d.record == "3-altmatch")
+                    })
+                    .map(|d| d.reads)
+                    .sum();
+
+                if total_reads_stage_3 > 0 {
+                    let percent_mapping =
+                        (total_reads_stage_3 as f64 / reads_stage_1 as f64 * 100.0).round();
+
+                    results.push(ReadQC {
+                        sample_id: sample_id.clone(),
+                        percent_mapping,
+                    });
+                }
+            }
+        }
+    }
+
+    // Categorize results into "passes QC" and "FAILS QC"
+    let mut passes_qc = HashMap::new();
+    let mut fails_qc = HashMap::new();
+
+    for qc in results {
+        let percent_mapping_str = format!("{:.2}", qc.percent_mapping);
+        if qc.percent_mapping < 1.0 {
+            passes_qc.insert(qc.sample_id, percent_mapping_str);
+        } else {
+            fails_qc.insert(qc.sample_id, percent_mapping_str);
+        }
+    }
+
+    let mut output = HashMap::new();
+    output.insert("passes QC".to_string(), passes_qc);
+    output.insert("FAILS QC".to_string(), fails_qc);
+
+    // Write the JSON to a file
+    let json_output = json!(output);
+    let mut file = File::create(output_file)?;
+    file.write_all(json_output.to_string().as_bytes())?;
+
+    println!("JSON written to {output_file}");
     Ok(())
 }

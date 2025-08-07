@@ -57,6 +57,8 @@ pub struct ReadsData {
     pub run_id: Option<String>,
     #[serde(rename = "Instrument")]
     pub instrument: Option<String>,
+    #[serde(rename = "Percent Mapping")]
+    pub percent_mapping: Option<f32>,
 }
 
 /// vtype struct

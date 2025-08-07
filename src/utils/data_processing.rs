@@ -19,13 +19,6 @@ pub struct DaisVarsData {
     pub aa_variants: String,
 }
 
-// PassQC struct
-#[derive(Serialize, Deserialize, Debug)]
-pub struct QCCalcs {
-    pub sample_id: String,
-    pub percent_mapping: i32,
-}
-
 /////////////// Traits ///////////////
 /// check for sample type and if not there add ""
 pub trait HasSampleType {
@@ -61,6 +54,15 @@ impl HasSampleId for SamplesheetO {
     }
 }
 
+impl HasSampleId for ReadsData {
+    fn sample_id(&self) -> &String {
+        self.sample_id.as_ref().unwrap_or_else(|| {
+            static EMPTY_STRING: String = String::new();
+            &EMPTY_STRING
+        })
+    }
+}
+
 /// Functions to convert values in a vecxtor of structs to vector
 /// Some perform type converions
 pub fn extract_field<T, U, F>(data: Vec<T>, extractor: F) -> Vec<U>
@@ -83,6 +85,26 @@ where
                 field.parse::<f32>().unwrap_or(0.0)
             }
         })
+        .collect()
+}
+
+//Function to filter struct by sample id
+//If using this with a Vec of structs then you need to add impl to HasSampleID trait above if not done already
+pub fn filter_struct_by_ids<T>(samples: &Vec<T>, ids: Vec<String>) -> Vec<T>
+where
+    T: Serialize + Clone,
+    T: HasSampleId,
+{
+    samples
+        .iter()
+        .filter(|sample| {
+            if let sample_id = sample.sample_id() {
+                ids.contains(sample_id)
+            } else {
+                false
+            }
+        })
+        .cloned()
         .collect()
 }
 
@@ -123,7 +145,6 @@ where
         .iter()
         .filter_map(|item| {
             let sample_type = item.sample_type().to_lowercase();
-            println!("{sample_type}");
             if negative_keywords
                 .iter()
                 .any(|keyword| sample_type.contains(keyword))
