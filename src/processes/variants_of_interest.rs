@@ -124,40 +124,32 @@ impl Entry<'_> {
         subtype: &str,
         aa_1: u8,
         aa_2: u8,
-        muts_columns: &Vec<MutsOfInterestInput>,
+        muts_columns: &[MutsOfInterestInput],
     ) -> bool {
         self.aa_mut = aa_2 as char;
         self.aa_ref = aa_1 as char;
         let hold_aa_mut = self.aa_mut.to_string();
-        //aa differences that are also in our "mutations of interest" list are written to file
-        for muts_entry in muts_columns {
-            //println!("ref {}", subtype);
-            //println!("mut {}", muts_entry.subtype);
+
+        for muts_entry in muts_columns.iter() {
+            // Check if the mutation matches the entry
             if subtype == muts_entry.subtype
                 && self.protein == muts_entry.protein
                 && self.aa_position.to_string() == muts_entry.aa_position
             {
-                if hold_aa_mut == muts_entry.aa {
-                    self.phenotypic_consequences = muts_entry.description.clone();
-                    return true;
-                } else {
-                    self.phenotypic_consequences = String::from("");
-                    return true;
-                }
-                //aa that are missing and also in our "mutations of interest" list are written to file
-                /*
-                else if hold_aa_mut == "." {
-                    self.phenotypic_consequences = String::from("amino acid information missing");
-                    return true;
-                } else if hold_aa_mut == "~" {
-                    self.phenotypic_consequences = String::from("partial amino acid");
-                    return true;
-                } else if hold_aa_mut == "X" {
-                    self.phenotypic_consequences = String::from("amino acid information missing");
-                    return true;
-                } */
+                // Use match for cleaner handling of `hold_aa_mut` cases
+                self.phenotypic_consequences = match hold_aa_mut.as_str() {
+                    "." => "amino acid information missing".to_string(),
+                    "~" => "partial amino acid".to_string(),
+                    "-" => "amino acid covered".to_string(),
+                    "X" => "amino acid information missing".to_string(),
+                    aa if aa == muts_entry.aa => muts_entry.description.clone(),
+                    _ => String::new(),
+                };
+
+                return true;
             }
         }
+
         false
     }
 }
@@ -211,10 +203,8 @@ pub fn align_sequences<'a>(query: &'a [u8], reference: &'a [u8]) -> (Vec<u8>, Ve
 }
 
 pub fn variants_of_interest_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
-    // let args = APDArgs::parse();
     let delim = args.output_delimiter;
 
-    //read in input file (dais input, ref input, muts input)
     let muts_reader = create_reader(Some(args.muts_file))?;
     let muts_interest: Vec<MutsOfInterestInput> = read_tsv(muts_reader, false)?;
 
@@ -235,13 +225,11 @@ pub fn variants_of_interest_process(args: VariantsArgs) -> Result<(), Box<dyn Er
         BufWriter::new(Either::Right(stdout()))
     };
 
-    //header of output file
     writeln!(
         &mut writer,
         "sample, reference_strain,gisaid_accession,ctype,dais_reference,protein,sample_codon,reference_codon,aa_mutation,phenotypic_consequence",
     )?;
 
-    //Finding reference sequences in the same coordinate space to compare with
     for dais_entry in &dais {
         for ref_entry in &refs {
             if dais_entry.subtype == ref_entry.ctype
@@ -250,8 +238,6 @@ pub fn variants_of_interest_process(args: VariantsArgs) -> Result<(), Box<dyn Er
             {
                 let nt_seq1: Nucleotides = ref_entry.cds_aln.clone().into();
                 let nt_seq2: Nucleotides = dais_entry.cds_aln.clone().into();
-                //If nt seq are the same length start seq comparison
-                //nt seqs that are the same length will be aligned already and saves time to not align
 
                 if nt_seq1.len() == nt_seq2.len() {
                     let mut entry = Entry {
@@ -284,111 +270,96 @@ pub fn variants_of_interest_process(args: VariantsArgs) -> Result<(), Box<dyn Er
                         let ref_aa = StdGeneticCode::translate_codon(ref_codon);
                         let query_aa = StdGeneticCode::translate_codon(query_codon);
 
-                        let mut codon_position: usize = 0;
-                        for nt in 0..ref_codon.len() {
-                            codon_position += 1;
+                        if ref_codon != query_codon {
+                            entry.ref_codon = std::str::from_utf8(ref_codon)
+                                .expect("Invalid UTF-8 sequence")
+                                .to_string();
+                            entry.mut_codon = std::str::from_utf8(query_codon)
+                                .expect("Invalid UTF-8 sequence")
+                                .to_string();
+                            entry.aa_position = aa_index;
+                            entry.aa_ref = ref_aa as char;
+                            entry.aa_mut = query_aa as char;
 
-                            if ref_codon != query_codon {
-                                entry.ref_codon = std::str::from_utf8(ref_codon)
-                                    .expect("Invalid UTF-8 sequence")
-                                    .to_string();
-                                entry.mut_codon = std::str::from_utf8(query_codon)
-                                    .expect("Invalid UTF-8 sequence")
-                                    .to_string();
-                                entry.aa_position = aa_index;
-                                entry.aa_ref = ref_aa as char;
-                                entry.aa_mut = query_aa as char;
+                            if entry.update_entry_from_alignment(
+                                &ref_entry.subtype,
+                                ref_aa,
+                                query_aa,
+                                &muts_interest,
+                            ) {
+                                let Entry {
+                                    sample_id,
+                                    ref_strain,
+                                    gisaid_accession,
+                                    subtype,
+                                    dais_ref,
+                                    protein,
+                                    ref_codon,
+                                    mut_codon,
+                                    aa_ref,
+                                    aa_position,
+                                    aa_mut,
+                                    phenotypic_consequences,
+                                } = &entry;
+                                let d = &delim;
 
-                                //aa difference moved forward in process;
-                                if entry.update_entry_from_alignment(
-                                    &ref_entry.subtype,
-                                    ref_aa,
-                                    query_aa,
-                                    &muts_interest,
-                                ) {
-                                    let Entry {
-                                        sample_id,
-                                        ref_strain,
-                                        gisaid_accession,
-                                        subtype,
-                                        dais_ref,
-                                        protein,
-                                        ref_codon,
-                                        mut_codon,
-                                        aa_ref,
-                                        aa_position,
-                                        aa_mut,
-                                        phenotypic_consequences,
-                                    } = &entry;
-                                    let d = &delim;
-
-                                    writeln!(
-                                        &mut writer,
-                                        "{sample_id}{d}{ref_strain}{d}{gisaid_accession}{d}\
+                                writeln!(
+                                    &mut writer,
+                                    "{sample_id}{d}{ref_strain}{d}{gisaid_accession}{d}\
                                         {subtype}{d}{dais_ref}{d}{protein}{d}\
                                         {ref_codon}{d}{mut_codon}{d}\
                                         {aa_ref}:{aa_position}:{aa_mut}{d}\
                                         {phenotypic_consequences}",
-                                    )?;
-                                }
+                                )?;
                             }
                         }
                     }
-                    if tail1.len() > 0 {
-                        let mut codon_position: usize = 0;
-                        for nt in 0..tail1.len() {
-                            codon_position += 1;
 
-                            if tail1 != tail2 {
-                                let partial_codon = b'~';
-                                entry.ref_codon = std::str::from_utf8(tail1)
-                                    .expect("Invalid UTF-8 sequence")
-                                    .to_string();
-                                entry.mut_codon = std::str::from_utf8(tail2)
-                                    .expect("Invalid UTF-8 sequence")
-                                    .to_string();
-                                entry.aa_position = tail_index + 1;
-                                entry.aa_ref = '~' as char;
-                                entry.aa_mut = '~' as char;
+                    if tail1 != tail2 {
+                        let partial_codon = b'~';
+                        entry.ref_codon = std::str::from_utf8(tail1)
+                            .expect("Invalid UTF-8 sequence")
+                            .to_string();
+                        entry.mut_codon = std::str::from_utf8(tail2)
+                            .expect("Invalid UTF-8 sequence")
+                            .to_string();
+                        entry.aa_position = tail_index + 1;
+                        entry.aa_ref = '~' as char;
+                        entry.aa_mut = '~' as char;
 
-                                //aa difference moved forward in process;
-                                if entry.update_entry_from_alignment(
-                                    &ref_entry.subtype,
-                                    partial_codon,
-                                    partial_codon,
-                                    &muts_interest,
-                                ) {
-                                    let Entry {
-                                        sample_id,
-                                        ref_strain,
-                                        gisaid_accession,
-                                        subtype,
-                                        dais_ref,
-                                        protein,
-                                        ref_codon,
-                                        mut_codon,
-                                        aa_ref,
-                                        aa_position,
-                                        aa_mut,
-                                        phenotypic_consequences,
-                                    } = &entry;
-                                    let d = &delim;
+                        if entry.update_entry_from_alignment(
+                            &ref_entry.subtype,
+                            partial_codon,
+                            partial_codon,
+                            &muts_interest,
+                        ) {
+                            let Entry {
+                                sample_id,
+                                ref_strain,
+                                gisaid_accession,
+                                subtype,
+                                dais_ref,
+                                protein,
+                                ref_codon,
+                                mut_codon,
+                                aa_ref,
+                                aa_position,
+                                aa_mut,
+                                phenotypic_consequences,
+                            } = &entry;
+                            let d = &delim;
 
-                                    writeln!(
-                                        &mut writer,
-                                        "{sample_id}{d}{ref_strain}{d}{gisaid_accession}{d}\
+                            writeln!(
+                                &mut writer,
+                                "{sample_id}{d}{ref_strain}{d}{gisaid_accession}{d}\
                                     {subtype}{d}{dais_ref}{d}{protein}{d}\
                                     {ref_codon}{d}{mut_codon}{d}\
                                     {aa_ref}:{aa_position}:{aa_mut}{d}\
                                     {phenotypic_consequences}",
-                                    )?;
-                                }
-                            }
+                            )?;
                         }
                     }
                 } else {
-                    //If aa seq are not the same length perform alignment to get them into the same coordinate space
-                    //Using Zoe for alignment
                     let query = dais_entry.cds_aln.as_bytes();
                     let reference = ref_entry.cds_aln.as_bytes();
                     let (aligned_1, aligned_2) = {
@@ -412,7 +383,7 @@ pub fn variants_of_interest_process(args: VariantsArgs) -> Result<(), Box<dyn Er
                     };
 
                     let mut tail_index = 0;
-                    let (codons1, tail1) = aligned_1.as_codons(); // TODO: fix tails
+                    let (codons1, tail1) = aligned_1.as_codons();
                     let (codons2, tail2) = aligned_2.as_codons();
 
                     for (index, (ref_codon, query_codon)) in codons1
@@ -426,106 +397,92 @@ pub fn variants_of_interest_process(args: VariantsArgs) -> Result<(), Box<dyn Er
                         let ref_aa = StdGeneticCode::translate_codon(ref_codon);
                         let query_aa = StdGeneticCode::translate_codon(query_codon);
 
-                        let mut codon_position: usize = 0;
-                        for nt in 0..ref_codon.len() {
-                            codon_position += 1;
+                        if ref_codon != query_codon {
+                            entry.ref_codon = std::str::from_utf8(ref_codon)
+                                .expect("Invalid UTF-8 sequence")
+                                .to_string();
+                            entry.mut_codon = std::str::from_utf8(query_codon)
+                                .expect("Invalid UTF-8 sequence")
+                                .to_string();
+                            entry.aa_position = aa_index;
+                            entry.aa_ref = ref_aa as char;
+                            entry.aa_mut = query_aa as char;
 
-                            if ref_codon != query_codon {
-                                entry.ref_codon = std::str::from_utf8(ref_codon)
-                                    .expect("Invalid UTF-8 sequence")
-                                    .to_string();
-                                entry.mut_codon = std::str::from_utf8(query_codon)
-                                    .expect("Invalid UTF-8 sequence")
-                                    .to_string();
-                                entry.aa_position = aa_index;
-                                entry.aa_ref = ref_aa as char;
-                                entry.aa_mut = query_aa as char;
+                            if entry.update_entry_from_alignment(
+                                &ref_entry.subtype,
+                                ref_aa,
+                                query_aa,
+                                &muts_interest,
+                            ) {
+                                let Entry {
+                                    sample_id,
+                                    ref_strain,
+                                    gisaid_accession,
+                                    subtype,
+                                    dais_ref,
+                                    protein,
+                                    ref_codon,
+                                    mut_codon,
+                                    aa_ref,
+                                    aa_position,
+                                    aa_mut,
+                                    phenotypic_consequences,
+                                } = &entry;
+                                let d = &delim;
 
-                                //aa difference moved forward in process;
-                                if entry.update_entry_from_alignment(
-                                    &ref_entry.subtype,
-                                    ref_aa,
-                                    query_aa,
-                                    &muts_interest,
-                                ) {
-                                    let Entry {
-                                        sample_id,
-                                        ref_strain,
-                                        gisaid_accession,
-                                        subtype,
-                                        dais_ref,
-                                        protein,
-                                        ref_codon,
-                                        mut_codon,
-                                        aa_ref,
-                                        aa_position,
-                                        aa_mut,
-                                        phenotypic_consequences,
-                                    } = &entry;
-                                    let d = &delim;
-
-                                    writeln!(
-                                        &mut writer,
-                                        "{sample_id}{d}{ref_strain}{d}{gisaid_accession}{d}\
+                                writeln!(
+                                    &mut writer,
+                                    "{sample_id}{d}{ref_strain}{d}{gisaid_accession}{d}\
                                         {subtype}{d}{dais_ref}{d}{protein}{d}\
                                         {ref_codon}{d}{mut_codon}{d}\
                                         {aa_ref}:{aa_position}:{aa_mut}{d}\
                                         {phenotypic_consequences}",
-                                    )?;
-                                }
+                                )?;
                             }
                         }
                     }
-                    if tail1.len() > 0 {
-                        let mut codon_position: usize = 0;
-                        for nt in 0..tail1.len() {
-                            codon_position += 1;
 
-                            if tail1 != tail2 {
-                                let partial_codon = b'~';
-                                entry.ref_codon = std::str::from_utf8(tail1)
-                                    .expect("Invalid UTF-8 sequence")
-                                    .to_string();
-                                entry.mut_codon = std::str::from_utf8(tail2)
-                                    .expect("Invalid UTF-8 sequence")
-                                    .to_string();
-                                entry.aa_position = tail_index + 1;
-                                entry.aa_ref = '~' as char;
-                                entry.aa_mut = '~' as char;
+                    if !tail1.is_empty() && tail1 != tail2 {
+                        let partial_codon = b'~';
+                        entry.ref_codon = std::str::from_utf8(tail1)
+                            .expect("Invalid UTF-8 sequence")
+                            .to_string();
+                        entry.mut_codon = std::str::from_utf8(tail2)
+                            .expect("Invalid UTF-8 sequence")
+                            .to_string();
+                        entry.aa_position = tail_index + 1;
+                        entry.aa_ref = '~';
+                        entry.aa_mut = '~';
+                        if entry.update_entry_from_alignment(
+                            &ref_entry.subtype,
+                            partial_codon,
+                            partial_codon,
+                            &muts_interest,
+                        ) {
+                            let Entry {
+                                sample_id,
+                                ref_strain,
+                                gisaid_accession,
+                                subtype,
+                                dais_ref,
+                                protein,
+                                ref_codon,
+                                mut_codon,
+                                aa_ref,
+                                aa_position,
+                                aa_mut,
+                                phenotypic_consequences,
+                            } = &entry;
+                            let d = &delim;
 
-                                //aa difference moved forward in process;
-                                if entry.update_entry_from_alignment(
-                                    &ref_entry.subtype,
-                                    partial_codon,
-                                    partial_codon,
-                                    &muts_interest,
-                                ) {
-                                    let Entry {
-                                        sample_id,
-                                        ref_strain,
-                                        gisaid_accession,
-                                        subtype,
-                                        dais_ref,
-                                        protein,
-                                        ref_codon,
-                                        mut_codon,
-                                        aa_ref,
-                                        aa_position,
-                                        aa_mut,
-                                        phenotypic_consequences,
-                                    } = &entry;
-                                    let d = &delim;
-
-                                    writeln!(
-                                        &mut writer,
-                                        "{sample_id}{d}{ref_strain}{d}{gisaid_accession}{d}\
-                                    {subtype}{d}{dais_ref}{d}{protein}{d}\
-                                    {ref_codon}{d}{mut_codon}{d}\
-                                    {aa_ref}:{aa_position}:{aa_mut}{d}\
-                                    {phenotypic_consequences}",
-                                    )?;
-                                }
-                            }
+                            writeln!(
+                                &mut writer,
+                                "{sample_id}{d}{ref_strain}{d}{gisaid_accession}{d}\
+                                        {subtype}{d}{dais_ref}{d}{protein}{d}\
+                                        {ref_codon}{d}{mut_codon}{d}\
+                                        {aa_ref}:{aa_position}:{aa_mut}{d}\
+                                        {phenotypic_consequences}",
+                            )?;
                         }
                     }
                 }
