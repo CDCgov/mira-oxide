@@ -225,7 +225,6 @@ pub fn positions_of_interest_process(args: PositionsArgs) -> Result<(), Box<dyn 
     } else {
         BufWriter::new(Either::Right(stdout()))
     };
-    println!("YO");
     writeln!(
         &mut writer,
         "sample, reference_strain,gisaid_accession,ctype,dais_reference,protein,sample_codon,reference_codon,aa_mutation,phenotypic_consequence",
@@ -260,11 +259,8 @@ pub fn positions_of_interest_process(args: PositionsArgs) -> Result<(), Box<dyn 
                     let (codons1, tail1) = nt_seq1.as_codons();
                     let (codons2, tail2) = nt_seq2.as_codons();
 
-                    for (index, (ref_codon, query_codon)) in codons1
-                        .iter()
-                        .zip(codons2.iter())
-                        .enumerate()
-                        .filter(|(_, (ref_chunk, query_chunk))| ref_chunk != query_chunk)
+                    for (index, (ref_codon, query_codon)) in
+                        codons1.iter().zip(codons2.iter()).enumerate()
                     {
                         let aa_index = index + 1;
                         tail_index = aa_index;
@@ -383,11 +379,8 @@ pub fn positions_of_interest_process(args: PositionsArgs) -> Result<(), Box<dyn 
                     let (codons1, tail1) = aligned_1.as_codons();
                     let (codons2, tail2) = aligned_2.as_codons();
 
-                    for (index, (ref_codon, query_codon)) in codons1
-                        .iter()
-                        .zip(codons2.iter())
-                        .enumerate()
-                        .filter(|(_, (ref_chunk, query_chunk))| ref_chunk != query_chunk)
+                    for (index, (ref_codon, query_codon)) in
+                        codons1.iter().zip(codons2.iter()).enumerate()
                     {
                         let aa_index = index + 1;
                         tail_index = aa_index;
