@@ -1,3 +1,4 @@
+#![allow(unreachable_patterns)]
 #![allow(dead_code, unused_imports)]
 use clap::Parser;
 use csv::ReaderBuilder;
@@ -20,8 +21,8 @@ use zoe::{
 };
 
 #[derive(Debug, Parser)]
-#[command(about = "Tool for calculating amino acid difference tables")]
-pub struct VariantsArgs {
+#[command(about = "Tool for observing codon and amino acid differences at a given poistion")]
+pub struct PositionsArgs {
     #[arg(short = 'i', long)]
     /// Optional input fasta
     input_file: PathBuf,
@@ -202,7 +203,7 @@ pub fn align_sequences<'a>(query: &'a [u8], reference: &'a [u8]) -> (Vec<u8>, Ve
     )
 }
 
-pub fn variants_of_interest_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
+pub fn positions_of_interest_process(args: PositionsArgs) -> Result<(), Box<dyn Error>> {
     let delim = args.output_delimiter;
 
     let muts_reader = create_reader(Some(args.muts_file))?;
@@ -224,7 +225,6 @@ pub fn variants_of_interest_process(args: VariantsArgs) -> Result<(), Box<dyn Er
     } else {
         BufWriter::new(Either::Right(stdout()))
     };
-
     writeln!(
         &mut writer,
         "sample, reference_strain,gisaid_accession,ctype,dais_reference,protein,sample_codon,reference_codon,aa_mutation,phenotypic_consequence",
@@ -259,78 +259,28 @@ pub fn variants_of_interest_process(args: VariantsArgs) -> Result<(), Box<dyn Er
                     let (codons1, tail1) = nt_seq1.as_codons();
                     let (codons2, tail2) = nt_seq2.as_codons();
 
-                    for (index, (ref_codon, query_codon)) in codons1
-                        .iter()
-                        .zip(codons2.iter())
-                        .enumerate()
-                        .filter(|(_, (ref_chunk, query_chunk))| ref_chunk != query_chunk)
+                    for (index, (ref_codon, query_codon)) in
+                        codons1.iter().zip(codons2.iter()).enumerate()
                     {
                         let aa_index = index + 1;
                         tail_index = aa_index;
                         let ref_aa = StdGeneticCode::translate_codon(ref_codon);
                         let query_aa = StdGeneticCode::translate_codon(query_codon);
 
-                        if ref_codon != query_codon {
-                            entry.ref_codon = std::str::from_utf8(ref_codon)
-                                .expect("Invalid UTF-8 sequence")
-                                .to_string();
-                            entry.mut_codon = std::str::from_utf8(query_codon)
-                                .expect("Invalid UTF-8 sequence")
-                                .to_string();
-                            entry.aa_position = aa_index;
-                            entry.aa_ref = ref_aa as char;
-                            entry.aa_mut = query_aa as char;
-
-                            if entry.update_entry_from_alignment(
-                                &ref_entry.subtype,
-                                ref_aa,
-                                query_aa,
-                                &muts_interest,
-                            ) {
-                                let Entry {
-                                    sample_id,
-                                    ref_strain,
-                                    gisaid_accession,
-                                    subtype,
-                                    dais_ref,
-                                    protein,
-                                    ref_codon,
-                                    mut_codon,
-                                    aa_ref,
-                                    aa_position,
-                                    aa_mut,
-                                    phenotypic_consequences,
-                                } = &entry;
-                                let d = &delim;
-
-                                writeln!(
-                                    &mut writer,
-                                    "{sample_id}{d}{ref_strain}{d}{gisaid_accession}{d}\
-                                        {subtype}{d}{dais_ref}{d}{protein}{d}\
-                                        {ref_codon}{d}{mut_codon}{d}\
-                                        {aa_ref}:{aa_position}:{aa_mut}{d}\
-                                        {phenotypic_consequences}",
-                                )?;
-                            }
-                        }
-                    }
-
-                    if tail1 != tail2 {
-                        let partial_codon = b'~';
-                        entry.ref_codon = std::str::from_utf8(tail1)
+                        entry.ref_codon = std::str::from_utf8(ref_codon)
                             .expect("Invalid UTF-8 sequence")
                             .to_string();
-                        entry.mut_codon = std::str::from_utf8(tail2)
+                        entry.mut_codon = std::str::from_utf8(query_codon)
                             .expect("Invalid UTF-8 sequence")
                             .to_string();
-                        entry.aa_position = tail_index + 1;
-                        entry.aa_ref = '~' as char;
-                        entry.aa_mut = '~' as char;
+                        entry.aa_position = aa_index;
+                        entry.aa_ref = ref_aa as char;
+                        entry.aa_mut = query_aa as char;
 
                         if entry.update_entry_from_alignment(
                             &ref_entry.subtype,
-                            partial_codon,
-                            partial_codon,
+                            ref_aa,
+                            query_aa,
                             &muts_interest,
                         ) {
                             let Entry {
@@ -352,12 +302,55 @@ pub fn variants_of_interest_process(args: VariantsArgs) -> Result<(), Box<dyn Er
                             writeln!(
                                 &mut writer,
                                 "{sample_id}{d}{ref_strain}{d}{gisaid_accession}{d}\
+                                        {subtype}{d}{dais_ref}{d}{protein}{d}\
+                                        {ref_codon}{d}{mut_codon}{d}\
+                                        {aa_ref}:{aa_position}:{aa_mut}{d}\
+                                        {phenotypic_consequences}",
+                            )?;
+                        }
+                    }
+
+                    let partial_codon = b'~';
+                    entry.ref_codon = std::str::from_utf8(tail1)
+                        .expect("Invalid UTF-8 sequence")
+                        .to_string();
+                    entry.mut_codon = std::str::from_utf8(tail2)
+                        .expect("Invalid UTF-8 sequence")
+                        .to_string();
+                    entry.aa_position = tail_index + 1;
+                    entry.aa_ref = '~' as char;
+                    entry.aa_mut = '~' as char;
+
+                    if entry.update_entry_from_alignment(
+                        &ref_entry.subtype,
+                        partial_codon,
+                        partial_codon,
+                        &muts_interest,
+                    ) {
+                        let Entry {
+                            sample_id,
+                            ref_strain,
+                            gisaid_accession,
+                            subtype,
+                            dais_ref,
+                            protein,
+                            ref_codon,
+                            mut_codon,
+                            aa_ref,
+                            aa_position,
+                            aa_mut,
+                            phenotypic_consequences,
+                        } = &entry;
+                        let d = &delim;
+
+                        writeln!(
+                            &mut writer,
+                            "{sample_id}{d}{ref_strain}{d}{gisaid_accession}{d}\
                                     {subtype}{d}{dais_ref}{d}{protein}{d}\
                                     {ref_codon}{d}{mut_codon}{d}\
                                     {aa_ref}:{aa_position}:{aa_mut}{d}\
                                     {phenotypic_consequences}",
-                            )?;
-                        }
+                        )?;
                     }
                 } else {
                     let query = dais_entry.cds_aln.as_bytes();
@@ -386,63 +379,58 @@ pub fn variants_of_interest_process(args: VariantsArgs) -> Result<(), Box<dyn Er
                     let (codons1, tail1) = aligned_1.as_codons();
                     let (codons2, tail2) = aligned_2.as_codons();
 
-                    for (index, (ref_codon, query_codon)) in codons1
-                        .iter()
-                        .zip(codons2.iter())
-                        .enumerate()
-                        .filter(|(_, (ref_chunk, query_chunk))| ref_chunk != query_chunk)
+                    for (index, (ref_codon, query_codon)) in
+                        codons1.iter().zip(codons2.iter()).enumerate()
                     {
                         let aa_index = index + 1;
                         tail_index = aa_index;
                         let ref_aa = StdGeneticCode::translate_codon(ref_codon);
                         let query_aa = StdGeneticCode::translate_codon(query_codon);
 
-                        if ref_codon != query_codon {
-                            entry.ref_codon = std::str::from_utf8(ref_codon)
-                                .expect("Invalid UTF-8 sequence")
-                                .to_string();
-                            entry.mut_codon = std::str::from_utf8(query_codon)
-                                .expect("Invalid UTF-8 sequence")
-                                .to_string();
-                            entry.aa_position = aa_index;
-                            entry.aa_ref = ref_aa as char;
-                            entry.aa_mut = query_aa as char;
+                        entry.ref_codon = std::str::from_utf8(ref_codon)
+                            .expect("Invalid UTF-8 sequence")
+                            .to_string();
+                        entry.mut_codon = std::str::from_utf8(query_codon)
+                            .expect("Invalid UTF-8 sequence")
+                            .to_string();
+                        entry.aa_position = aa_index;
+                        entry.aa_ref = ref_aa as char;
+                        entry.aa_mut = query_aa as char;
 
-                            if entry.update_entry_from_alignment(
-                                &ref_entry.subtype,
-                                ref_aa,
-                                query_aa,
-                                &muts_interest,
-                            ) {
-                                let Entry {
-                                    sample_id,
-                                    ref_strain,
-                                    gisaid_accession,
-                                    subtype,
-                                    dais_ref,
-                                    protein,
-                                    ref_codon,
-                                    mut_codon,
-                                    aa_ref,
-                                    aa_position,
-                                    aa_mut,
-                                    phenotypic_consequences,
-                                } = &entry;
-                                let d = &delim;
+                        if entry.update_entry_from_alignment(
+                            &ref_entry.subtype,
+                            ref_aa,
+                            query_aa,
+                            &muts_interest,
+                        ) {
+                            let Entry {
+                                sample_id,
+                                ref_strain,
+                                gisaid_accession,
+                                subtype,
+                                dais_ref,
+                                protein,
+                                ref_codon,
+                                mut_codon,
+                                aa_ref,
+                                aa_position,
+                                aa_mut,
+                                phenotypic_consequences,
+                            } = &entry;
+                            let d = &delim;
 
-                                writeln!(
-                                    &mut writer,
-                                    "{sample_id}{d}{ref_strain}{d}{gisaid_accession}{d}\
+                            writeln!(
+                                &mut writer,
+                                "{sample_id}{d}{ref_strain}{d}{gisaid_accession}{d}\
                                         {subtype}{d}{dais_ref}{d}{protein}{d}\
                                         {ref_codon}{d}{mut_codon}{d}\
                                         {aa_ref}:{aa_position}:{aa_mut}{d}\
                                         {phenotypic_consequences}",
-                                )?;
-                            }
+                            )?;
                         }
                     }
 
-                    if !tail1.is_empty() && tail1 != tail2 {
+                    if !tail1.is_empty() {
                         let partial_codon = b'~';
                         entry.ref_codon = std::str::from_utf8(tail1)
                             .expect("Invalid UTF-8 sequence")

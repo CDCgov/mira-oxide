@@ -1,7 +1,7 @@
 #![allow(unreachable_patterns)]
 use crate::processes::{
     all_sample_hd::*, all_sample_nt_diffs::*, find_chemistry::*, plotter::*,
-    prepare_mira_reports::*, variants_of_interest::*,
+    positions_of_interest::*, variants_of_interest::*,
 };
 use clap::{Parser, Subcommand};
 use zoe::prelude::OrFail;
@@ -18,6 +18,8 @@ struct Cli {
 enum Commands {
     /// Variants of Interest
     VariantsOfInterest(VariantsArgs),
+    /// Positions of Interest
+    PositionsOfInterest(PositionsArgs),
     /// Find Chemistry
     FindChemistry(FindChemArgs),
     /// Hamming
@@ -35,8 +37,12 @@ fn main() {
     let module = module_path!();
 
     match args.command {
-        Commands::VariantsOfInterest(cmd_args) => variants_of_interest_process(cmd_args)
-            .unwrap_or_else(|_| panic!("{module}::VariantsOfInterest")),
+        Commands::VariantsOfInterest(cmd_args) => {
+            variants_of_interest_process(cmd_args).expect(&format!("{module}::VariantsOfInterest"))
+        }
+        Commands::PositionsOfInterest(cmd_args) => positions_of_interest_process(cmd_args)
+            .expect(&format!("{module}::PositionsOfInterest")),
+
         Commands::FindChemistry(cmd_args) => {
             find_chemistry_process(cmd_args).unwrap_or_die(&format!("{module}::FindChemistry"))
         }
