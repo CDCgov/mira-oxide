@@ -164,7 +164,7 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     //println!("dais del data: {dais_del_data:#?}");
     //println!("dais seq data: {dais_seq_data:#?}");
     //println!("dais ref data: {dais_ref_data:#?}");
-    //println!("ref length data: {ref_lengths:#?}");
+    println!("ref length data: {ref_lengths:#?}");
 
     //Calculate AA variants for aavars.csv and dais_vars.json
     //TODO: circle back for the rsv and sc2 situations
@@ -175,7 +175,12 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
         &neg_control_list,
     )?;
 
+    let melted_reads_df = melt_reads_data(&read_data);
+    // TODO: add in SC2 handling
+    let calculated_cov_df = process_coverage_data(&coverage_data, &ref_lengths, "flu");
     //println!("{dais_vars_data:?}");
+    //println!("{melted_reads_df:?}");
+    println!("{calculated_cov_df:?}");
 
     /////////////// Write the structs to JSON files and CSV files ///////////////
     // Writing out coverage data

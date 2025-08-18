@@ -4,6 +4,7 @@ use crate::processes::{
     positions_of_interest::*, variants_of_interest::*,
 };
 use clap::{Parser, Subcommand};
+use processes::prepare_mira_reports::{ReportsArgs, prepare_mira_reports_process};
 use zoe::prelude::OrFail;
 
 #[derive(Parser)]

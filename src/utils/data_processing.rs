@@ -7,7 +7,7 @@ use std::{
 use crate::processes::prepare_mira_reports::SamplesheetI;
 use crate::processes::prepare_mira_reports::SamplesheetO;
 
-use super::data_ingest::{DaisSeqData, ReadsData};
+use super::data_ingest::{CoverageData, DaisSeqData, ReadsData};
 
 /// Dais Variants Struct
 #[derive(Serialize, Deserialize, Debug)]
@@ -17,6 +17,25 @@ pub struct DaisVarsData {
     pub protein: String,
     pub aa_variant_count: i32,
     pub aa_variants: String,
+}
+
+//Melted Reads df
+#[derive(Debug)]
+pub struct MeltedRecord {
+    sample_id: String,
+    reference: String,
+    reads_mapped: i32,
+    total_reads: i32,
+    pass_qc: i32,
+}
+
+/// Processed Cov Calcs
+#[derive(Debug)]
+pub struct ProcessedCoverage {
+    pub sample: String,
+    pub reference: String,
+    pub median_coverage: f64,
+    pub percent_reference_covered: Option<f64>,
 }
 
 /////////////// Traits ///////////////
@@ -258,4 +277,132 @@ pub fn compute_dais_variants(
     }
 
     Ok(unique_entries)
+}
+
+//////////////// Functions using to create irma_summary ///////////////
+/// Flip reads df
+pub fn melt_reads_data(records: &Vec<ReadsData>) -> Vec<MeltedRecord> {
+    let mut result = Vec::new();
+    let mut sample_data: HashMap<String, (i32, i32)> = HashMap::new(); // To store total_reads and pass_qc for each sample_id
+
+    for record in records {
+        if let Some(sample_id) = &record.sample_id {
+            if record.record == "1-initial" {
+                sample_data.entry(sample_id.clone()).or_insert((0, 0)).0 = record.reads; // Store total_reads
+            } else if record.record == "2-passQC" {
+                sample_data.entry(sample_id.clone()).or_insert((0, 0)).1 = record.reads; // Store pass_qc
+            }
+        }
+    }
+
+    for record in records {
+        if let Some(sample_id) = &record.sample_id {
+            if record.record.starts_with("4-") {
+                if let Some(&(total_reads, pass_qc)) = sample_data.get(sample_id) {
+                    let reference = record
+                        .record
+                        .strip_prefix("4-")
+                        .unwrap_or(&record.record)
+                        .to_string();
+                    result.push(MeltedRecord {
+                        sample_id: sample_id.to_string(),
+                        reference,
+                        reads_mapped: record.reads,
+                        total_reads,
+                        pass_qc,
+                    });
+                }
+            }
+        }
+    }
+
+    result
+}
+
+/// Coverage dataframe calculations
+pub fn process_coverage_data(
+    coverage_df: &Vec<CoverageData>,
+    ref_lens: &HashMap<String, usize>,
+    virus: &str,
+) -> Vec<ProcessedCoverage> {
+    // Filter out invalid consensus values
+    let filtered_coverage: Vec<_> = coverage_df
+        .iter()
+        .filter(|row| !["-", "N", "a", "c", "t", "g"].contains(&row.consensus.as_str()))
+        .collect();
+
+    // Group by Sample and Reference_Name and calculate maplen
+    let mut cov_ref_lens: HashMap<(String, String), usize> = HashMap::new();
+    for row in &filtered_coverage {
+        let key = (
+            row.sample_id.clone().unwrap_or_default(),
+            row.reference_name.clone(),
+        );
+        *cov_ref_lens.entry(key).or_insert(0) += 1;
+    }
+
+    let mut cov_ref_lens_processed: Vec<_> = cov_ref_lens
+        .into_iter()
+        .map(|((sample, reference_name), maplen)| {
+            let percent_reference_covered = ref_lens
+                .get(&reference_name)
+                .map(|&ref_len| (maplen as f64 / ref_len as f64) * 100.0);
+            (
+                sample,
+                reference_name,
+                percent_reference_covered.map(|x| (x * 100.0).round() / 100.0),
+            )
+        })
+        .collect();
+
+    // Calculate Median Coverage
+    let mut coverage_df_grouped: HashMap<(String, String), Vec<i32>> = HashMap::new();
+    for row in &filtered_coverage {
+        let key = (
+            row.sample_id.clone().unwrap_or_default(),
+            row.reference_name.clone(),
+        );
+        coverage_df_grouped
+            .entry(key)
+            .or_insert_with(Vec::new)
+            .push(row.coverage_depth);
+    }
+
+    let mut coverage_df_processed: HashMap<(String, String), f64> = HashMap::new();
+    for (key, depths) in coverage_df_grouped {
+        let median_coverage = calculate_median(&depths);
+        coverage_df_processed.insert(key, median_coverage);
+    }
+
+    // Combine results into ProcessedCoverage
+    let mut processed_coverage = Vec::new();
+    for (sample, reference, percent_reference_covered) in cov_ref_lens_processed {
+        let median_coverage = coverage_df_processed
+            .get(&(sample.clone(), reference.clone()))
+            .copied()
+            .unwrap_or(0.0);
+
+        processed_coverage.push(ProcessedCoverage {
+            sample,
+            reference,
+            median_coverage,
+            percent_reference_covered,
+        });
+    }
+
+    processed_coverage
+}
+
+fn calculate_median(values: &[i32]) -> f64 {
+    let mut sorted_values = values.to_vec();
+    sorted_values.sort_unstable();
+    let len = sorted_values.len();
+    if len == 0 {
+        return 0.0;
+    }
+    if len % 2 == 0 {
+        (sorted_values[len / 2 - 1] + sorted_values[len / 2]) as f64 / 2.0
+    } else {
+        sorted_values[len / 2] as f64
+    }
 }
