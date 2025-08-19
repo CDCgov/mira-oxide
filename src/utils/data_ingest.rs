@@ -677,7 +677,7 @@ pub fn dais_insertion_data_collection(
     // Construct the glob pattern for matching files
     //If using * situation, you will have to use glob
     let pattern = format!(
-        "{}/aggregate_outputs/dais-ribosome/*.ins",
+        "{}/aggregate_outputs/dais-ribosome/DAIS_ribosome.ins",
         dais_path.as_ref().display()
     );
 
@@ -708,7 +708,7 @@ pub fn dias_deletion_data_collection(
     // Construct the glob pattern for matching files
     //If using * situation, you will have to use glob
     let pattern = format!(
-        "{}/aggregate_outputs/dais-ribosome/*.del",
+        "{}/aggregate_outputs/dais-ribosome/DAIS_ribosome.del",
         dais_path.as_ref().display()
     );
 
@@ -728,7 +728,6 @@ pub fn dias_deletion_data_collection(
             }
         }
     }
-
     Ok(dais_del_data)
 }
 
@@ -739,7 +738,7 @@ pub fn dias_sequence_data_collection(
     // Construct the glob pattern for matching files
     //If using * situation, you will have to use glob
     let pattern = format!(
-        "{}/aggregate_outputs/dais-ribosome/*.seq",
+        "{}/aggregate_outputs/dais-ribosome/DAIS_ribosome.seq",
         dais_path.as_ref().display()
     );
 

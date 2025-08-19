@@ -155,10 +155,11 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
         }));
 
     //Read in DAIS-ribosome data
-    //let dais_ins_data = dais_insertion_data_collection(&args.irma_path)?;
-    //let dais_del_data = dias_deletion_data_collection(&args.irma_path)?;
-    //let dais_seq_data = dias_sequence_data_collection(&args.irma_path)?;
-    //let dais_ref_data = dais_ref_seq_data_collection(&args.workdir_path, virus)?;
+    let dais_ins_data = dais_insertion_data_collection(&args.irma_path)?;
+    let dais_del_data = dias_deletion_data_collection(&args.irma_path)?;
+    let dais_seq_data = dias_sequence_data_collection(&args.irma_path)?;
+    //TODO: sc2 handling
+    let dais_ref_data = dais_ref_seq_data_collection(&args.workdir_path, &args.virus)?;
 
     //TODO: remove these at end
     //println!("{qc_config:?}")
@@ -174,7 +175,7 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
 
     //Calculate AA variants for aavars.csv and dais_vars.json
     //TODO: circle back for the rsv and sc2 situations
-    //let dais_vars_data = compute_dais_variants(&dais_ref_data, &dais_seq_data)?;
+    let dais_vars_data = compute_dais_variants(&dais_ref_data, &dais_seq_data)?;
     negative_qc_statement(
         "/home/xpa3/mira-oxide/test/qc_statement.json",
         &read_data,
