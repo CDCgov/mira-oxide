@@ -183,17 +183,23 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
 
     let melted_reads_df = melt_reads_data(&read_data);
     let mut calculated_cov_df: Vec<ProcessedCoverage> = Vec::new();
+    let mut calculated_position_cov_df: Vec<ProcessedCoverage> = Vec::new();
     // TODO: add in SC2 handling
     if args.virus.to_lowercase() == "flu" {
         calculated_cov_df = process_wgs_coverage_data(&coverage_data, &ref_lengths);
     } else if args.virus.to_lowercase() == "sc2-spike" {
         calculated_cov_df =
             process_position_coverage_data(&coverage_data, &ref_lengths, 21563, 25384);
+    } else if args.virus.to_lowercase() == "sc2-wgs" {
+        calculated_cov_df = process_wgs_coverage_data(&coverage_data, &ref_lengths);
+        calculated_position_cov_df =
+            process_position_coverage_data(&coverage_data, &ref_lengths, 21563, 25384);
     }
 
     //println!("{dais_vars_data:?}");
     //println!("{melted_reads_df:?}");
     println!("{calculated_cov_df:?}");
+    println!("{calculated_position_cov_df:?}");
     /*
     /////////////// Write the structs to JSON files and CSV files ///////////////
     // Writing out coverage data

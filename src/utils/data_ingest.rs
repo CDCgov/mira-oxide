@@ -621,6 +621,10 @@ pub fn get_reference_lens(
                     let line = line?;
                     if line.starts_with('>') {
                         if !ref_name.is_empty() {
+                            // Remove "{S1}" suffix if present - sc2 situations
+                            if ref_name.ends_with("{S1}") {
+                                ref_name.truncate(ref_name.len() - 4);
+                            }
                             ref_len_map.insert(ref_name.clone(), current_sequence.len());
                         }
                         ref_name = line[1..].to_string();
@@ -631,7 +635,10 @@ pub fn get_reference_lens(
                 }
 
                 if !ref_name.is_empty() {
-                    // Insert the last reference name and its length into the HashMap
+                    // Remove "{S1}" suffix if present - sc2 situations
+                    if ref_name.ends_with("{S1}") {
+                        ref_name.truncate(ref_name.len() - 4);
+                    }
                     ref_len_map.insert(ref_name, current_sequence.len());
                 }
             }
