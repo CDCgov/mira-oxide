@@ -112,7 +112,9 @@ fn read_yaml<R: std::io::Read>(reader: R) -> Result<QCConfig, Box<dyn std::error
 }
 
 pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Error>> {
-    /////////////// Read in all data ///////////////
+    ///////////////////////////////////////////////////////////////////////////
+    /////////////// Read in and process data from IRMA and Dais ///////////////
+    ///////////////////////////////////////////////////////////////////////////
     // Read in samplesheet
     let samplesheet_path = create_reader(args.samplesheet)?;
     let samplesheet = if &args.platform == "illumina" {
@@ -134,13 +136,12 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     let qc_yaml_path = create_reader(args.qc_yaml)?;
     let qc_config: QCConfig = read_yaml(qc_yaml_path)?;
 
-    //Read in IRMA data
+    // Read in IRMA data
     let coverage_data = coverage_data_collection(&args.irma_path, &args.platform, &args.runid)?;
     let read_data = reads_data_collection(&args.irma_path, &args.platform, &args.runid)?;
     let vtype_data = create_vtype_data(&read_data);
     let allele_data = allele_data_collection(&args.irma_path)?;
     let indel_data = indels_data_collection(&args.irma_path)?;
-    //TODO: feed in organism from argument
     //let seq_data = amended_consensus_data_collection(&args.irma_path, virus);
     let ref_lengths = match get_reference_lens(&args.irma_path) {
         Ok(data) => data,
@@ -158,10 +159,13 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     let dais_ins_data = dais_insertion_data_collection(&args.irma_path)?;
     let dais_del_data = dias_deletion_data_collection(&args.irma_path)?;
     let dais_seq_data = dias_sequence_data_collection(&args.irma_path)?;
-    //TODO: sc2 handling
-    let dais_ref_data = dais_ref_seq_data_collection(&args.workdir_path, &args.virus)?;
-
-    //TODO: remove these at end
+    let mut dais_ref_data: Vec<DaisSeqData> = Vec::new();
+    if args.virus.to_lowercase() == "flu" || args.virus.to_lowercase() == "rsv" {
+        dais_ref_data = dais_ref_seq_data_collection(&args.workdir_path, &args.virus)?;
+    } else if args.virus.to_lowercase() == "sc2-wgs" {
+        dais_ref_data = dais_ref_seq_data_collection(&args.workdir_path, "sc2")?;
+    }
+    //TODO: remove print statements at end
     //println!("{qc_config:?}")
     //println!("cov data: {coverage_data:?}");
     //println!("Allele data: {allele_data:?}");
@@ -171,22 +175,33 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     //println!("dais del data: {dais_del_data:#?}");
     //println!("dais seq data: {dais_seq_data:#?}");
     //println!("dais ref data: {dais_ref_data:#?}");
-    println!("ref length data: {ref_lengths:#?}");
+    //println!("ref length data: {ref_lengths:#?}");
 
     //Calculate AA variants for aavars.csv and dais_vars.json
-    //TODO: circle back for the rsv and sc2 situations
-    let dais_vars_data = compute_dais_variants(&dais_ref_data, &dais_seq_data)?;
+    let mut dais_vars_data: Vec<DaisVarsData> = Vec::new();
+
+    if args.virus.to_lowercase() == "flu" {
+        dais_vars_data = compute_dais_variants(&dais_ref_data, &dais_seq_data)?;
+    } else if args.virus.to_lowercase() == "sc2-wgs"
+        || args.virus.to_lowercase() == "sc2"
+        || args.virus.to_lowercase() == "rsv"
+    {
+        println!("sc2");
+        dais_vars_data = compute_cvv_dais_variants(&dais_ref_data, &dais_seq_data)?;
+    }
+
     negative_qc_statement(
         "/home/xpa3/mira-oxide/test/qc_statement.json",
         &read_data,
         &neg_control_list,
     )?;
 
+    // Calculating the % coverage and median coverage for summary
     let melted_reads_df = melt_reads_data(&read_data);
     let mut calculated_cov_df: Vec<ProcessedCoverage> = Vec::new();
     let mut calculated_position_cov_df: Vec<ProcessedCoverage> = Vec::new();
-    // TODO: add in SC2 handling
-    if args.virus.to_lowercase() == "flu" {
+
+    if args.virus.to_lowercase() == "flu" || args.virus.to_lowercase() == "rsv" {
         calculated_cov_df = process_wgs_coverage_data(&coverage_data, &ref_lengths);
     } else if args.virus.to_lowercase() == "sc2-spike" {
         calculated_cov_df =
@@ -199,10 +214,13 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
 
     //println!("{dais_vars_data:?}");
     //println!("{melted_reads_df:?}");
-    println!("{calculated_cov_df:?}");
-    println!("{calculated_position_cov_df:?}");
-    /*
+    //println!("{calculated_cov_df:?}");
+    //println!("{calculated_position_cov_df:?}");
+
+    /////////////////////////////////////////////////////////////////////////////
     /////////////// Write the structs to JSON files and CSV files ///////////////
+    /////////////////////////////////////////////////////////////////////////////
+
     // Writing out coverage data
     let coverage_struct_values = vec![
         "Sample",
@@ -384,7 +402,7 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
         &dais_vars_data,
         &aavars_columns,
         &aavars_columns,
-    )?; */
+    )?;
 
     /////////////// Write the structs to parquet files if flag invoked ///////////////
     // Write fields to parq if flag given

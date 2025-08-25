@@ -215,6 +215,7 @@ pub fn return_seg_data(
     (segments, segset, segcolor)
 }
 
+//////////////// Functions used to process the variants found in dais outputs ///////////////
 // Function to calculate the aa variants - this is specifically for flu right now
 pub fn compute_dais_variants(
     ref_seqs_data: &Vec<DaisSeqData>,
@@ -279,7 +280,112 @@ pub fn compute_dais_variants(
     Ok(unique_entries)
 }
 
-//////////////// Functions using to create irma_summary ///////////////
+/// Compute CVV DAIS Variants
+pub fn compute_cvv_dais_variants(
+    ref_seqs_data: &Vec<DaisSeqData>,
+    sample_seqs_data: &Vec<DaisSeqData>,
+) -> Result<Vec<DaisVarsData>, Box<dyn Error>> {
+    let mut merged_data = merge_sequences(ref_seqs_data, sample_seqs_data)?;
+
+    // Compute AA Variants
+    for entry in &mut merged_data {
+        entry.insertion = compute_aa_variants(&entry.aa_aln, &entry.aa_seq);
+    }
+
+    for entry in &mut merged_data {
+        entry.insertions_shift_frame = if entry.insertion.is_empty() {
+            "0".to_string()
+        } else {
+            entry.insertion.split(',').count().to_string()
+        };
+    }
+
+    // Filter and sort the data - keep first
+    merged_data.sort_by(|a, b| {
+        a.protein
+            .cmp(&b.protein)
+            .then(a.sample_id.cmp(&b.sample_id))
+            .then(a.insertions_shift_frame.cmp(&b.insertions_shift_frame))
+    });
+
+    let mut unique_data = HashMap::new();
+    for entry in merged_data {
+        let key = (entry.sample_id.clone(), entry.protein.clone());
+        unique_data.entry(key).or_insert(entry);
+    }
+
+    // Convert DaisSeqData to DaisVarsData and collect into a Vec
+    let result: Vec<DaisVarsData> = unique_data
+        .into_values()
+        .map(|entry| DaisVarsData {
+            sample_id: entry.sample_id,
+            reference_id: entry.reference.clone(),
+            protein: entry.protein.clone(),
+            aa_variant_count: entry.insertions_shift_frame.parse::<i32>().unwrap_or(0),
+            aa_variants: entry.insertion.clone(),
+        })
+        .collect();
+
+    Ok(result)
+}
+
+/// Merge sequences based on Coordspace and Protein - used by compute_cvv_dais_variants fn
+fn merge_sequences(
+    ref_seqs_data: &Vec<DaisSeqData>,
+    sample_seqs_data: &Vec<DaisSeqData>,
+) -> Result<Vec<DaisSeqData>, Box<dyn Error>> {
+    let mut merged_data = Vec::new();
+
+    for sample_entry in sample_seqs_data {
+        for ref_entry in ref_seqs_data {
+            if sample_entry.reference == ref_entry.reference
+                && sample_entry.protein == ref_entry.protein
+            {
+                // Create a new owned DaisSeqData instance - it was this or lifetimes...
+                let merged_entry = DaisSeqData {
+                    sample_id: sample_entry.sample_id.clone(),
+                    ctype: sample_entry.ctype.clone(),
+                    reference: sample_entry.reference.clone(),
+                    protein: sample_entry.protein.clone(),
+                    vh: sample_entry.vh.clone(),
+                    aa_seq: ref_entry.aa_seq.clone(), // Use ref_entry's AA sequence
+                    aa_aln: sample_entry.aa_aln.clone(),
+                    cds_id: sample_entry.cds_id.clone(),
+                    insertion: sample_entry.insertion.clone(),
+                    insertions_shift_frame: sample_entry.insertions_shift_frame.clone(),
+                    cds_sequence: sample_entry.cds_sequence.clone(),
+                    aligned_cds_sequence: sample_entry.aligned_cds_sequence.clone(),
+                    reference_nt_positions: sample_entry.reference_nt_positions.clone(),
+                    sample_nt_positions: sample_entry.sample_nt_positions.clone(),
+                };
+
+                merged_data.push(merged_entry); // Push the owned value
+            }
+        }
+    }
+
+    Ok(merged_data)
+}
+
+/// Compute AA variants - used by compute_cvv_dais_variants fn
+fn compute_aa_variants(aligned_aa_sequence: &str, ref_aa_sequence: &str) -> String {
+    let mut aa_vars = String::new();
+
+    for (index, (sample_aa, ref_aa)) in aligned_aa_sequence
+        .chars()
+        .zip(ref_aa_sequence.chars())
+        .enumerate()
+    {
+        if sample_aa != ref_aa {
+            let pos = index + 1;
+            let variant = format!("{ref_aa}{pos}{sample_aa}");
+            append_with_comma(&mut aa_vars, &variant);
+        }
+    }
+
+    aa_vars
+}
+//////////////// Functions used to create irma_summary ///////////////
 /// Flip orientation of the reads structs
 pub fn melt_reads_data(records: &Vec<ReadsData>) -> Vec<MeltedRecord> {
     let mut result = Vec::new();
