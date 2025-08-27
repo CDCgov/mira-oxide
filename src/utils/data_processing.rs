@@ -191,7 +191,8 @@ where
 {
     let mut sample_list = Vec::new();
 
-    for entry in samples {
+    // Skip the first element (header) and iterate over the rest
+    for entry in samples.iter().skip(1) {
         sample_list.push(entry.sample_id().clone());
     }
 
@@ -691,8 +692,11 @@ pub fn create_irma_summary(
 
     // First loop: Populate `irma_summary` with initial data from `reads_count_df`
     for sample in sample_list {
+        let mut found_match = false;
         for entry in reads_count_df {
+            println!("{} --- {}", &sample, entry.sample_id);
             if *sample == entry.sample_id {
+                found_match = true;
                 irma_summary.push(IRMASummary {
                     sample_id: Some(entry.sample_id.clone()),
                     reference: Some(entry.reference.clone()),
@@ -712,6 +716,27 @@ pub fn create_irma_summary(
                     instrument: None,
                 });
             }
+        }
+        // If no match was found, push the default IRMASummary entry
+        if !found_match {
+            irma_summary.push(IRMASummary {
+                sample_id: Some(sample.to_string()),
+                reference: Some("Undetermined".to_owned()),
+                total_reads: Some(0),
+                pass_qc: Some(0),
+                reads_mapped: Some(0),
+                precent_reference_coverage: Some(0.0),
+                median_coverage: Some(0.0),
+                count_minor_snv: Some(0),
+                count_minor_indel: Some(0),
+                spike_percent_coverage: None,
+                spike_median_coverage: None,
+                pass_fail_reason: Some("Fail".to_owned()),
+                subtype: Some("Undetermined".to_owned()),
+                mira_module: None,
+                runid: None,
+                instrument: None,
+            });
         }
     }
 
