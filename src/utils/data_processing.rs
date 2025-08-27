@@ -662,8 +662,11 @@ pub fn count_minority_indels(data: &Vec<IndelsData>) -> Vec<VariantCountData> {
     let mut counts: HashMap<(Option<String>, String), i32> = HashMap::new();
 
     for entry in data {
-        let key = (entry.sample_id.clone(), entry.reference_name.clone());
-        *counts.entry(key).or_insert(0) += 1;
+        //Alleles were already filtered, but have to filter indels for >= 0.2 freq here.
+        if entry.frequency >= 0.2 {
+            let key = (entry.sample_id.clone(), entry.reference_name.clone());
+            *counts.entry(key).or_insert(0) += 1;
+        }
     }
 
     let mut result = Vec::new();
@@ -674,6 +677,8 @@ pub fn count_minority_indels(data: &Vec<IndelsData>) -> Vec<VariantCountData> {
             minor_variant_count,
         });
     }
+
+    println!("{result:?}");
 
     result
 }
@@ -690,11 +695,10 @@ pub fn create_irma_summary(
     let allele_count_data = count_minority_alleles(alleles_df);
     let indel_count_data = count_minority_indels(indels_df);
 
-    // First loop: Populate `irma_summary` with initial data from `reads_count_df`
+    // Populate irma_summary with initial data from reads_count_df
     for sample in sample_list {
         let mut found_match = false;
         for entry in reads_count_df {
-            println!("{} --- {}", &sample, entry.sample_id);
             if *sample == entry.sample_id {
                 found_match = true;
                 irma_summary.push(IRMASummary {
@@ -705,8 +709,8 @@ pub fn create_irma_summary(
                     reads_mapped: Some(entry.reads_mapped.clone()),
                     precent_reference_coverage: None,
                     median_coverage: None,
-                    count_minor_snv: None,
-                    count_minor_indel: None,
+                    count_minor_snv: Some(0),
+                    count_minor_indel: Some(0),
                     spike_percent_coverage: None,
                     spike_median_coverage: None,
                     pass_fail_reason: None,
@@ -740,7 +744,7 @@ pub fn create_irma_summary(
         }
     }
 
-    // Second loop: Update `irma_summary` with data from other dataframes
+    //Update irma_summary with data from other dataframes
     for sample in &mut irma_summary {
         for entry in calc_cov_df {
             if sample.sample_id == Some(entry.sample.clone())
@@ -754,22 +758,17 @@ pub fn create_irma_summary(
         for entry in &allele_count_data {
             if sample.sample_id == entry.sample_id.clone()
                 && sample.reference == Some(entry.reference.clone())
-                && entry.minor_variant_count > 0
             {
                 sample.count_minor_snv = Some(entry.minor_variant_count);
-            } else {
-                sample.count_minor_snv = Some(0);
             }
         }
 
         for entry in &indel_count_data {
             if sample.sample_id == entry.sample_id.clone()
                 && sample.reference == Some(entry.reference.clone())
-                && entry.minor_variant_count > 0
             {
+                println!("check {}", entry.minor_variant_count);
                 sample.count_minor_indel = Some(entry.minor_variant_count);
-            } else {
-                sample.count_minor_indel = Some(0);
             }
         }
     }

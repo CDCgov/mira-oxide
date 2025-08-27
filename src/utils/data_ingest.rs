@@ -123,7 +123,7 @@ pub struct IndelsData {
     #[serde(rename = "Total")]
     pub total: String,
     #[serde(rename = "Frequency")]
-    pub frequency: String,
+    pub frequency: f64,
     #[serde(rename = "Average_Quality")]
     pub average_quality: Option<String>,
     #[serde(rename = "ConfidenceNotMacErr")]
