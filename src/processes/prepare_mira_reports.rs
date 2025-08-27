@@ -66,7 +66,7 @@ pub struct SamplesheetO {
 
 enum Samplesheet {
     Illumina(Vec<SamplesheetI>),
-    Other(Vec<SamplesheetO>),
+    ONT(Vec<SamplesheetO>),
 }
 
 #[derive(Debug, Deserialize)]
@@ -121,14 +121,20 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
         let illumina_samplesheet: Vec<SamplesheetI> = read_csv(samplesheet_path, true)?;
         Samplesheet::Illumina(illumina_samplesheet)
     } else {
-        let other_samplesheet: Vec<SamplesheetO> = read_csv(samplesheet_path, false)?;
-        Samplesheet::Other(other_samplesheet)
+        let ont_samplesheet: Vec<SamplesheetO> = read_csv(samplesheet_path, false)?;
+        Samplesheet::ONT(ont_samplesheet)
     };
-    // Get the negative controls from the samplesheet
 
+    // Get sample ids from the samplesheet
+    let sample_list = match samplesheet {
+        Samplesheet::Illumina(ref sheet) => collect_sample_id(sheet),
+        Samplesheet::ONT(ref sheet) => collect_sample_id(sheet),
+    };
+    //println!("negs: {sample_list:?}");
+    // Get the negative controls from the samplesheet
     let neg_control_list = match samplesheet {
         Samplesheet::Illumina(ref sheet) => collect_negatives(sheet),
-        Samplesheet::Other(ref sheet) => collect_negatives(sheet),
+        Samplesheet::ONT(ref sheet) => collect_negatives(sheet),
     };
     //println!("negs: {neg_control_list:?}");
 
@@ -186,7 +192,6 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
         || args.virus.to_lowercase() == "sc2"
         || args.virus.to_lowercase() == "rsv"
     {
-        println!("sc2");
         dais_vars_data = compute_cvv_dais_variants(&dais_ref_data, &dais_seq_data)?;
     }
 
@@ -212,16 +217,25 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
             process_position_coverage_data(&coverage_data, &ref_lengths, 21563, 25384);
     }
 
+    let irma_summary = create_irma_summary(
+        &sample_list,
+        &melted_reads_df,
+        &calculated_cov_df,
+        &allele_data,
+        &indel_data,
+    )?;
+
     //println!("{dais_vars_data:?}");
     //println!("{melted_reads_df:?}");
     //println!("{calculated_cov_df:?}");
     //println!("{calculated_position_cov_df:?}");
+    //println!("{irma_summary:?}");
 
     /////////////////////////////////////////////////////////////////////////////
     /////////////// Write the structs to JSON files and CSV files ///////////////
     /////////////////////////////////////////////////////////////////////////////
 
-    // Writing out coverage data
+    // Writing out Coverage data
     let coverage_struct_values = vec![
         "Sample",
         "Reference_Name",
@@ -402,6 +416,59 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
         &dais_vars_data,
         &aavars_columns,
         &aavars_columns,
+    )?;
+
+    // write out the summary.json and the {runid}_summary.csv
+    let summary_columns: Vec<&str> = if args.virus.to_lowercase() == "sc2-wgs" {
+        vec![
+            "sample_id",
+            "total_reads",
+            "pass_qc",
+            "reads_mapped",
+            "reference",
+            "precent_reference_coverage",
+            "median_coverage",
+            "count_minor_snv",
+            "count_minor_indel",
+            "spike_percent_coverage",
+            "spike_median_coverage",
+            "pass_fail_reason",
+            "subtype",
+            "mira_module",
+            "runid",
+            "instrument",
+        ]
+    } else {
+        vec![
+            "sample_id",
+            "total_reads",
+            "pass_qc",
+            "reads_mapped",
+            "reference",
+            "precent_reference_coverage",
+            "median_coverage",
+            "count_minor_snv",
+            "count_minor_indel",
+            "pass_fail_reason",
+            "subtype",
+            "mira_module",
+            "runid",
+            "instrument",
+        ]
+    };
+
+    write_structs_to_split_json_file(
+        "/home/xpa3/mira-oxide/test/irma_summary.json",
+        &irma_summary,
+        &summary_columns,
+        &summary_columns,
+    )?;
+
+    write_structs_to_csv_file(
+        &format!("/home/xpa3/mira-oxide/test/{}_summary.csv", &args.runid),
+        &irma_summary,
+        &summary_columns,
+        &summary_columns,
     )?;
 
     /////////////// Write the structs to parquet files if flag invoked ///////////////

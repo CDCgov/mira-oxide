@@ -64,7 +64,7 @@ pub struct ReadsData {
 /// vtype struct
 #[derive(Serialize, Debug, Clone)]
 pub struct ProcessedRecord {
-    pub sample_id: Option<String>, // Optional field
+    pub sample_id: Option<String>,
     pub vtype: String,
     pub ref_type: String,
     pub subtype: String,
@@ -119,7 +119,7 @@ pub struct IndelsData {
     #[serde(rename = "Called")]
     pub called: String,
     #[serde(rename = "Count")]
-    pub count: String,
+    pub count: i32,
     #[serde(rename = "Total")]
     pub total: String,
     #[serde(rename = "Frequency")]
@@ -421,7 +421,7 @@ pub fn allele_data_collection(
         irma_path.to_string_lossy()
     );
 
-    let mut reads_data: Vec<AllelesData> = Vec::new();
+    let mut alleles_data: Vec<AllelesData> = Vec::new();
 
     // Iterate over all files matching the pattern and get the sample name from file
     for entry in glob(&pattern).expect("Failed to read glob pattern") {
@@ -434,12 +434,12 @@ pub fn allele_data_collection(
                 // Read the data from the file and include the sample name
                 let mut records: Vec<AllelesData> = process_txt_with_sample(reader, true, sample)?;
                 records.retain(|record| record.minority_frequency >= 0.05);
-                reads_data.append(&mut records);
+                alleles_data.append(&mut records);
             }
             Err(e) => println!("Error reading file: {e}"),
         }
     }
-    Ok(reads_data)
+    Ok(alleles_data)
 }
 
 /// Collect indel data and save to vector of IndelsData
@@ -456,7 +456,7 @@ pub fn indels_data_collection(
         irma_path.as_ref().display()
     );
 
-    let mut reads_data: Vec<IndelsData> = Vec::new();
+    let mut indels_data: Vec<IndelsData> = Vec::new();
 
     // Iterate over all files matching the pattern1 (Insertions) and get the sample name from file
     for entry in glob(&pattern1).expect("Failed to read glob pattern") {
@@ -468,7 +468,7 @@ pub fn indels_data_collection(
 
                 // Read the data from the file and include the sample name
                 let mut records: Vec<IndelsData> = process_txt_with_sample(reader, true, sample)?;
-                reads_data.append(&mut records);
+                indels_data.append(&mut records);
             }
             Err(e) => println!("Error reading file: {e}"),
         }
@@ -484,12 +484,12 @@ pub fn indels_data_collection(
 
                 // Read the data from the file and include the sample name
                 let mut records: Vec<IndelsData> = process_txt_with_sample(reader, true, sample)?;
-                reads_data.append(&mut records);
+                indels_data.append(&mut records);
             }
             Err(e) => println!("Error reading file: {e}"),
         }
     }
-    Ok(reads_data)
+    Ok(indels_data)
 }
 
 /// Read in IRMA amended consensus fasta files to SeqData struct

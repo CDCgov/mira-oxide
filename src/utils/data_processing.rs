@@ -7,7 +7,7 @@ use std::{
 use crate::processes::prepare_mira_reports::SamplesheetI;
 use crate::processes::prepare_mira_reports::SamplesheetO;
 
-use super::data_ingest::{CoverageData, DaisSeqData, ReadsData};
+use super::data_ingest::{AllelesData, CoverageData, DaisSeqData, IndelsData, ReadsData};
 
 /// Dais Variants Struct
 #[derive(Serialize, Deserialize, Debug)]
@@ -36,6 +36,37 @@ pub struct ProcessedCoverage {
     pub reference: String,
     pub median_coverage: f64,
     pub percent_reference_covered: Option<f64>,
+}
+
+/// vtype struct
+#[derive(Serialize, Debug, Clone)]
+pub struct IRMASummary {
+    pub sample_id: Option<String>,
+    pub total_reads: Option<i32>,
+    pub pass_qc: Option<i32>,
+    pub reads_mapped: Option<i32>,
+    pub reference: Option<String>,
+    pub precent_reference_coverage: Option<f64>,
+    pub median_coverage: Option<f64>,
+    pub count_minor_snv: Option<i32>,
+    pub count_minor_indel: Option<i32>,
+    pub spike_percent_coverage: Option<f64>,
+    pub spike_median_coverage: Option<f64>,
+    pub pass_fail_reason: Option<String>,
+    pub subtype: Option<String>,
+    pub mira_module: Option<String>,
+    pub runid: Option<String>,
+    pub instrument: Option<String>,
+}
+
+/// Variant Count struct
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct VariantCountData {
+    #[serde(rename = "Sample")]
+    pub sample_id: Option<String>,
+    #[serde(rename = "Reference_Name")]
+    pub reference: String,
+    pub minor_variant_count: i32,
 }
 
 /////////////// Traits ///////////////
@@ -151,6 +182,20 @@ pub fn append_with_comma(base: &mut String, new_entry: &str) {
     } else {
         base.push_str(new_entry);
     }
+}
+
+pub fn collect_sample_id<T>(samples: &Vec<T>) -> Vec<String>
+where
+    T: Serialize + Clone,
+    T: HasSampleId, // Custom trait to ensure T has a sample_id field
+{
+    let mut sample_list = Vec::new();
+
+    for entry in samples {
+        sample_list.push(entry.sample_id().clone());
+    }
+
+    sample_list
 }
 
 pub fn collect_negatives<T>(samples: &Vec<T>) -> Vec<String>
@@ -588,4 +633,121 @@ pub fn process_position_coverage_data(
     }
 
     processed_coverage
+}
+
+/// Count minority alleles for each unique sample_id and reference - used in IRMA summary below
+pub fn count_minority_alleles(data: &Vec<AllelesData>) -> Vec<VariantCountData> {
+    let mut counts: HashMap<(Option<String>, String), i32> = HashMap::new();
+
+    for entry in data {
+        let key = (entry.sample_id.clone(), entry.reference.clone());
+        *counts.entry(key).or_insert(0) += 1;
+    }
+
+    let mut result = Vec::new();
+    for ((sample_id, reference), minor_variant_count) in counts {
+        result.push(VariantCountData {
+            sample_id,
+            reference,
+            minor_variant_count,
+        });
+    }
+
+    result
+}
+
+/// Count minority alleles for each unique sample_id and reference - used in IRMA summary below
+pub fn count_minority_indels(data: &Vec<IndelsData>) -> Vec<VariantCountData> {
+    let mut counts: HashMap<(Option<String>, String), i32> = HashMap::new();
+
+    for entry in data {
+        let key = (entry.sample_id.clone(), entry.reference_name.clone());
+        *counts.entry(key).or_insert(0) += 1;
+    }
+
+    let mut result = Vec::new();
+    for ((sample_id, reference), minor_variant_count) in counts {
+        result.push(VariantCountData {
+            sample_id,
+            reference,
+            minor_variant_count,
+        });
+    }
+
+    result
+}
+
+/// Combine all df to create IRMA summary
+pub fn create_irma_summary(
+    sample_list: &Vec<String>,
+    reads_count_df: &Vec<MeltedRecord>,
+    calc_cov_df: &Vec<ProcessedCoverage>,
+    alleles_df: &Vec<AllelesData>,
+    indels_df: &Vec<IndelsData>,
+) -> Result<Vec<IRMASummary>, Box<dyn Error>> {
+    let mut irma_summary: Vec<IRMASummary> = Vec::new();
+    let allele_count_data = count_minority_alleles(alleles_df);
+    let indel_count_data = count_minority_indels(indels_df);
+
+    // First loop: Populate `irma_summary` with initial data from `reads_count_df`
+    for sample in sample_list {
+        for entry in reads_count_df {
+            if *sample == entry.sample_id {
+                irma_summary.push(IRMASummary {
+                    sample_id: Some(entry.sample_id.clone()),
+                    reference: Some(entry.reference.clone()),
+                    total_reads: Some(entry.total_reads.clone()),
+                    pass_qc: Some(entry.pass_qc.clone()),
+                    reads_mapped: Some(entry.reads_mapped.clone()),
+                    precent_reference_coverage: None,
+                    median_coverage: None,
+                    count_minor_snv: None,
+                    count_minor_indel: None,
+                    spike_percent_coverage: None,
+                    spike_median_coverage: None,
+                    pass_fail_reason: None,
+                    subtype: None,
+                    mira_module: None,
+                    runid: None,
+                    instrument: None,
+                });
+            }
+        }
+    }
+
+    // Second loop: Update `irma_summary` with data from other dataframes
+    for sample in &mut irma_summary {
+        for entry in calc_cov_df {
+            if sample.sample_id == Some(entry.sample.clone())
+                && sample.reference == Some(entry.reference.clone())
+            {
+                sample.precent_reference_coverage = entry.percent_reference_covered;
+                sample.median_coverage = Some(entry.median_coverage);
+            }
+        }
+
+        for entry in &allele_count_data {
+            if sample.sample_id == entry.sample_id.clone()
+                && sample.reference == Some(entry.reference.clone())
+                && entry.minor_variant_count > 0
+            {
+                sample.count_minor_snv = Some(entry.minor_variant_count);
+            } else {
+                sample.count_minor_snv = Some(0);
+            }
+        }
+
+        for entry in &indel_count_data {
+            if sample.sample_id == entry.sample_id.clone()
+                && sample.reference == Some(entry.reference.clone())
+                && entry.minor_variant_count > 0
+            {
+                sample.count_minor_indel = Some(entry.minor_variant_count);
+            } else {
+                sample.count_minor_indel = Some(0);
+            }
+        }
+    }
+
+    Ok(irma_summary)
 }
