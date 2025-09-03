@@ -172,6 +172,7 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
         dais_ref_data = dais_ref_seq_data_collection(&args.workdir_path, "sc2")?;
     }
     //TODO: remove print statements at end
+    //println!("{vtype_data:?}");
     //println!("{qc_config:?}")
     //println!("cov data: {coverage_data:?}");
     //println!("Allele data: {allele_data:?}");
@@ -216,6 +217,9 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
         calculated_position_cov_df =
             process_position_coverage_data(&coverage_data, &ref_lengths, 21563, 25384);
     }
+
+    let subtype_data = extract_subtype_flu(&dais_vars_data);
+    println!("{subtype_data:?}");
 
     let irma_summary = create_irma_summary(
         &sample_list,

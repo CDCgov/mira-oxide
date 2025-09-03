@@ -7,7 +7,9 @@ use std::{
 use crate::processes::prepare_mira_reports::SamplesheetI;
 use crate::processes::prepare_mira_reports::SamplesheetO;
 
-use super::data_ingest::{AllelesData, CoverageData, DaisSeqData, IndelsData, ReadsData};
+use super::data_ingest::{
+    AllelesData, CoverageData, DaisSeqData, IndelsData, ProcessedRecord, ReadsData,
+};
 
 /// Dais Variants Struct
 #[derive(Serialize, Deserialize, Debug)]
@@ -17,6 +19,13 @@ pub struct DaisVarsData {
     pub protein: String,
     pub aa_variant_count: i32,
     pub aa_variants: String,
+}
+
+/// Subtype Struct
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Subtype {
+    pub sample_id: Option<String>,
+    pub subtype: String,
 }
 
 //Melted Reads df
@@ -431,18 +440,105 @@ fn compute_aa_variants(aligned_aa_sequence: &str, ref_aa_sequence: &str) -> Stri
 
     aa_vars
 }
+
+/// Get subtypes for flu
+pub fn extract_subtype_flu(dais_vars: &Vec<DaisVarsData>) -> Result<Vec<Subtype>, Box<dyn Error>> {
+    let mut subtype_data: Vec<Subtype> = Vec::new();
+    let mut sample_ha_map: HashMap<String, String> = HashMap::new();
+    let mut sample_na_map: HashMap<String, String> = HashMap::new();
+
+    for entry in dais_vars {
+        let hold_sample = entry.sample_id.clone().ok_or("Missing sample_id")?;
+        let sample_ha: String = hold_sample[..hold_sample.len() - 2].to_string();
+        let ha = if entry.protein == "HA" {
+            match entry.reference_id.as_str() {
+                "CALI07" => "H1",
+                "ANNARBOR60" => "H2",
+                "HK4801" => "H3",
+                "VT1203" => "H5",
+                "ANHUI01" => "H7",
+                "BGD0994" => "H9",
+                "BRISBANE60" => "BVIC",
+                "PHUKET3073" => "BYAM",
+                _ => "",
+            }
+        } else {
+            ""
+        };
+        if !ha.is_empty() {
+            sample_ha_map.insert(sample_ha, ha.to_string());
+        }
+    }
+
+    for entry in dais_vars {
+        let hold_sample = entry.sample_id.clone().ok_or("Missing sample_id")?;
+        let sample_na: String = hold_sample[..hold_sample.len() - 2].to_string();
+        let na = if entry.protein == "NA" {
+            match entry.reference_id.as_str() {
+                "CALI07" => "N1",
+                "HK4801" => "N2",
+                "ONTARIO6118" => "N4",
+                "RU1526" => "N5",
+                "ALASKA4733" => "N5",
+                "SICHUAN26221" => "N6",
+                "NL219" => "N7",
+                "ASTRAKHAN3212" => "N8",
+                "ANHUI01" => "N9",
+                _ => "",
+            }
+        } else {
+            ""
+        };
+        if !na.is_empty() {
+            sample_na_map.insert(sample_na, na.to_string());
+        }
+    }
+    //Combine ha and na from the hashmaps where sample IDs match
+    let mut all_samples: HashMap<String, String> = HashMap::new();
+
+    for (sample_id, ha) in &sample_ha_map {
+        all_samples.insert(sample_id.clone(), ha.clone());
+    }
+
+    for (sample_id, na) in &sample_na_map {
+        if let Some(existing) = all_samples.get_mut(sample_id) {
+            *existing = format!("{existing}{na}");
+        } else {
+            all_samples.insert(sample_id.clone(), na.clone());
+        }
+    }
+
+    //Process all_samples to determine subtype
+    for (sample_id, combined) in all_samples {
+        let subtype = if !combined.is_empty() {
+            combined
+        } else {
+            "Undetermined".to_string()
+        };
+        println!("Sample ID: {}, subtype: {}", sample_id, subtype);
+
+        // Add subtype to subtype_data (if needed)
+        subtype_data.push(Subtype {
+            sample_id: Some(sample_id.clone()),
+            subtype,
+        });
+    }
+
+    Ok(subtype_data)
+}
+
 //////////////// Functions used to create irma_summary ///////////////
 /// Flip orientation of the reads structs
 pub fn melt_reads_data(records: &Vec<ReadsData>) -> Vec<MeltedRecord> {
     let mut result = Vec::new();
-    let mut sample_data: HashMap<String, (i32, i32)> = HashMap::new(); // To store total_reads and pass_qc for each sample_id
+    let mut sample_data: HashMap<String, (i32, i32)> = HashMap::new();
 
     for record in records {
         if let Some(sample_id) = &record.sample_id {
             if record.record == "1-initial" {
-                sample_data.entry(sample_id.clone()).or_insert((0, 0)).0 = record.reads; // Store total_reads
+                sample_data.entry(sample_id.clone()).or_insert((0, 0)).0 = record.reads;
             } else if record.record == "2-passQC" {
-                sample_data.entry(sample_id.clone()).or_insert((0, 0)).1 = record.reads; // Store pass_qc
+                sample_data.entry(sample_id.clone()).or_insert((0, 0)).1 = record.reads;
             }
         }
     }
@@ -678,8 +774,6 @@ pub fn count_minority_indels(data: &Vec<IndelsData>) -> Vec<VariantCountData> {
         });
     }
 
-    println!("{result:?}");
-
     result
 }
 
@@ -767,7 +861,6 @@ pub fn create_irma_summary(
             if sample.sample_id == entry.sample_id.clone()
                 && sample.reference == Some(entry.reference.clone())
             {
-                println!("check {}", entry.minor_variant_count);
                 sample.count_minor_indel = Some(entry.minor_variant_count);
             }
         }
