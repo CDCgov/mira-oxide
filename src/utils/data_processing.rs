@@ -515,9 +515,7 @@ pub fn extract_subtype_flu(dais_vars: &Vec<DaisVarsData>) -> Result<Vec<Subtype>
         } else {
             "Undetermined".to_string()
         };
-        println!("Sample ID: {}, subtype: {}", sample_id, subtype);
 
-        // Add subtype to subtype_data (if needed)
         subtype_data.push(Subtype {
             sample_id: Some(sample_id.clone()),
             subtype,
@@ -784,6 +782,7 @@ pub fn create_irma_summary(
     calc_cov_df: &Vec<ProcessedCoverage>,
     alleles_df: &Vec<AllelesData>,
     indels_df: &Vec<IndelsData>,
+    subtype_df: &Vec<Subtype>,
 ) -> Result<Vec<IRMASummary>, Box<dyn Error>> {
     let mut irma_summary: Vec<IRMASummary> = Vec::new();
     let allele_count_data = count_minority_alleles(alleles_df);
@@ -862,6 +861,12 @@ pub fn create_irma_summary(
                 && sample.reference == Some(entry.reference.clone())
             {
                 sample.count_minor_indel = Some(entry.minor_variant_count);
+            }
+        }
+
+        for entry in subtype_df {
+            if sample.sample_id == entry.sample_id.clone() {
+                sample.subtype = Some(entry.subtype.clone());
             }
         }
     }

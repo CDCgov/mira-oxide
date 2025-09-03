@@ -218,22 +218,21 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
             process_position_coverage_data(&coverage_data, &ref_lengths, 21563, 25384);
     }
 
-    let subtype_data = extract_subtype_flu(&dais_vars_data);
-    println!("{subtype_data:?}");
-
+    let subtype_data = extract_subtype_flu(&dais_vars_data)?;
     let irma_summary = create_irma_summary(
         &sample_list,
         &melted_reads_df,
         &calculated_cov_df,
         &allele_data,
         &indel_data,
+        &subtype_data,
     )?;
 
     //println!("{dais_vars_data:?}");
     //println!("{melted_reads_df:?}");
     //println!("{calculated_cov_df:?}");
     //println!("{calculated_position_cov_df:?}");
-    //println!("{irma_summary:?}");
+    println!("{irma_summary:?}");
 
     /////////////////////////////////////////////////////////////////////////////
     /////////////// Write the structs to JSON files and CSV files ///////////////
