@@ -148,7 +148,7 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     let vtype_data = create_vtype_data(&read_data);
     let allele_data = allele_data_collection(&args.irma_path)?;
     let indel_data = indels_data_collection(&args.irma_path)?;
-    //let seq_data = amended_consensus_data_collection(&args.irma_path, virus);
+    let seq_data = amended_consensus_data_collection(&args.irma_path, &args.virus);
     let ref_lengths = match get_reference_lens(&args.irma_path) {
         Ok(data) => data,
         Err(e) => {
@@ -172,7 +172,7 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
         dais_ref_data = dais_ref_seq_data_collection(&args.workdir_path, "sc2")?;
     }
     //TODO: remove print statements at end
-    //println!("{vtype_data:?}");
+    println!("{vtype_data:?}");
     //println!("{qc_config:?}")
     //println!("cov data: {coverage_data:?}");
     //println!("Allele data: {allele_data:?}");
@@ -218,8 +218,17 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
             process_position_coverage_data(&coverage_data, &ref_lengths, 21563, 25384);
     }
 
-    let subtype_data = extract_subtype_flu(&dais_vars_data)?;
-    let irma_summary = create_irma_summary(
+    //Gather subtype information
+    //todo: add rsv handling
+    let mut subtype_data: Vec<Subtype> = Vec::new();
+    if args.virus.to_lowercase() == "flu" {
+        subtype_data = extract_subtype_flu(&dais_vars_data)?;
+    } else if args.virus.to_lowercase() == "sc2-wgs" || args.virus.to_lowercase() == "sc2-spike" {
+        subtype_data = extract_subtype_sc2(&dais_vars_data)?;
+    }
+    //Build prelim irma summary "dataframe"
+    //More will be added and analyzed before final irma summary created
+    let irma_summary = create_prelim_irma_summary_df(
         &sample_list,
         &melted_reads_df,
         &calculated_cov_df,
@@ -228,11 +237,12 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
         &subtype_data,
     )?;
 
+    //todo:remove before end
     //println!("{dais_vars_data:?}");
     //println!("{melted_reads_df:?}");
     //println!("{calculated_cov_df:?}");
     //println!("{calculated_position_cov_df:?}");
-    println!("{irma_summary:?}");
+    //println!("{irma_summary:?}");
 
     /////////////////////////////////////////////////////////////////////////////
     /////////////// Write the structs to JSON files and CSV files ///////////////

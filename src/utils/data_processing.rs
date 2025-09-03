@@ -47,7 +47,7 @@ pub struct ProcessedCoverage {
     pub percent_reference_covered: Option<f64>,
 }
 
-/// vtype struct
+/// IRMA struct
 #[derive(Serialize, Debug, Clone)]
 pub struct IRMASummary {
     pub sample_id: Option<String>,
@@ -525,6 +525,20 @@ pub fn extract_subtype_flu(dais_vars: &Vec<DaisVarsData>) -> Result<Vec<Subtype>
     Ok(subtype_data)
 }
 
+pub fn extract_subtype_sc2(dais_vars: &Vec<DaisVarsData>) -> Result<Vec<Subtype>, Box<dyn Error>> {
+    let mut subtype_data: Vec<Subtype> = Vec::new();
+
+    for entry in dais_vars {
+        println!("{}", entry.reference_id);
+        subtype_data.push(Subtype {
+            sample_id: entry.sample_id.clone(),
+            subtype: entry.reference_id.clone(),
+        })
+    }
+
+    Ok(subtype_data)
+}
+
 //////////////// Functions used to create irma_summary ///////////////
 /// Flip orientation of the reads structs
 pub fn melt_reads_data(records: &Vec<ReadsData>) -> Vec<MeltedRecord> {
@@ -776,7 +790,7 @@ pub fn count_minority_indels(data: &Vec<IndelsData>) -> Vec<VariantCountData> {
 }
 
 /// Combine all df to create IRMA summary
-pub fn create_irma_summary(
+pub fn create_prelim_irma_summary_df(
     sample_list: &Vec<String>,
     reads_count_df: &Vec<MeltedRecord>,
     calc_cov_df: &Vec<ProcessedCoverage>,
