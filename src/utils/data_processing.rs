@@ -10,9 +10,7 @@ use std::{
 use crate::processes::prepare_mira_reports::SamplesheetI;
 use crate::processes::prepare_mira_reports::SamplesheetO;
 
-use super::data_ingest::{
-    AllelesData, CoverageData, DaisSeqData, IndelsData, ProcessedRecord, ReadsData,
-};
+use super::data_ingest::{AllelesData, CoverageData, DaisSeqData, IndelsData, ReadsData};
 
 /// Dais Variants Struct
 #[derive(Serialize, Deserialize, Debug)]
@@ -160,20 +158,14 @@ where
 
 //Function to filter struct by sample id
 //If using this with a Vec of structs then you need to add impl to HasSampleID trait above if not done already
-pub fn filter_struct_by_ids<T>(samples: &Vec<T>, ids: Vec<String>) -> Vec<T>
+pub fn filter_struct_by_ids<T>(samples: &[T], ids: Vec<String>) -> Vec<T>
 where
     T: Serialize + Clone,
     T: HasSampleId,
 {
     samples
         .iter()
-        .filter(|sample| {
-            if let sample_id = sample.sample_id() {
-                ids.contains(sample_id)
-            } else {
-                false
-            }
-        })
+        .filter(|sample| ids.contains(sample.sample_id()))
         .cloned()
         .collect()
 }
@@ -204,7 +196,7 @@ pub fn append_with_comma(base: &mut String, new_entry: &str) {
     }
 }
 
-pub fn collect_sample_id<T>(samples: &Vec<T>) -> Vec<String>
+pub fn collect_sample_id<T>(samples: &[T]) -> Vec<String>
 where
     T: Serialize + Clone,
     T: HasSampleId, // Custom trait to ensure T has a sample_id field
@@ -219,7 +211,7 @@ where
     sample_list
 }
 
-pub fn collect_negatives<T>(samples: &Vec<T>) -> Vec<String>
+pub fn collect_negatives<T>(samples: &[T]) -> Vec<String>
 where
     T: Serialize + Clone,
     T: HasSampleType + HasSampleId, // Custom trait to ensure T has a `sample_type` and sample_id field
@@ -284,8 +276,8 @@ pub fn return_seg_data(
 //////////////// Functions used to process the variants found in dais outputs ///////////////
 // Function to calculate the aa variants - this is specifically for flu right now
 pub fn compute_dais_variants(
-    ref_seqs_data: &Vec<DaisSeqData>,
-    sample_seqs_data: &Vec<DaisSeqData>,
+    ref_seqs_data: &[DaisSeqData],
+    sample_seqs_data: &[DaisSeqData],
 ) -> Result<Vec<DaisVarsData>, Box<dyn Error>> {
     let mut dais_vars_data: Vec<DaisVarsData> = Vec::new();
 
@@ -348,8 +340,8 @@ pub fn compute_dais_variants(
 
 /// Compute CVV DAIS Variants
 pub fn compute_cvv_dais_variants(
-    ref_seqs_data: &Vec<DaisSeqData>,
-    sample_seqs_data: &Vec<DaisSeqData>,
+    ref_seqs_data: &[DaisSeqData],
+    sample_seqs_data: &[DaisSeqData],
 ) -> Result<Vec<DaisVarsData>, Box<dyn Error>> {
     let mut merged_data = merge_sequences(ref_seqs_data, sample_seqs_data)?;
 
@@ -397,8 +389,8 @@ pub fn compute_cvv_dais_variants(
 
 /// Merge sequences based on Coordspace and Protein - used by compute_cvv_dais_variants fn
 fn merge_sequences(
-    ref_seqs_data: &Vec<DaisSeqData>,
-    sample_seqs_data: &Vec<DaisSeqData>,
+    ref_seqs_data: &[DaisSeqData],
+    sample_seqs_data: &[DaisSeqData],
 ) -> Result<Vec<DaisSeqData>, Box<dyn Error>> {
     let mut merged_data = Vec::new();
 
@@ -453,7 +445,7 @@ fn compute_aa_variants(aligned_aa_sequence: &str, ref_aa_sequence: &str) -> Stri
 }
 
 /// Get subtypes for flu
-pub fn extract_subtype_flu(dais_vars: &Vec<DaisVarsData>) -> Result<Vec<Subtype>, Box<dyn Error>> {
+pub fn extract_subtype_flu(dais_vars: &[DaisVarsData]) -> Result<Vec<Subtype>, Box<dyn Error>> {
     let mut subtype_data: Vec<Subtype> = Vec::new();
     let mut sample_ha_map: HashMap<String, String> = HashMap::new();
     let mut sample_na_map: HashMap<String, String> = HashMap::new();
@@ -536,7 +528,7 @@ pub fn extract_subtype_flu(dais_vars: &Vec<DaisVarsData>) -> Result<Vec<Subtype>
     Ok(subtype_data)
 }
 
-pub fn extract_subtype_sc2(dais_vars: &Vec<DaisVarsData>) -> Result<Vec<Subtype>, Box<dyn Error>> {
+pub fn extract_subtype_sc2(dais_vars: &[DaisVarsData]) -> Result<Vec<Subtype>, Box<dyn Error>> {
     let mut subtype_data: Vec<Subtype> = Vec::new();
 
     for entry in dais_vars {
@@ -551,7 +543,7 @@ pub fn extract_subtype_sc2(dais_vars: &Vec<DaisVarsData>) -> Result<Vec<Subtype>
 
 //////////////// Functions used to create irma_summary ///////////////
 /// Flip orientation of the reads structs
-pub fn melt_reads_data(records: &Vec<ReadsData>) -> Vec<MeltedRecord> {
+pub fn melt_reads_data(records: &[ReadsData]) -> Vec<MeltedRecord> {
     let mut result = Vec::new();
     let mut sample_data: HashMap<String, (i32, i32)> = HashMap::new();
 
@@ -606,7 +598,7 @@ fn calculate_median(values: &[i32]) -> f64 {
 
 /// Coverage dataframe calculations
 pub fn process_wgs_coverage_data(
-    coverage_df: &Vec<CoverageData>,
+    coverage_df: &[CoverageData],
     ref_lens: &HashMap<String, usize>,
 ) -> Vec<ProcessedCoverage> {
     // Filter out invalid consensus values
@@ -677,7 +669,7 @@ pub fn process_wgs_coverage_data(
 }
 
 pub fn process_position_coverage_data(
-    coverage_df: &Vec<CoverageData>,
+    coverage_df: &[CoverageData],
     ref_lens: &HashMap<String, usize>,
     position_1: i32,
     position_2: i32,
@@ -755,7 +747,7 @@ pub fn process_position_coverage_data(
 }
 
 /// Count minority alleles for each unique sample_id and reference - used in IRMA summary below
-pub fn count_minority_alleles(data: &Vec<AllelesData>) -> Vec<VariantCountData> {
+pub fn count_minority_alleles(data: &[AllelesData]) -> Vec<VariantCountData> {
     let mut counts: HashMap<(Option<String>, String), i32> = HashMap::new();
 
     for entry in data {
@@ -776,7 +768,7 @@ pub fn count_minority_alleles(data: &Vec<AllelesData>) -> Vec<VariantCountData> 
 }
 
 /// Count minority alleles for each unique sample_id and reference - used in IRMA summary below
-pub fn count_minority_indels(data: &Vec<IndelsData>) -> Vec<VariantCountData> {
+pub fn count_minority_indels(data: &[IndelsData]) -> Vec<VariantCountData> {
     let mut counts: HashMap<(Option<String>, String), i32> = HashMap::new();
 
     for entry in data {
@@ -840,12 +832,12 @@ pub fn collect_analysis_metadata(
 
 /// Combine all df to create IRMA summary
 pub fn create_prelim_irma_summary_df(
-    sample_list: &Vec<String>,
-    reads_count_df: &Vec<MeltedRecord>,
-    calc_cov_df: &Vec<ProcessedCoverage>,
-    alleles_df: &Vec<AllelesData>,
-    indels_df: &Vec<IndelsData>,
-    subtype_df: &Vec<Subtype>,
+    sample_list: &[String],
+    reads_count_df: &[MeltedRecord],
+    calc_cov_df: &[ProcessedCoverage],
+    alleles_df: &[AllelesData],
+    indels_df: &[IndelsData],
+    subtype_df: &[Subtype],
     metadata: Metadata,
 ) -> Result<Vec<IRMASummary>, Box<dyn Error>> {
     let mut irma_summary: Vec<IRMASummary> = Vec::new();
