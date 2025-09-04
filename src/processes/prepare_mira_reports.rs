@@ -121,7 +121,7 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
         let illumina_samplesheet: Vec<SamplesheetI> = read_csv(samplesheet_path, true)?;
         Samplesheet::Illumina(illumina_samplesheet)
     } else {
-        let ont_samplesheet: Vec<SamplesheetO> = read_csv(samplesheet_path, false)?;
+        let ont_samplesheet: Vec<SamplesheetO> = read_csv(samplesheet_path, true)?;
         Samplesheet::ONT(ont_samplesheet)
     };
 
@@ -130,7 +130,7 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
         Samplesheet::Illumina(ref sheet) => collect_sample_id(sheet),
         Samplesheet::ONT(ref sheet) => collect_sample_id(sheet),
     };
-    //println!("negs: {sample_list:?}");
+    println!("samples: {sample_list:?}");
     // Get the negative controls from the samplesheet
     let neg_control_list = match samplesheet {
         Samplesheet::Illumina(ref sheet) => collect_negatives(sheet),
@@ -172,7 +172,7 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
         dais_ref_data = dais_ref_seq_data_collection(&args.workdir_path, "sc2")?;
     }
     //TODO: remove print statements at end
-    println!("{vtype_data:?}");
+    //println!("{vtype_data:?}");
     //println!("{qc_config:?}")
     //println!("cov data: {coverage_data:?}");
     //println!("Allele data: {allele_data:?}");
@@ -243,6 +243,7 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     //println!("{calculated_cov_df:?}");
     //println!("{calculated_position_cov_df:?}");
     //println!("{irma_summary:?}");
+    //println!("{subtype_data:?}");
 
     /////////////////////////////////////////////////////////////////////////////
     /////////////// Write the structs to JSON files and CSV files ///////////////

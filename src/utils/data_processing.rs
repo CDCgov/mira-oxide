@@ -201,7 +201,8 @@ where
     let mut sample_list = Vec::new();
 
     // Skip the first element (header) and iterate over the rest
-    for entry in samples.iter().skip(1) {
+    for entry in samples.iter() {
+        println!("{}", entry.sample_id());
         sample_list.push(entry.sample_id().clone());
     }
 
