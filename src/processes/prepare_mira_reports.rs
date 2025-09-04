@@ -44,9 +44,9 @@ pub struct ReportsArgs {
     /// The file path to the working directory
     workdir_path: PathBuf,
 
-    #[arg(short = 'c', long, default_value = "default config")]
+    #[arg(short = 'c', long, default_value = "default-config")]
     /// the irma config used for IRMA
-    irma_config: Option<String>,
+    irma_config: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -59,8 +59,11 @@ pub struct SamplesheetI {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct SamplesheetO {
+    #[serde(rename = "Barcode #")]
     pub barcode: String,
+    #[serde(rename = "Sample ID")]
     pub sample_id: String,
+    #[serde(rename = "Sample Type")]
     pub sample_type: Option<String>,
 }
 
@@ -130,7 +133,8 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
         Samplesheet::Illumina(ref sheet) => collect_sample_id(sheet),
         Samplesheet::ONT(ref sheet) => collect_sample_id(sheet),
     };
-    println!("samples: {sample_list:?}");
+
+    //println!("samples: {sample_list:?}");
     // Get the negative controls from the samplesheet
     let neg_control_list = match samplesheet {
         Samplesheet::Illumina(ref sheet) => collect_negatives(sheet),
@@ -148,6 +152,7 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     let vtype_data = create_vtype_data(&read_data);
     let allele_data = allele_data_collection(&args.irma_path)?;
     let indel_data = indels_data_collection(&args.irma_path)?;
+
     let seq_data = amended_consensus_data_collection(&args.irma_path, &args.virus);
     let ref_lengths = match get_reference_lens(&args.irma_path) {
         Ok(data) => data,
@@ -226,6 +231,16 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     } else if args.virus.to_lowercase() == "sc2-wgs" || args.virus.to_lowercase() == "sc2-spike" {
         subtype_data = extract_subtype_sc2(&dais_vars_data)?;
     }
+
+    //Gather Anlysis Metadata for irma_summary
+    let analysis_metadata = collect_analysis_metadata(
+        &args.workdir_path,
+        &args.platform,
+        &args.virus,
+        &args.irma_config,
+        &args.runid,
+    )?;
+
     //Build prelim irma summary "dataframe"
     //More will be added and analyzed before final irma summary created
     let irma_summary = create_prelim_irma_summary_df(
@@ -235,6 +250,7 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
         &allele_data,
         &indel_data,
         &subtype_data,
+        analysis_metadata,
     )?;
 
     //todo:remove before end

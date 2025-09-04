@@ -2,6 +2,9 @@ use serde::{self, Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
     error::Error,
+    fs::File,
+    io::{self, BufRead},
+    path::PathBuf,
 };
 
 use crate::processes::prepare_mira_reports::SamplesheetI;
@@ -26,6 +29,14 @@ pub struct DaisVarsData {
 pub struct Subtype {
     pub sample_id: Option<String>,
     pub subtype: String,
+}
+
+/// Analysis Metadata
+#[derive(Debug)]
+pub struct Metadata {
+    pub module: String,
+    pub runid: String,
+    pub instrument: String,
 }
 
 //Melted Reads df
@@ -202,7 +213,6 @@ where
 
     // Skip the first element (header) and iterate over the rest
     for entry in samples.iter() {
-        println!("{}", entry.sample_id());
         sample_list.push(entry.sample_id().clone());
     }
 
@@ -530,7 +540,6 @@ pub fn extract_subtype_sc2(dais_vars: &Vec<DaisVarsData>) -> Result<Vec<Subtype>
     let mut subtype_data: Vec<Subtype> = Vec::new();
 
     for entry in dais_vars {
-        println!("{}", entry.reference_id);
         subtype_data.push(Subtype {
             sample_id: entry.sample_id.clone(),
             subtype: entry.reference_id.clone(),
@@ -790,6 +799,45 @@ pub fn count_minority_indels(data: &Vec<IndelsData>) -> Vec<VariantCountData> {
     result
 }
 
+pub fn collect_analysis_metadata(
+    work_path: &PathBuf,
+    platform: &str,
+    virus: &str,
+    irma_config: &String,
+    input_runid: &str,
+) -> Result<Metadata, Box<dyn Error>> {
+    let mut descript_dict = HashMap::new();
+    let description_path = format!("{}/DESCRIPTION", work_path.display());
+
+    // Open the file for reading
+    let file = File::open(&description_path)?;
+    let reader = io::BufReader::new(file);
+
+    // Read the file line by line
+    for line in reader.lines() {
+        if let Ok(line) = line {
+            let parts: Vec<&str> = line.split(':').collect();
+            if parts.len() == 2 {
+                descript_dict.insert(parts[0].trim().to_string(), parts[1].trim().to_string());
+            }
+        }
+    }
+
+    // Construct the modulestring
+    let version = descript_dict
+        .get("Version")
+        .ok_or("Version key not found in DESCRIPTION file")?;
+
+    let modulestring = format!("MIRA-NF-v{version} {platform}-{virus} {irma_config}");
+
+    let analysis_metadata = Metadata {
+        module: modulestring,
+        runid: input_runid.to_owned(),
+        instrument: platform.to_owned(),
+    };
+    Ok(analysis_metadata)
+}
+
 /// Combine all df to create IRMA summary
 pub fn create_prelim_irma_summary_df(
     sample_list: &Vec<String>,
@@ -798,6 +846,7 @@ pub fn create_prelim_irma_summary_df(
     alleles_df: &Vec<AllelesData>,
     indels_df: &Vec<IndelsData>,
     subtype_df: &Vec<Subtype>,
+    metadata: Metadata,
 ) -> Result<Vec<IRMASummary>, Box<dyn Error>> {
     let mut irma_summary: Vec<IRMASummary> = Vec::new();
     let allele_count_data = count_minority_alleles(alleles_df);
@@ -823,9 +872,9 @@ pub fn create_prelim_irma_summary_df(
                     spike_median_coverage: None,
                     pass_fail_reason: None,
                     subtype: None,
-                    mira_module: None,
-                    runid: None,
-                    instrument: None,
+                    mira_module: Some(metadata.module.to_owned()),
+                    runid: Some(metadata.runid.to_owned()),
+                    instrument: Some(metadata.instrument.to_owned()),
                 });
             }
         }
