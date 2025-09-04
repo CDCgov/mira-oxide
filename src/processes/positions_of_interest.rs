@@ -139,10 +139,9 @@ impl Entry<'_> {
             {
                 // Use match for cleaner handling of `hold_aa_mut` cases
                 self.phenotypic_consequences = match hold_aa_mut.as_str() {
-                    "." => "amino acid information missing".to_string(),
                     "~" => "partial amino acid".to_string(),
                     "-" => "amino acid covered".to_string(),
-                    "X" => "amino acid information missing".to_string(),
+                    "." | "X" => "amino acid information missing".to_string(),
                     aa if aa == muts_entry.aa => muts_entry.description.clone(),
                     _ => String::new(),
                 };
@@ -318,8 +317,8 @@ pub fn positions_of_interest_process(args: PositionsArgs) -> Result<(), Box<dyn 
                         .expect("Invalid UTF-8 sequence")
                         .to_string();
                     entry.aa_position = tail_index + 1;
-                    entry.aa_ref = '~' as char;
-                    entry.aa_mut = '~' as char;
+                    entry.aa_ref = '~';
+                    entry.aa_mut = '~';
 
                     if entry.update_entry_from_alignment(
                         &ref_entry.subtype,

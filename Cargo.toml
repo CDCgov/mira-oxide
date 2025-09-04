@@ -23,3 +23,6 @@ zoe = { version = "0.0.19", default-features = false, features = [
 
 [profile.release]
 strip = true
+
+[lints.clippy]
+pedantic = "warn"

@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 // Add this function to generate consistent colors for segment names
 fn get_segment_color(segment_name: &str) -> &'static str {
@@ -35,7 +35,7 @@ fn get_segment_color(segment_name: &str) -> &'static str {
         // For any other segments, use a hash of the segment name to pick a color
         let hash = segment_name
             .bytes()
-            .fold(0u32, |acc, b| acc.wrapping_add(b as u32));
+            .fold(0u32, |acc, b| acc.wrapping_add(u32::from(b)));
         match hash % 10 {
             0 => "#3366CC", // blue
             1 => "#DC3912", // red
@@ -105,7 +105,7 @@ pub struct PlotterArgs {
     output: Option<PathBuf>,
 }
 
-fn generate_plot_coverage(input_directory: &PathBuf) -> Result<Plot, Box<dyn Error>> {
+fn generate_plot_coverage(input_directory: &Path) -> Result<Plot, Box<dyn Error>> {
     // Create a Plotly plot
     let mut plot = Plot::new();
 
@@ -193,7 +193,7 @@ fn generate_plot_coverage(input_directory: &PathBuf) -> Result<Plot, Box<dyn Err
     Ok(plot)
 }
 
-fn generate_plot_coverage_seg(input_directory: &PathBuf) -> Result<Plot, Box<dyn Error>> {
+fn generate_plot_coverage_seg(input_directory: &Path) -> Result<Plot, Box<dyn Error>> {
     // Init a Plotly plot
     let mut plot = Plot::new();
 
@@ -470,7 +470,7 @@ fn generate_plot_coverage_seg(input_directory: &PathBuf) -> Result<Plot, Box<dyn
 }
 
 // TO DO: fix colors for Sankey diagram
-fn generate_sankey_plot(input_directory: &PathBuf) -> Result<Plot, Box<dyn Error>> {
+fn generate_sankey_plot(input_directory: &Path) -> Result<Plot, Box<dyn Error>> {
     // Path to READ_COUNTS.txt
     let read_counts_path = input_directory.join("tables").join("READ_COUNTS.txt");
 
@@ -658,7 +658,10 @@ fn generate_sankey_plot(input_directory: &PathBuf) -> Result<Plot, Box<dyn Error
     let mut plot = Plot::new();
 
     // Create Sankey trace
-    let node_labels_refs: Vec<&str> = node_labels.iter().map(|s| s.as_str()).collect();
+    let node_labels_refs: Vec<&str> = node_labels
+        .iter()
+        .map(std::string::String::as_str)
+        .collect();
 
     // Explicitly define x and y positions for each node
     let n = node_labels.len();
@@ -696,7 +699,7 @@ fn generate_sankey_plot(input_directory: &PathBuf) -> Result<Plot, Box<dyn Error
             _ => {
                 // Segment nodes: stack vertically in last column
                 x[i] = 0.7;
-                y[i] = 0.1 + 0.8 * (seg_idx as f64) / ((n - 5).max(1) as f64);
+                y[i] = 0.1 + 0.8 * f64::from(seg_idx) / ((n - 5).max(1) as f64);
                 seg_idx += 1;
             }
         }

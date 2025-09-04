@@ -31,7 +31,7 @@ struct ValidSeq {
     sequence: Nucleotides,
 }
 
-pub fn all_sample_nt_diffs_process(args: NTDiffsArgs) {
+pub fn all_sample_nt_diffs_process(args: &NTDiffsArgs) {
     //let args = NTDiffsArgs::parse();
     let delim = args.output_delimiter.unwrap_or(',');
 
@@ -80,10 +80,10 @@ pub fn all_sample_nt_diffs_process(args: NTDiffsArgs) {
     )
     .unwrap();
 
-    all_sequences.iter().for_each(|f| {
+    for f in &all_sequences {
         let name_1 = &f.name;
         let seq1 = &f.sequence;
-        all_sequences.iter().for_each(|f| {
+        for f in &all_sequences {
             let name_2 = &f.name;
             let seq2 = &f.sequence;
             for (i, (nt1, nt2)) in seq1.iter().zip(seq2.iter()).enumerate() {
@@ -97,6 +97,6 @@ pub fn all_sample_nt_diffs_process(args: NTDiffsArgs) {
                     .unwrap();
                 }
             }
-        });
-    });
+        }
+    }
 }

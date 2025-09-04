@@ -46,26 +46,13 @@ impl FindChemArgs {
     /// Flu experiment.
     fn validate(&self) -> Result<(), String> {
         match self.irma_config {
-            IRMAConfig::Sensitive
+            IRMAConfig::Sensitive | IRMAConfig::Secondary | IRMAConfig::UTR
                 if self.experiment == Experiment::FluIllumina
                     || self.experiment == Experiment::FluONT =>
             {
                 Ok(())
             }
-            IRMAConfig::Secondary
-                if self.experiment == Experiment::FluIllumina
-                    || self.experiment == Experiment::FluONT =>
-            {
-                Ok(())
-            }
-            IRMAConfig::UTR
-                if self.experiment == Experiment::FluIllumina
-                    || self.experiment == Experiment::FluONT =>
-            {
-                Ok(())
-            }
-            IRMAConfig::Custom => Ok(()),
-            IRMAConfig::NoConfig => Ok(()),
+            IRMAConfig::Custom | IRMAConfig::NoConfig => Ok(()),
             _ => Err(format!(
                 "Invalid combination: {:?} cannot be used with {:?}",
                 self.experiment, self.irma_config
@@ -128,15 +115,13 @@ impl ValueEnum for Experiment {
 
 impl Experiment {
     /// Selects the appropriate IRMA Module from the user provided experiment type
-    fn get_module(&self) -> IrmaModule {
+    fn get_module(self) -> IrmaModule {
         match self {
             Self::FluIllumina => IrmaModule::FLU,
-            Self::RSVIllumina => IrmaModule::RSV,
-            Self::SC2WholeGenomeIllumina => IrmaModule::CoV,
+            Self::RSVIllumina | Self::RSVONT => IrmaModule::RSV,
+            Self::SC2WholeGenomeIllumina | Self::SC2WholeGenomeONT => IrmaModule::CoV,
             Self::FluONT => IrmaModule::FLUMinion,
             Self::SC2SpikeOnlyONT => IrmaModule::CoVsGene,
-            Self::SC2WholeGenomeONT => IrmaModule::CoV,
-            Self::RSVONT => IrmaModule::RSV,
         }
     }
 }
@@ -188,7 +173,7 @@ fn get_config_path(args: &FindChemArgs, seq_len: Option<usize>) -> String {
     }
 
     let path_extension = match (args.experiment, seq_len, args.irma_config) {
-        (_, None, _) => return "".to_string(),
+        (_, None, _) => return String::new(),
         (_, _, IRMAConfig::Sensitive) => "/bin/irma_config/FLU-sensitive.sh",
         (_, _, IRMAConfig::Secondary) => "/bin/irma_config/FLU-secondary.sh",
         (_, _, IRMAConfig::UTR) => "/bin/irma_config/FLU-utr.sh",
@@ -309,7 +294,7 @@ fn parse_chemistry_args(args: &FindChemArgs) -> Result<ChemistryOutput, std::io:
     Ok(out)
 }
 
-pub fn find_chemistry_process(args: FindChemArgs) -> Result<(), std::io::Error> {
+pub fn find_chemistry_process(args: &FindChemArgs) -> Result<(), std::io::Error> {
     //let args = CheckChemArgs::parse();
     // handle input validation to ensure valid combinations of
     if let Err(e) = args.validate() {
@@ -317,7 +302,7 @@ pub fn find_chemistry_process(args: FindChemArgs) -> Result<(), std::io::Error> 
         std::process::exit(1);
     }
     // parse the arguments into output format
-    let output = parse_chemistry_args(&args)?;
+    let output = parse_chemistry_args(args)?;
     let filename = format!("{}_chemistry.csv", args.sample);
     let headers = "sample_ID,irma_custom,subsample,irma_module";
 

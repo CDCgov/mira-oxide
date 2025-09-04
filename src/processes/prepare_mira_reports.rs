@@ -1,5 +1,23 @@
 #![allow(dead_code, unused_imports)]
-use crate::utils::{data_ingest::*, data_processing::*, writing_outputs::*};
+use crate::utils::{
+    data_ingest::{
+        DaisSeqData, allele_data_collection, amended_consensus_data_collection,
+        coverage_data_collection, create_reader, create_vtype_data, dais_insertion_data_collection,
+        dais_ref_seq_data_collection, dias_deletion_data_collection, dias_sequence_data_collection,
+        get_reference_lens, indels_data_collection, read_csv, reads_data_collection,
+    },
+    data_processing::{
+        DaisVarsData, HasSampleId, HasSampleType, ProcessedCoverage, Subtype,
+        collect_analysis_metadata, collect_negatives, collect_sample_id, compute_cvv_dais_variants,
+        compute_dais_variants, create_prelim_irma_summary_df, extract_field, extract_subtype_flu,
+        extract_subtype_sc2, melt_reads_data, process_position_coverage_data,
+        process_wgs_coverage_data, return_seg_data,
+    },
+    writing_outputs::{
+        negative_qc_statement, write_reads_to_parquet, write_ref_data_json,
+        write_structs_to_csv_file, write_structs_to_split_json_file,
+    },
+};
 use clap::Parser;
 use csv::ReaderBuilder;
 use either::Either;

@@ -24,9 +24,9 @@ pub struct ReadQC {
 /// Function to serialize a vector of structs into split-oriented JSON with precision and indexing
 pub fn write_structs_to_split_json_file<T: Serialize>(
     file_path: &str,
-    data: &Vec<T>,
-    columns: &Vec<&str>,
-    struct_values: &Vec<&str>,
+    data: &[T],
+    columns: &[&str],
+    struct_values: &[&str],
 ) -> Result<(), Box<dyn Error>> {
     // Create the "split-oriented" JSON structure
     let split_json = json!({
@@ -58,9 +58,9 @@ pub fn write_structs_to_split_json_file<T: Serialize>(
 /// Write to CSV
 pub fn write_structs_to_csv_file<T: Serialize>(
     file_path: &str,
-    data: &Vec<T>,
-    columns: &Vec<&str>,
-    struct_values: &Vec<&str>,
+    data: &[T],
+    columns: &[&str],
+    struct_values: &[&str],
 ) -> Result<(), Box<dyn Error>> {
     let mut csv_writer = Writer::from_path(file_path)?;
 
@@ -94,8 +94,8 @@ pub fn write_structs_to_csv_file<T: Serialize>(
 pub fn write_ref_data_json(
     file_path: &str,
     ref_lens: &HashMap<String, usize>,
-    segments: &Vec<String>,
-    segset: &Vec<String>,
+    segments: &[String],
+    segset: &[String],
     segcolor: &HashMap<String, &str>,
 ) -> Result<(), Box<dyn Error>> {
     let json_data = json!({
@@ -117,22 +117,22 @@ pub fn write_ref_data_json(
 
 /// Write the reads data to parquet file.
 pub fn write_reads_to_parquet(
-    reads_data: &Vec<ReadsData>,
+    reads_data: &[ReadsData],
     output_file: &str,
 ) -> Result<(), Box<dyn Error>> {
     // Convert values in struct to vector of values
     let sample_ids_vec: Vec<Option<String>> =
-        extract_field(reads_data.clone(), |item| item.sample_id.clone());
-    let record_vec = extract_field(reads_data.clone(), |item| item.record.clone());
-    let reads_vec = extract_field(reads_data.clone(), |item| item.reads);
-    let patterns_vec = extract_string_fields_as_float(reads_data.clone(), |item| &item.patterns);
+        extract_field(reads_data.to_owned(), |item| item.sample_id.clone());
+    let record_vec = extract_field(reads_data.to_owned(), |item| item.record.clone());
+    let reads_vec = extract_field(reads_data.to_owned(), |item| item.reads);
+    let patterns_vec = extract_string_fields_as_float(reads_data.to_owned(), |item| &item.patterns);
     let pairs_and_windows_vec =
-        extract_string_fields_as_float(reads_data.clone(), |item| &item.pairs_and_windows);
-    let stages_vec = extract_string_fields_as_int(reads_data.clone(), |item| {
+        extract_string_fields_as_float(reads_data.to_owned(), |item| &item.pairs_and_windows);
+    let stages_vec = extract_string_fields_as_int(reads_data.to_owned(), |item| {
         item.stage.as_deref().unwrap_or("")
     });
-    let runid_vec = extract_field(reads_data.clone(), |item| item.run_id.clone());
-    let instrument_vec = extract_field(reads_data.clone(), |item| item.instrument.clone());
+    let runid_vec = extract_field(reads_data.to_owned(), |item| item.run_id.clone());
+    let instrument_vec = extract_field(reads_data.to_owned(), |item| item.instrument.clone());
 
     // Convert the vectors into Arrow columns
     let sample_array: ArrayRef = Arc::new(StringArray::from(sample_ids_vec));
@@ -183,8 +183,8 @@ pub fn write_reads_to_parquet(
 
 pub fn negative_qc_statement(
     output_file: &str,
-    reads_data: &Vec<ReadsData>,
-    neg_control_list: &Vec<String>,
+    reads_data: &[ReadsData],
+    neg_control_list: &[String],
 ) -> Result<(), Box<dyn Error>> {
     let filtered_reads_data = filter_struct_by_ids(reads_data, neg_control_list.to_vec());
 
@@ -207,7 +207,7 @@ pub fn negative_qc_statement(
 
                 if total_reads_stage_3 > 0 {
                     let percent_mapping =
-                        (total_reads_stage_3 as f64 / reads_stage_1 as f64 * 100.0).round();
+                        (f64::from(total_reads_stage_3) / f64::from(reads_stage_1) * 100.0).round();
 
                     results.push(ReadQC {
                         sample_id: sample_id.clone(),
