@@ -132,6 +132,8 @@ fn read_yaml<R: std::io::Read>(reader: R) -> Result<QCConfig, Box<dyn std::error
     Ok(config)
 }
 
+//todo: split ingest, proccessing and writing out
+#[allow(clippy::too_many_lines)]
 pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Error>> {
     ///////////////////////////////////////////////////////////////////////////
     /////////////// Read in and process data from IRMA and Dais ///////////////
@@ -152,13 +154,11 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
         Samplesheet::ONT(ref sheet) => collect_sample_id(sheet),
     };
 
-    //println!("samples: {sample_list:?}");
     // Get the negative controls from the samplesheet
     let neg_control_list = match samplesheet {
         Samplesheet::Illumina(ref sheet) => collect_negatives(sheet),
         Samplesheet::ONT(ref sheet) => collect_negatives(sheet),
     };
-    //println!("negs: {neg_control_list:?}");
 
     // Read in qc yaml
     let qc_yaml_path = create_reader(args.qc_yaml)?;
@@ -272,6 +272,41 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
         analysis_metadata,
     )?;
 
+    //todo: see how this works with the padded amended consensus
+    let mut qc_values = QCSettings {
+        med_cov: 0,
+        minor_vars: 0,
+        allow_stop_codons: false,
+        perc_ref_covered: 0,
+        negative_control_perc: 0,
+        negative_control_perc_exception: 0,
+        positive_control_minimum: 0,
+        padded_consensus: false,
+        med_spike_cov: None,
+        perc_ref_spike_covered: None,
+    };
+    if args.virus.to_lowercase() == "flu" {
+        if args.platform.to_lowercase() == "illumina" {
+            qc_values = qc_config.illumina_flu;
+        } else {
+            qc_values = qc_config.ont_flu;
+        }
+    } else if args.virus.to_lowercase() == "sc2-wgs" {
+        if args.platform.to_lowercase() == "illumina" {
+            qc_values = qc_config.illumina_sc2;
+        } else {
+            qc_values = qc_config.ont_sc2;
+        }
+    } else if args.virus.to_lowercase() == "sc2-spike" {
+        qc_values = qc_config.ont_sc2_spike;
+    } else if args.virus.to_lowercase() == "rsv" {
+        if args.platform.to_lowercase() == "illumina" {
+            qc_values = qc_config.illumina_rsv;
+        } else {
+            qc_values = qc_config.ont_rsv;
+        }
+    }
+    println!("{qc_values:?}");
     //todo:remove before end
     //println!("{dais_vars_data:?}");
     //println!("{melted_reads_df:?}");
