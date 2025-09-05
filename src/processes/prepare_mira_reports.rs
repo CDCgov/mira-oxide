@@ -242,7 +242,7 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     }
 
     //Gather subtype information
-    //todo: add rsv handling
+    //todo: add rsv handling - fix sc2-spike handling
     let mut subtype_data: Vec<Subtype> = Vec::new();
     if args.virus.to_lowercase() == "flu" {
         subtype_data = extract_subtype_flu(&dais_vars_data)?;
@@ -261,6 +261,7 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
 
     //Build prelim irma summary "dataframe"
     //More will be added and analyzed before final irma summary created
+    //todo: fix the fix sc2-wgs spike protein coverage handling in summary
     let irma_summary = create_prelim_irma_summary_df(
         &sample_list,
         &melted_reads_df,

@@ -131,7 +131,7 @@ impl Entry<'_> {
         self.aa_ref = aa_1 as char;
         let hold_aa_mut = self.aa_mut.to_string();
 
-        for muts_entry in muts_columns.iter() {
+        for muts_entry in muts_columns {
             // Check if the mutation matches the entry
             if subtype == muts_entry.subtype
                 && self.protein == muts_entry.protein
@@ -154,7 +154,7 @@ impl Entry<'_> {
     }
 }
 
-fn create_reader(path: Option<PathBuf>) -> std::io::Result<BufReader<Either<File, Stdin>>> {
+fn create_reader(path: Option<&PathBuf>) -> std::io::Result<BufReader<Either<File, Stdin>>> {
     let reader = if let Some(ref file_path) = path {
         let file = OpenOptions::new().read(true).open(file_path)?;
         BufReader::new(Either::Left(file))
@@ -205,13 +205,13 @@ pub fn align_sequences<'a>(query: &'a [u8], reference: &'a [u8]) -> (Vec<u8>, Ve
 pub fn positions_of_interest_process(args: PositionsArgs) -> Result<(), Box<dyn Error>> {
     let delim = args.output_delimiter;
 
-    let muts_reader = create_reader(Some(args.muts_file))?;
+    let muts_reader = create_reader(Some(&args.muts_file))?;
     let muts_interest: Vec<MutsOfInterestInput> = read_tsv(muts_reader, false)?;
 
-    let dais_reader = create_reader(Some(args.input_file))?;
+    let dais_reader = create_reader(Some(&args.input_file))?;
     let dais: Vec<DaisInput> = read_tsv(dais_reader, false)?;
 
-    let ref_reader = create_reader(Some(args.ref_file))?;
+    let ref_reader = create_reader(Some(&args.ref_file))?;
     let refs: Vec<RefInput> = read_tsv(ref_reader, true)?;
 
     let mut writer = if let Some(ref file_path) = args.output_xsv {
