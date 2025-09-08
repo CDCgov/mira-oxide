@@ -11,6 +11,42 @@ use std::{
 };
 
 /////////////// Structs to hold IRMA data ///////////////
+///
+///QC structs
+#[derive(Debug, Deserialize)]
+pub struct QCSettings {
+    pub med_cov: u32,
+    pub minor_vars: u32,
+    pub allow_stop_codons: bool,
+    pub perc_ref_covered: u32,
+    pub negative_control_perc: u32,
+    pub negative_control_perc_exception: u32,
+    pub positive_control_minimum: u32,
+    pub padded_consensus: bool,
+    #[serde(default)]
+    pub med_spike_cov: Option<u32>,
+    #[serde(default)]
+    pub perc_ref_spike_covered: Option<u32>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct QCConfig {
+    #[serde(rename = "ont-flu")]
+    pub ont_flu: QCSettings,
+    #[serde(rename = "ont-sc2-spike")]
+    pub ont_sc2_spike: QCSettings,
+    #[serde(rename = "illumina-flu")]
+    pub illumina_flu: QCSettings,
+    #[serde(rename = "illumina-sc2")]
+    pub illumina_sc2: QCSettings,
+    #[serde(rename = "ont-sc2")]
+    pub ont_sc2: QCSettings,
+    #[serde(rename = "illumina-rsv")]
+    pub illumina_rsv: QCSettings,
+    #[serde(rename = "ont-rsv")]
+    pub ont_rsv: QCSettings,
+}
+
 /// Coverage struct
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct CoverageData {
@@ -59,15 +95,6 @@ pub struct ReadsData {
     pub instrument: Option<String>,
     #[serde(rename = "Percent Mapping")]
     pub percent_mapping: Option<f32>,
-}
-
-/// vtype struct
-#[derive(Serialize, Debug, Clone)]
-pub struct ProcessedRecord {
-    pub sample_id: Option<String>,
-    pub vtype: String,
-    pub ref_type: String,
-    pub subtype: String,
 }
 
 /// Alleles struct
@@ -298,6 +325,15 @@ pub fn read_csv<T: DeserializeOwned, R: std::io::Read>(
     Ok(records)
 }
 
+/// Reads in yaml file - currently only used for qc yaml
+pub fn read_yaml<R: std::io::Read>(reader: R) -> Result<QCConfig, Box<dyn std::error::Error>> {
+    let mut contents = String::new();
+    let mut buf_reader = BufReader::new(reader);
+    buf_reader.read_to_string(&mut contents)?;
+    let config: QCConfig = serde_yaml_ng::from_str(&contents)?;
+    Ok(config)
+}
+
 /// Extract the sample name from the file path
 fn extract_sample_name(path: &Path) -> Result<String, Box<dyn Error>> {
     let parent_dir = path.parent().and_then(|p| p.parent());
@@ -317,7 +353,7 @@ fn extract_sample_name(path: &Path) -> Result<String, Box<dyn Error>> {
 fn process_txt_with_sample<R, T>(
     reader: R,
     has_headers: bool,
-    sample_id: String,
+    sample_id: &String,
 ) -> Result<Vec<T>, Box<dyn std::error::Error>>
 where
     R: Read,
@@ -338,7 +374,7 @@ where
     Ok(records)
 }
 
-/// Read in the coverage files made by IRMA and save to a vector of CoverageData
+/// Read in the coverage files made by IRMA and save to a vector of `CoverageData`
 pub fn coverage_data_collection(
     irma_path: impl AsRef<Path>,
     platform: &str,
@@ -360,7 +396,8 @@ pub fn coverage_data_collection(
                 let reader = BufReader::new(file);
 
                 // Read the data from the file and include the sample name
-                let mut records: Vec<CoverageData> = process_txt_with_sample(reader, true, sample)?;
+                let mut records: Vec<CoverageData> =
+                    process_txt_with_sample(reader, true, &sample)?;
                 for line in &mut records {
                     line.run_id = Some(runid.to_string());
                     line.instrument = Some(platform.to_string());
@@ -373,7 +410,7 @@ pub fn coverage_data_collection(
     Ok(cov_data)
 }
 
-///  Collect read data created by IRMA and save to vector of ReadsData
+///  Collect read data created by IRMA and save to vector of `ReadsData`
 pub fn reads_data_collection(
     irma_path: impl AsRef<Path>,
     platform: &str,
@@ -395,7 +432,7 @@ pub fn reads_data_collection(
                 let reader = BufReader::new(file);
 
                 // Read the data from the file and include the sample name
-                let mut records: Vec<ReadsData> = process_txt_with_sample(reader, true, sample)?;
+                let mut records: Vec<ReadsData> = process_txt_with_sample(reader, true, &sample)?;
                 for line in &mut records {
                     line.run_id = Some(runid.to_string());
                     line.instrument = Some(platform.to_string());
@@ -412,7 +449,7 @@ pub fn reads_data_collection(
     Ok(reads_data)
 }
 
-/// Collecting allele data created by IRMA and and save to vector of AllelesData
+/// Collecting allele data created by IRMA and and save to vector of `AllelesData`
 pub fn allele_data_collection(
     irma_path: &Path,
 ) -> Result<Vec<AllelesData>, Box<dyn std::error::Error>> {
@@ -432,7 +469,7 @@ pub fn allele_data_collection(
                 let reader = BufReader::new(file);
 
                 // Read the data from the file and include the sample name
-                let mut records: Vec<AllelesData> = process_txt_with_sample(reader, true, sample)?;
+                let mut records: Vec<AllelesData> = process_txt_with_sample(reader, true, &sample)?;
                 records.retain(|record| record.minority_frequency >= 0.05);
                 alleles_data.append(&mut records);
             }
@@ -442,7 +479,7 @@ pub fn allele_data_collection(
     Ok(alleles_data)
 }
 
-/// Collect indel data and save to vector of IndelsData
+/// Collect indel data and save to vector of `IndelsData`
 /// Note that insertions and deletions are being added  to the same Vec<Indelsdata>
 pub fn indels_data_collection(
     irma_path: impl AsRef<Path>,
@@ -467,7 +504,7 @@ pub fn indels_data_collection(
                 let reader = BufReader::new(file);
 
                 // Read the data from the file and include the sample name
-                let mut records: Vec<IndelsData> = process_txt_with_sample(reader, true, sample)?;
+                let mut records: Vec<IndelsData> = process_txt_with_sample(reader, true, &sample)?;
                 indels_data.append(&mut records);
             }
             Err(e) => println!("Error reading file: {e}"),
@@ -483,7 +520,7 @@ pub fn indels_data_collection(
                 let reader = BufReader::new(file);
 
                 // Read the data from the file and include the sample name
-                let mut records: Vec<IndelsData> = process_txt_with_sample(reader, true, sample)?;
+                let mut records: Vec<IndelsData> = process_txt_with_sample(reader, true, &sample)?;
                 indels_data.append(&mut records);
             }
             Err(e) => println!("Error reading file: {e}"),
@@ -492,7 +529,7 @@ pub fn indels_data_collection(
     Ok(indels_data)
 }
 
-/// Read in IRMA amended consensus fasta files to SeqData struct
+/// Read in IRMA amended consensus fasta files to `SeqData` struct
 pub fn amended_consensus_data_collection(
     irma_path: impl AsRef<Path>,
     organism: &str,
@@ -555,46 +592,6 @@ pub fn amended_consensus_data_collection(
     }
 
     Ok(seq_data)
-}
-
-/////////////// Functions for manipulating IRMA data ///////////////
-/// Breaking up the records column into three string for the create_vtype_data function
-fn read_record2type(record: &str) -> (String, String, String) {
-    let parts: Vec<&str> = record.split('_').collect();
-    if parts.len() >= 2 {
-        let vtype = parts[0][2..].to_string();
-        let ref_type = parts[1].to_string();
-        let subtype = if ref_type == "HA" || ref_type == "NA" {
-            parts.last().unwrap_or(&"").to_string()
-        } else {
-            "".to_string()
-        };
-        (vtype, ref_type, subtype)
-    } else {
-        let fallback = record[2..].to_string();
-        (fallback.clone(), fallback.clone(), fallback.clone())
-    }
-}
-
-/// Converting info for read data into vtype
-pub fn create_vtype_data(reads_data: &Vec<ReadsData>) -> Vec<ProcessedRecord> {
-    let mut processed_records = Vec::new();
-
-    for data in reads_data.iter() {
-        // Filter records where the first character of 'record' is '4'
-        if data.record.starts_with('4') {
-            let (vtype, ref_type, subtype) = read_record2type(&data.record);
-            let processed_record = ProcessedRecord {
-                sample_id: data.sample_id.clone(),
-                vtype,
-                ref_type,
-                subtype,
-            };
-            processed_records.push(processed_record);
-        }
-    }
-
-    processed_records
 }
 
 // Function to collect reference lengths from IRMA outputs
@@ -670,7 +667,7 @@ where
     Ok(records)
 }
 
-/// Read in dais-ribosome ins file fto InsertionData struct
+/// Read in dais-ribosome ins file fto `InsertionData` struct
 pub fn dais_insertion_data_collection(
     dais_path: impl AsRef<Path>,
 ) -> Result<Vec<InsertionData>, Box<dyn std::error::Error>> {
@@ -701,8 +698,8 @@ pub fn dais_insertion_data_collection(
     Ok(dais_ins_data)
 }
 
-/// Read in dais-ribosome ins file fto DeletionsData struct
-pub fn dias_deletion_data_collection(
+/// Read in dais-ribosome ins file fto `DeletionsData` struct
+pub fn dais_deletion_data_collection(
     dais_path: impl AsRef<Path>,
 ) -> Result<Vec<DeletionsData>, Box<dyn std::error::Error>> {
     // Construct the glob pattern for matching files
@@ -731,8 +728,8 @@ pub fn dias_deletion_data_collection(
     Ok(dais_del_data)
 }
 
-/// Read in dais-ribosome ins file fto DaisSeqData struct
-pub fn dias_sequence_data_collection(
+/// Read in dais-ribosome ins file fto `DaisSeqData` struct
+pub fn dais_sequence_data_collection(
     dais_path: impl AsRef<Path>,
 ) -> Result<Vec<DaisSeqData>, Box<dyn std::error::Error>> {
     // Construct the glob pattern for matching files
@@ -762,7 +759,7 @@ pub fn dias_sequence_data_collection(
     Ok(dais_seq_data)
 }
 
-/// Read in dais-ribosome ins file fto DaisSeqData struct
+/// Read in dais-ribosome ins file fto `DaisSeqData` struct
 pub fn dais_ref_seq_data_collection(
     dais_path: impl AsRef<Path>,
     organism: &str,

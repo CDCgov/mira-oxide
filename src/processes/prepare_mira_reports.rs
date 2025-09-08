@@ -1,15 +1,16 @@
 #![allow(dead_code, unused_imports)]
 use crate::utils::{
     data_ingest::{
-        DaisSeqData, allele_data_collection, amended_consensus_data_collection,
-        coverage_data_collection, create_reader, create_vtype_data, dais_insertion_data_collection,
-        dais_ref_seq_data_collection, dias_deletion_data_collection, dias_sequence_data_collection,
-        get_reference_lens, indels_data_collection, read_csv, reads_data_collection,
+        DaisSeqData, QCConfig, QCSettings, allele_data_collection,
+        amended_consensus_data_collection, coverage_data_collection, create_reader,
+        dais_deletion_data_collection, dais_insertion_data_collection,
+        dais_ref_seq_data_collection, dais_sequence_data_collection, get_reference_lens,
+        indels_data_collection, read_csv, read_yaml, reads_data_collection,
     },
     data_processing::{
-        DaisVarsData, HasSampleId, HasSampleType, ProcessedCoverage, Subtype,
-        collect_analysis_metadata, collect_negatives, collect_sample_id, compute_cvv_dais_variants,
-        compute_dais_variants, create_prelim_irma_summary_df, extract_field, extract_subtype_flu,
+        DaisVarsData, ProcessedCoverage, Subtype, collect_analysis_metadata, collect_negatives,
+        collect_sample_id, compute_cvv_dais_variants, compute_dais_variants,
+        create_prelim_irma_summary_df, create_vtype_data, extract_field, extract_subtype_flu,
         extract_subtype_sc2, melt_reads_data, process_position_coverage_data,
         process_wgs_coverage_data, return_seg_data,
     },
@@ -90,48 +91,6 @@ enum Samplesheet {
     ONT(Vec<SamplesheetO>),
 }
 
-#[derive(Debug, Deserialize)]
-struct QCSettings {
-    med_cov: u32,
-    minor_vars: u32,
-    allow_stop_codons: bool,
-    perc_ref_covered: u32,
-    negative_control_perc: u32,
-    negative_control_perc_exception: u32,
-    positive_control_minimum: u32,
-    padded_consensus: bool,
-    #[serde(default)]
-    med_spike_cov: Option<u32>,
-    #[serde(default)]
-    perc_ref_spike_covered: Option<u32>,
-}
-
-#[derive(Debug, Deserialize)]
-struct QCConfig {
-    #[serde(rename = "ont-flu")]
-    ont_flu: QCSettings,
-    #[serde(rename = "ont-sc2-spike")]
-    ont_sc2_spike: QCSettings,
-    #[serde(rename = "illumina-flu")]
-    illumina_flu: QCSettings,
-    #[serde(rename = "illumina-sc2")]
-    illumina_sc2: QCSettings,
-    #[serde(rename = "ont-sc2")]
-    ont_sc2: QCSettings,
-    #[serde(rename = "illumina-rsv")]
-    illumina_rsv: QCSettings,
-    #[serde(rename = "ont-rsv")]
-    ont_rsv: QCSettings,
-}
-
-fn read_yaml<R: std::io::Read>(reader: R) -> Result<QCConfig, Box<dyn std::error::Error>> {
-    let mut contents = String::new();
-    let mut buf_reader = BufReader::new(reader);
-    buf_reader.read_to_string(&mut contents)?;
-    let config: QCConfig = serde_yaml_ng::from_str(&contents)?;
-    Ok(config)
-}
-
 //todo: split ingest, proccessing and writing out
 #[allow(clippy::too_many_lines)]
 pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Error>> {
@@ -171,7 +130,7 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     let allele_data = allele_data_collection(&args.irma_path)?;
     let indel_data = indels_data_collection(&args.irma_path)?;
 
-    let seq_data = amended_consensus_data_collection(&args.irma_path, &args.virus);
+    let seq_data = amended_consensus_data_collection(&args.irma_path, &args.virus)?;
     let ref_lengths = match get_reference_lens(&args.irma_path) {
         Ok(data) => data,
         Err(e) => {
@@ -186,8 +145,8 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
 
     //Read in DAIS-ribosome data
     let dais_ins_data = dais_insertion_data_collection(&args.irma_path)?;
-    let dais_del_data = dias_deletion_data_collection(&args.irma_path)?;
-    let dais_seq_data = dias_sequence_data_collection(&args.irma_path)?;
+    let dais_del_data = dais_deletion_data_collection(&args.irma_path)?;
+    let dais_seq_data = dais_sequence_data_collection(&args.irma_path)?;
     let mut dais_ref_data: Vec<DaisSeqData> = Vec::new();
     if args.virus.to_lowercase() == "flu" || args.virus.to_lowercase() == "rsv" {
         dais_ref_data = dais_ref_seq_data_collection(&args.workdir_path, &args.virus)?;
@@ -201,6 +160,7 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     //println!("Allele data: {allele_data:?}");
     //println!("Indel data: {indel_data:?}");
     //println!("Seq data: {seq_data:#?}");
+    println!("Seq data: {:#?}", seq_data);
     //println!("dais ins data: {dais_ins_data:#?}");
     //println!("dais del data: {dais_del_data:#?}");
     //println!("dais seq data: {dais_seq_data:#?}");

@@ -12,6 +12,15 @@ use crate::processes::prepare_mira_reports::SamplesheetO;
 
 use super::data_ingest::{AllelesData, CoverageData, DaisSeqData, IndelsData, ReadsData};
 
+/// vtype struct
+#[derive(Serialize, Debug, Clone)]
+pub struct ProcessedRecord {
+    pub sample_id: Option<String>,
+    pub vtype: String,
+    pub ref_type: String,
+    pub subtype: String,
+}
+
 /// Dais Variants Struct
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DaisVarsData {
@@ -131,7 +140,7 @@ impl HasSampleId for ReadsData {
     }
 }
 
-/// Functions to convert values in a vecxtor of structs to vector
+/// Functions to convert values in a vector of structs to vector
 /// Some perform type converions
 pub fn extract_field<T, U, F>(data: Vec<T>, extractor: F) -> Vec<U>
 where
@@ -188,10 +197,10 @@ where
 
 // Function to append a new string with a comma
 pub fn append_with_comma(base: &mut String, new_entry: &str) {
-    if !base.is_empty() {
-        base.push(',');
+    if base.is_empty() {
         base.push_str(new_entry);
     } else {
+        base.push(',');
         base.push_str(new_entry);
     }
 }
@@ -204,7 +213,7 @@ where
     let mut sample_list = Vec::new();
 
     // Skip the first element (header) and iterate over the rest
-    for entry in samples.iter() {
+    for entry in samples {
         sample_list.push(entry.sample_id().clone());
     }
 
@@ -234,7 +243,49 @@ where
         .collect()
 }
 
+/////////////// Functions for manipulating IRMA data ///////////////
+/// Breaking up the records column into three string for the `create_vtype_data` function
+fn read_record2type(record: &str) -> (String, String, String) {
+    let parts: Vec<&str> = record.split('_').collect();
+    if parts.len() >= 2 {
+        let vtype = parts[0][2..].to_string();
+        let ref_type = parts[1].to_string();
+        let subtype = if ref_type == "HA" || ref_type == "NA" {
+            (*parts.last().unwrap_or(&"")).to_string()
+        } else {
+            "".to_string()
+        };
+        (vtype, ref_type, subtype)
+    } else {
+        let fallback = record[2..].to_string();
+        (fallback.clone(), fallback.clone(), fallback.clone())
+    }
+}
+
+/// Converting info for read data into vtype
+#[must_use]
+pub fn create_vtype_data(reads_data: &Vec<ReadsData>) -> Vec<ProcessedRecord> {
+    let mut processed_records = Vec::new();
+
+    for data in reads_data {
+        // Filter records where the first character of 'record' is '4'
+        if data.record.starts_with('4') {
+            let (vtype, ref_type, subtype) = read_record2type(&data.record);
+            let processed_record = ProcessedRecord {
+                sample_id: data.sample_id.clone(),
+                vtype,
+                ref_type,
+                subtype,
+            };
+            processed_records.push(processed_record);
+        }
+    }
+
+    processed_records
+}
+
 // Function to process reference names and generate segments, segset, and segcolor
+#[must_use]
 pub fn return_seg_data(
     reference_names: Vec<String>,
 ) -> (Vec<String>, Vec<String>, HashMap<String, &'static str>) {
@@ -343,7 +394,7 @@ pub fn compute_cvv_dais_variants(
     ref_seqs_data: &[DaisSeqData],
     sample_seqs_data: &[DaisSeqData],
 ) -> Result<Vec<DaisVarsData>, Box<dyn Error>> {
-    let mut merged_data = merge_sequences(ref_seqs_data, sample_seqs_data)?;
+    let mut merged_data = merge_sequences(ref_seqs_data, sample_seqs_data);
 
     // Compute AA Variants
     for entry in &mut merged_data {
@@ -391,7 +442,7 @@ pub fn compute_cvv_dais_variants(
 fn merge_sequences(
     ref_seqs_data: &[DaisSeqData],
     sample_seqs_data: &[DaisSeqData],
-) -> Result<Vec<DaisSeqData>, Box<dyn Error>> {
+) -> std::vec::Vec<DaisSeqData> {
     let mut merged_data = Vec::new();
 
     for sample_entry in sample_seqs_data {
@@ -422,7 +473,7 @@ fn merge_sequences(
         }
     }
 
-    Ok(merged_data)
+    merged_data
 }
 
 /// Compute AA variants - used by compute_cvv_dais_variants fn
@@ -513,10 +564,10 @@ pub fn extract_subtype_flu(dais_vars: &[DaisVarsData]) -> Result<Vec<Subtype>, B
 
     //Process all_samples to determine subtype
     for (sample_id, combined) in all_samples {
-        let subtype = if !combined.is_empty() {
-            combined
-        } else {
+        let subtype = if combined.is_empty() {
             "Undetermined".to_string()
+        } else {
+            combined
         };
 
         subtype_data.push(Subtype {
@@ -535,7 +586,7 @@ pub fn extract_subtype_sc2(dais_vars: &[DaisVarsData]) -> Result<Vec<Subtype>, B
         subtype_data.push(Subtype {
             sample_id: entry.sample_id.clone(),
             subtype: entry.reference_id.clone(),
-        })
+        });
     }
 
     Ok(subtype_data)
@@ -747,6 +798,7 @@ pub fn process_position_coverage_data(
 }
 
 /// Count minority alleles for each unique sample_id and reference - used in IRMA summary below
+#[must_use]
 pub fn count_minority_alleles(data: &[AllelesData]) -> Vec<VariantCountData> {
     let mut counts: HashMap<(Option<String>, String), i32> = HashMap::new();
 
@@ -768,6 +820,7 @@ pub fn count_minority_alleles(data: &[AllelesData]) -> Vec<VariantCountData> {
 }
 
 /// Count minority alleles for each unique sample_id and reference - used in IRMA summary below
+#[must_use]
 pub fn count_minority_indels(data: &[IndelsData]) -> Vec<VariantCountData> {
     let mut counts: HashMap<(Option<String>, String), i32> = HashMap::new();
 
