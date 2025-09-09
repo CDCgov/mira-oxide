@@ -1,11 +1,13 @@
 use clap::{Parser, ValueEnum, builder::PossibleValue};
 use std::{
     fmt,
-    fs::{File, OpenOptions},
-    io::{BufReader, BufWriter, Write},
-    path::PathBuf,
+    fs::OpenOptions,
+    io::{BufWriter, Write},
+    path::{Path, PathBuf},
 };
 use zoe::prelude::*;
+
+use crate::utils::fastq_read::open_fastq_file;
 
 #[derive(Debug, Parser)]
 #[command(about = "Get relevant IRMA configuration and modules for the current experiment.")]
@@ -272,16 +274,15 @@ impl fmt::Display for ChemistryOutput {
 
 /// Averages the first five sequence lengths if possible. If the file has no
 /// sequences, returns None
-fn get_average_line_length(fastq: &PathBuf) -> Result<Option<usize>, std::io::Error> {
-    let sample_size = 5;
-    let file = File::open(fastq)?;
-    let buf_reader = BufReader::new(file);
-    let fastq_reader = FastQReader::new(buf_reader);
+fn get_average_line_length<P: AsRef<Path>>(fastq_path: P) -> Result<Option<usize>, std::io::Error> {
+    const SAMPLE_SIZE: usize = 5;
+
+    let fastq_reader = open_fastq_file(fastq_path)?;
 
     let mut total_len = 0;
     let mut count = 0;
 
-    for result in fastq_reader.take(sample_size) {
+    for result in fastq_reader.take(SAMPLE_SIZE) {
         let record = result?;
         total_len += record.sequence.len();
         count += 1;
