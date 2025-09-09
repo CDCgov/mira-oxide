@@ -10,14 +10,10 @@ use std::{
     io::{BufRead, BufReader, BufWriter, Stdin, Write, stdin, stdout},
     path::{Path, PathBuf},
 };
-use zoe::{alignment::sw::sw_scalar_alignment, prelude::Nucleotides};
 use zoe::{
-    alignment::{MaybeAligned, ScalarProfile},
-    data::nucleotides::GetCodons,
-};
-use zoe::{
-    data::{ByteIndexMap, StdGeneticCode, WeightMatrix},
-    prelude::Len,
+    alignment::{MaybeAligned, ScalarProfile, sw::sw_scalar_alignment},
+    data::{ByteIndexMap, StdGeneticCode, WeightMatrix, nucleotides::GetCodons},
+    prelude::{Len, Nucleotides},
 };
 
 #[derive(Debug, Parser)]

@@ -1,15 +1,19 @@
 use clap::Parser;
 use csv::ReaderBuilder;
 use glob::glob;
-use plotly::common::{Mode, Title};
-use plotly::configuration::{ImageButtonFormats, ToImageButtonOptions};
-use plotly::layout::{Axis, GridPattern, LayoutGrid};
-use plotly::{Layout, Plot, Sankey, Scatter};
-use std::collections::HashMap;
-use std::error::Error;
-use std::fs::File;
-use std::io::{BufRead, BufReader};
-use std::path::{Path, PathBuf};
+use plotly::{
+    Layout, Plot, Sankey, Scatter,
+    common::{Mode, Title},
+    configuration::{ImageButtonFormats, ToImageButtonOptions},
+    layout::{Axis, GridPattern, LayoutGrid},
+};
+use std::{
+    collections::HashMap,
+    error::Error,
+    fs::File,
+    io::{BufRead, BufReader},
+    path::{Path, PathBuf},
+};
 
 // Add this function to generate consistent colors for segment names
 fn get_segment_color(segment_name: &str) -> &'static str {

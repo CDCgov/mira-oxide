@@ -23,12 +23,12 @@ use csv::ReaderBuilder;
 use either::Either;
 use serde::{self, Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::json;
-use std::sync::Arc;
 use std::{
     error::Error,
     fs::{File, OpenOptions},
     io::{BufRead, BufReader, BufWriter, Read, Stdin, Write, stdin, stdout},
     path::{Path, PathBuf},
+    sync::Arc,
 };
 
 #[derive(Debug, Parser)]

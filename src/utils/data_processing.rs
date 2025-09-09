@@ -7,8 +7,7 @@ use std::{
     path::PathBuf,
 };
 
-use crate::processes::prepare_mira_reports::SamplesheetI;
-use crate::processes::prepare_mira_reports::SamplesheetO;
+use crate::processes::prepare_mira_reports::{SamplesheetI, SamplesheetO};
 
 use super::data_ingest::{AllelesData, CoverageData, DaisSeqData, IndelsData, ReadsData};
 
