@@ -1,4 +1,5 @@
 #![allow(dead_code, unused_imports)]
+use crate::utils::alignment::align_sequences;
 use clap::Parser;
 use csv::ReaderBuilder;
 use either::Either;
@@ -9,11 +10,8 @@ use std::{
     io::{BufRead, BufReader, BufWriter, Stdin, Write, stdin, stdout},
     path::{Path, PathBuf},
 };
+use zoe::{alignment::ScalarProfile, data::nucleotides::GetCodons};
 use zoe::{alignment::sw::sw_scalar_alignment, prelude::Nucleotides};
-use zoe::{
-    alignment::{ScalarProfile, pairwise_align_with_cigar},
-    data::nucleotides::GetCodons,
-};
 use zoe::{
     data::{ByteIndexMap, StdGeneticCode, WeightMatrix},
     prelude::Len,
@@ -182,24 +180,6 @@ pub fn lines_to_vec<R: BufRead>(reader: R) -> std::io::Result<Vec<Vec<String>>> 
     }
 
     Ok(columns)
-}
-
-pub fn align_sequences<'a>(query: &'a [u8], reference: &'a [u8]) -> (Vec<u8>, Vec<u8>) {
-    const MAPPING: ByteIndexMap<6> = ByteIndexMap::new(*b"ACGTN*", b'N');
-    const WEIGHTS: WeightMatrix<i8, 6> = WeightMatrix::new(&MAPPING, 1, 0, Some(b'N'));
-    const GAP_OPEN: i8 = -1;
-    const GAP_EXTEND: i8 = 0;
-
-    let profile = ScalarProfile::<6>::new(query, WEIGHTS, GAP_OPEN, GAP_EXTEND)
-        .expect("Alignment profile failed");
-    let alignment = sw_scalar_alignment(reference, &profile);
-
-    pairwise_align_with_cigar(
-        reference,
-        query,
-        &alignment.cigar,
-        alignment.ref_range.start,
-    )
 }
 
 pub fn variants_of_interest_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {

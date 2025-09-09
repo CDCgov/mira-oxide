@@ -15,7 +15,7 @@ ordered-float = "5.0.0"
 #plotly = "0.12.1"
 plotly = { git = "https://github.com/plotly/plotly.rs.git", branch = "main" }
 
-zoe = { version = "0.0.19", default-features = false, features = [
+zoe = { version = "0.0.21", default-features = false, features = [
     "multiversion",
 ] }
 
