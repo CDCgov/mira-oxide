@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 // Add this function to generate consistent colors for segment names
 fn get_segment_color(segment_name: &str) -> &'static str {
@@ -105,7 +105,7 @@ pub struct PlotterArgs {
     output: Option<PathBuf>,
 }
 
-fn generate_plot_coverage(input_directory: &PathBuf) -> Result<Plot, Box<dyn Error>> {
+fn generate_plot_coverage(input_directory: &Path) -> Result<Plot, Box<dyn Error>> {
     // Create a Plotly plot
     let mut plot = Plot::new();
 
@@ -162,7 +162,7 @@ fn generate_plot_coverage(input_directory: &PathBuf) -> Result<Plot, Box<dyn Err
 
     // Set the figure title
     let layout = Layout::new()
-        .title(&format!(
+        .title(format!(
             "Coverage | {}",
             input_directory
                 .file_name()
@@ -193,7 +193,7 @@ fn generate_plot_coverage(input_directory: &PathBuf) -> Result<Plot, Box<dyn Err
     Ok(plot)
 }
 
-fn generate_plot_coverage_seg(input_directory: &PathBuf) -> Result<Plot, Box<dyn Error>> {
+fn generate_plot_coverage_seg(input_directory: &Path) -> Result<Plot, Box<dyn Error>> {
     // Init a Plotly plot
     let mut plot = Plot::new();
 
@@ -201,14 +201,13 @@ fn generate_plot_coverage_seg(input_directory: &PathBuf) -> Result<Plot, Box<dyn
     let mut file_paths = Vec::new();
 
     // First, count files and collect paths
-    for entry in glob(&format!(
+    let tmp = glob(&format!(
         "{}/tables/*coverage.txt",
         input_directory.display()
-    ))? {
-        if let Ok(path) = entry {
-            //file_count += 1;
-            file_paths.push(path);
-        }
+    ))?;
+    for path in tmp.flatten() {
+        //file_count += 1;
+        file_paths.push(path);
     }
 
     // Calculate grid dimensions for subplots
@@ -216,46 +215,45 @@ fn generate_plot_coverage_seg(input_directory: &PathBuf) -> Result<Plot, Box<dyn
     let cols = 2; //(file_count + rows - 1) / rows; // Ceiling division
 
     // Load variant data into a HashMap keyed by segment name
+    // todo: fix this type
+    #[allow(clippy::type_complexity)]
     let mut variants_data: HashMap<String, Vec<(u32, String, String, u32, u32, f32)>> =
         HashMap::new();
 
     // Look for variant files with matching prefixes in the directory
-    for entry in glob(&format!(
+    let tmp1 = glob(&format!(
         "{}/tables/*variants.txt",
         input_directory.display()
-    ))? {
-        if let Ok(variant_path) = entry {
-            let file = File::open(&variant_path)?;
+    ))?;
+    let tmp2 = tmp1;
+    for variant_path in tmp2.flatten() {
+        let file = File::open(&variant_path)?;
 
-            // Create a TSV reader
-            let mut rdr = ReaderBuilder::new()
-                .delimiter(b'\t')
-                .has_headers(true)
-                .from_reader(file);
+        // Create a TSV reader
+        let mut rdr = ReaderBuilder::new()
+            .delimiter(b'\t')
+            .has_headers(true)
+            .from_reader(file);
 
-            for result in rdr.records() {
-                let record = result?;
-                if record.len() >= 8 {
-                    let segment_name = record[0].to_string();
-                    let position: u32 = record[1].parse()?;
-                    let consensus_allele: String = record[3].to_string();
-                    let minority_allele: String = record[4].to_string();
-                    let consensus_count: u32 = record[5].parse()?;
-                    let minority_count: u32 = record[6].parse()?;
-                    let minority_frequency: f32 = record[8].parse()?;
+        for result in rdr.records() {
+            let record = result?;
+            if record.len() >= 8 {
+                let segment_name = record[0].to_string();
+                let position: u32 = record[1].parse()?;
+                let consensus_allele: String = record[3].to_string();
+                let minority_allele: String = record[4].to_string();
+                let consensus_count: u32 = record[5].parse()?;
+                let minority_count: u32 = record[6].parse()?;
+                let minority_frequency: f32 = record[8].parse()?;
 
-                    variants_data
-                        .entry(segment_name)
-                        .or_insert_with(Vec::new)
-                        .push((
-                            position,
-                            consensus_allele,
-                            minority_allele,
-                            consensus_count,
-                            minority_count,
-                            minority_frequency,
-                        ));
-                }
+                variants_data.entry(segment_name).or_default().push((
+                    position,
+                    consensus_allele,
+                    minority_allele,
+                    consensus_count,
+                    minority_count,
+                    minority_frequency,
+                ));
             }
         }
     }
@@ -356,7 +354,7 @@ fn generate_plot_coverage_seg(input_directory: &PathBuf) -> Result<Plot, Box<dyn
             // Create trace for minority values with consistent color (but with transparency)
             let minority_trace = Scatter::new(variant_positions, minority_values)
                 .mode(Mode::Markers)
-                .name(&format!("{}", segment_name))
+                .name(&segment_name)
                 .marker(
                     plotly::common::Marker::new()
                         .color(segment_color)
@@ -383,7 +381,7 @@ fn generate_plot_coverage_seg(input_directory: &PathBuf) -> Result<Plot, Box<dyn
                 .columns(cols)
                 .pattern(GridPattern::Independent),
         )
-        .title(&format!(
+        .title(format!(
             "Segment Coverage | {}",
             input_directory
                 .file_name()
@@ -472,7 +470,7 @@ fn generate_plot_coverage_seg(input_directory: &PathBuf) -> Result<Plot, Box<dyn
 }
 
 // TO DO: fix colors for Sankey diagram
-fn generate_sankey_plot(input_directory: &PathBuf) -> Result<Plot, Box<dyn Error>> {
+fn generate_sankey_plot(input_directory: &Path) -> Result<Plot, Box<dyn Error>> {
     // Path to READ_COUNTS.txt
     let read_counts_path = input_directory.join("tables").join("READ_COUNTS.txt");
 
@@ -505,7 +503,8 @@ fn generate_sankey_plot(input_directory: &PathBuf) -> Result<Plot, Box<dyn Error
 
     // Process data and build node map first
     let mut records = Vec::new();
-    for line in lines {
+
+    lines.for_each(|line| {
         if let Ok(line) = line {
             let parts: Vec<&str> = line.split('\t').collect();
             if parts.len() >= 3 {
@@ -518,7 +517,7 @@ fn generate_sankey_plot(input_directory: &PathBuf) -> Result<Plot, Box<dyn Error
                 }
             }
         }
-    }
+    });
 
     // Add initial nodes
     add_node(
@@ -573,10 +572,9 @@ fn generate_sankey_plot(input_directory: &PathBuf) -> Result<Plot, Box<dyn Error
             "3-nomatch" => no_match = *reads,
             "3-chimeric" | "3-altmatch" => chi_alt_reads += *reads,
             _ => {
-                if record.starts_with("4-") {
+                if let Some(stripped) = record.strip_prefix("4-") {
                     primary_match_sum += *reads;
-                    let segment = record[2..].to_string();
-                    four_segments.push((segment, *reads));
+                    four_segments.push((stripped.to_string(), *reads))
                 }
             }
         }
@@ -615,19 +613,17 @@ fn generate_sankey_plot(input_directory: &PathBuf) -> Result<Plot, Box<dyn Error
 
     // Now process 5- records as before
     for (record, reads) in &records {
-        if record.starts_with("5-") {
-            let segment = record[2..].to_string();
-            let segment_color = get_segment_color(&segment);
+        if let Some(segment) = record.strip_prefix("5-") {
+            let segment_color = get_segment_color(segment);
             add_node(
-                &segment,
+                segment,
                 &mut node_labels,
                 &mut node_map,
                 &mut node_colors,
                 segment_color,
             );
-            // Link from Alt Match to this segment
             source_indices.push(node_map["Alt Match"]);
-            target_indices.push(node_map[&segment]);
+            target_indices.push(node_map[segment]);
             values.push(*reads);
         }
     }
@@ -733,7 +729,7 @@ fn generate_sankey_plot(input_directory: &PathBuf) -> Result<Plot, Box<dyn Error
 
     // Set layout
     let layout = Layout::new()
-        .title(&format!(
+        .title(format!(
             "Read Assignment | {}",
             input_directory
                 .file_name()

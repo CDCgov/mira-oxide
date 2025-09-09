@@ -304,8 +304,8 @@ pub fn variants_of_interest_process(args: VariantsArgs) -> Result<(), Box<dyn Er
                             .expect("Invalid UTF-8 sequence")
                             .to_string();
                         entry.aa_position = tail_index + 1;
-                        entry.aa_ref = '~' as char;
-                        entry.aa_mut = '~' as char;
+                        entry.aa_ref = '~';
+                        entry.aa_mut = '~';
 
                         if entry.update_entry_from_alignment(
                             &ref_entry.subtype,
