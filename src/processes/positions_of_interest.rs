@@ -1,5 +1,5 @@
 #![allow(unreachable_patterns)]
-#![allow(dead_code, unused_imports)]
+#![allow(dead_code)]
 use crate::utils::alignment::align_sequences;
 use clap::Parser;
 use csv::ReaderBuilder;
@@ -9,13 +9,11 @@ use std::{
     error::Error,
     fs::{File, OpenOptions},
     io::{BufRead, BufReader, BufWriter, Stdin, Write, stdin, stdout},
-    path::{Path, PathBuf},
+    path::PathBuf,
 };
-use zoe::{alignment::ScalarProfile, data::nucleotides::GetCodons};
-use zoe::{alignment::sw::sw_scalar_alignment, prelude::Nucleotides};
 use zoe::{
-    data::{ByteIndexMap, StdGeneticCode, WeightMatrix},
-    prelude::Len,
+    data::{StdGeneticCode, nucleotides::GetCodons},
+    prelude::{Len, Nucleotides},
 };
 
 #[derive(Debug, Parser)]
@@ -298,8 +296,8 @@ pub fn positions_of_interest_process(args: PositionsArgs) -> Result<(), Box<dyn 
                         .expect("Invalid UTF-8 sequence")
                         .to_string();
                     entry.aa_position = tail_index + 1;
-                    entry.aa_ref = '~' as char;
-                    entry.aa_mut = '~' as char;
+                    entry.aa_ref = '~';
+                    entry.aa_mut = '~';
 
                     if entry.update_entry_from_alignment(
                         &ref_entry.subtype,

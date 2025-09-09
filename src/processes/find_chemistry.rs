@@ -274,7 +274,7 @@ impl fmt::Display for ChemistryOutput {
 /// sequences, returns None
 fn get_average_line_length(fastq: &PathBuf) -> Result<Option<usize>, std::io::Error> {
     let sample_size = 5;
-    let file = File::open(&fastq)?;
+    let file = File::open(fastq)?;
     let buf_reader = BufReader::new(file);
     let fastq_reader = FastQReader::new(buf_reader);
 
