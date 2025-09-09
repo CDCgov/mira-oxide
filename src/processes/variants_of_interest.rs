@@ -11,7 +11,7 @@ use std::{
 };
 use zoe::{alignment::sw::sw_scalar_alignment, prelude::Nucleotides};
 use zoe::{
-    alignment::{ScalarProfile, pairwise_align_with_cigar},
+    alignment::{MaybeAligned, ScalarProfile},
     data::nucleotides::GetCodons,
 };
 use zoe::{
@@ -190,16 +190,18 @@ pub fn align_sequences<'a>(query: &'a [u8], reference: &'a [u8]) -> (Vec<u8>, Ve
     const GAP_OPEN: i8 = -1;
     const GAP_EXTEND: i8 = 0;
 
-    let profile = ScalarProfile::<6>::new(query, WEIGHTS, GAP_OPEN, GAP_EXTEND)
+    let profile = ScalarProfile::<6>::new(query, &WEIGHTS, GAP_OPEN, GAP_EXTEND)
         .expect("Alignment profile failed");
     let alignment = sw_scalar_alignment(reference, &profile);
+    let alignment = match alignment {
+        MaybeAligned::Some(alignment) => alignment,
+        MaybeAligned::Overflowed => unreachable!("Scalar should not ever overflow"),
+        MaybeAligned::Unmapped => {
+            return (Vec::new(), Vec::new());
+        }
+    };
 
-    pairwise_align_with_cigar(
-        reference,
-        query,
-        &alignment.cigar,
-        alignment.ref_range.start,
-    )
+    alignment.get_aligned_seqs(reference, query)
 }
 
 pub fn variants_of_interest_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {

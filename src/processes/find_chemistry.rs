@@ -1,11 +1,35 @@
 use clap::{Parser, ValueEnum, builder::PossibleValue};
+use flate2::read::MultiGzDecoder;
 use std::{
     fmt,
     fs::{File, OpenOptions},
-    io::{BufReader, BufWriter, Write},
-    path::PathBuf,
+    io::{BufReader, BufWriter, Read, Write},
+    path::{Path, PathBuf},
 };
-use zoe::prelude::*;
+
+use zoe::{
+    define_whichever,
+    prelude::{FastQReader, Len},
+};
+
+pub(crate) fn is_gz<P: AsRef<Path>>(path: P) -> bool {
+    path.as_ref().extension().is_some_and(|ext| ext == "gz")
+}
+
+#[inline]
+pub(crate) fn open_fastq_file<P: AsRef<Path>>(
+    path: P,
+) -> std::io::Result<FastQReader<ReadFileZip>> {
+    let file = File::open(&path)?;
+
+    if is_gz(&path) {
+        Ok(FastQReader::from_readable(ReadFileZip::Zipped(
+            MultiGzDecoder::new(file),
+        ))?)
+    } else {
+        Ok(FastQReader::from_readable(ReadFileZip::File(file))?)
+    }
+}
 
 #[derive(Debug, Parser)]
 #[command(about = "Get relevant IRMA configuration and modules for the current experiment.")]
@@ -257,16 +281,15 @@ impl fmt::Display for ChemistryOutput {
 
 /// Averages the first five sequence lengths if possible. If the file has no
 /// sequences, returns None
-fn get_average_line_length(fastq: &PathBuf) -> Result<Option<usize>, std::io::Error> {
-    let sample_size = 5;
-    let file = File::open(fastq)?;
-    let buf_reader = BufReader::new(file);
-    let fastq_reader = FastQReader::new(buf_reader);
+fn get_average_line_length<P: AsRef<Path>>(fastq_path: P) -> Result<Option<usize>, std::io::Error> {
+    const SAMPLE_SIZE: usize = 5;
+
+    let fastq_reader = open_fastq_file(fastq_path)?;
 
     let mut total_len = 0;
     let mut count = 0;
 
-    for result in fastq_reader.take(sample_size) {
+    for result in fastq_reader.take(SAMPLE_SIZE) {
         let record = result?;
         total_len += record.sequence.len();
         count += 1;
@@ -282,7 +305,6 @@ fn get_average_line_length(fastq: &PathBuf) -> Result<Option<usize>, std::io::Er
 /// Takes user input arguments and prepares them for output
 fn parse_chemistry_args(args: &FindChemArgs) -> Result<ChemistryOutput, std::io::Error> {
     let line_length = get_average_line_length(&args.fastq)?;
-
     let irma_custom = get_config_path(args, line_length);
     let irma_module = args.experiment.get_module();
     let out = ChemistryOutput {
