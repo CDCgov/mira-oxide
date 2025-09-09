@@ -10,7 +10,9 @@ use std::{
 use crate::processes::prepare_mira_reports::SamplesheetI;
 use crate::processes::prepare_mira_reports::SamplesheetO;
 
-use super::data_ingest::{AllelesData, CoverageData, DaisSeqData, IndelsData, ReadsData};
+use super::data_ingest::{
+    AllelesData, CoverageData, DaisSeqData, IndelsData, QCSettings, ReadsData, SeqData,
+};
 
 /// vtype struct
 #[derive(Serialize, Debug, Clone)]
@@ -819,7 +821,7 @@ pub fn count_minority_alleles(data: &[AllelesData]) -> Vec<VariantCountData> {
     result
 }
 
-/// Count minority alleles for each unique sample_id and reference - used in IRMA summary below
+/// Count minority alleles for each unique `sample_id` and reference - used in IRMA summary below
 #[must_use]
 pub fn count_minority_indels(data: &[IndelsData]) -> Vec<VariantCountData> {
     let mut counts: HashMap<(Option<String>, String), i32> = HashMap::new();
@@ -883,6 +885,7 @@ pub fn collect_analysis_metadata(
     Ok(analysis_metadata)
 }
 
+/////////////// Final IRMA summary file creation ///////////////
 /// Combine all df to create IRMA summary
 pub fn create_prelim_irma_summary_df(
     sample_list: &[String],
@@ -906,9 +909,9 @@ pub fn create_prelim_irma_summary_df(
                 irma_summary.push(IRMASummary {
                     sample_id: Some(entry.sample_id.clone()),
                     reference: Some(entry.reference.clone()),
-                    total_reads: Some(entry.total_reads.clone()),
-                    pass_qc: Some(entry.pass_qc.clone()),
-                    reads_mapped: Some(entry.reads_mapped.clone()),
+                    total_reads: Some(entry.total_reads),
+                    pass_qc: Some(entry.pass_qc),
+                    reads_mapped: Some(entry.reads_mapped),
                     precent_reference_coverage: None,
                     median_coverage: None,
                     count_minor_snv: Some(0),
@@ -917,9 +920,9 @@ pub fn create_prelim_irma_summary_df(
                     spike_median_coverage: None,
                     pass_fail_reason: None,
                     subtype: None,
-                    mira_module: Some(metadata.module.to_owned()),
-                    runid: Some(metadata.runid.to_owned()),
-                    instrument: Some(metadata.instrument.to_owned()),
+                    mira_module: Some(metadata.module.clone()),
+                    runid: Some(metadata.runid.clone()),
+                    instrument: Some(metadata.instrument.clone()),
                 });
             }
         }
@@ -979,6 +982,19 @@ pub fn create_prelim_irma_summary_df(
             }
         }
     }
+
+    Ok(irma_summary)
+}
+
+/// Combine all df to create IRMA summary
+pub fn create_final_irma_summary_df(
+    prelim_sumamary: &[IRMASummary],
+    dais_vars: &[DaisVarsData],
+    seq_df: &[SeqData],
+    qc_values: QCSettings,
+) -> Result<Vec<IRMASummary>, Box<dyn Error>> {
+    let mut irma_summary: Vec<IRMASummary> = Vec::new();
+    println!("QC {qc_values:#?}");
 
     Ok(irma_summary)
 }
