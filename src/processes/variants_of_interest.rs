@@ -1,4 +1,3 @@
-#![allow(dead_code, unused_imports)]
 use crate::utils::alignment::align_sequences;
 use clap::Parser;
 use csv::ReaderBuilder;
@@ -8,13 +7,11 @@ use std::{
     error::Error,
     fs::{File, OpenOptions},
     io::{BufRead, BufReader, BufWriter, Stdin, Write, stdin, stdout},
-    path::{Path, PathBuf},
+    path::PathBuf,
 };
-use zoe::{alignment::ScalarProfile, data::nucleotides::GetCodons};
-use zoe::{alignment::sw::sw_scalar_alignment, prelude::Nucleotides};
 use zoe::{
-    data::{ByteIndexMap, StdGeneticCode, WeightMatrix},
-    prelude::Len,
+    data::{StdGeneticCode, nucleotides::GetCodons},
+    prelude::{Len, Nucleotides},
 };
 
 #[derive(Debug, Parser)]
@@ -66,16 +63,16 @@ pub struct DaisInput {
     subtype: String,
     ref_strain: String,
     protein: String,
-    nt_hash: String,
-    query_nt_seq: String,
-    query_aa_aln_seq: String,
-    cds_id: String,
-    insertion: String,
-    inert_shift: String,
-    cds_seq: String,
+    _nt_hash: String,
+    _query_nt_seq: String,
+    _query_aa_aln_seq: String,
+    _cds_id: String,
+    _insertion: String,
+    _inert_shift: String,
+    _cds_seq: String,
     cds_aln: String,
-    query_nt_coordinates: String,
-    cds_nt_coordinates: String,
+    _query_nt_coordinates: String,
+    _cds_nt_coordinates: String,
 }
 
 #[derive(Deserialize, Debug)]
@@ -83,12 +80,12 @@ pub struct RefInput {
     isolate_id: String,
     isolate_name: String,
     subtype: String,
-    passage_history: String,
-    nt_id: String,
+    _passage_history: String,
+    _nt_id: String,
     ctype: String,
     reference_id: String,
     protein: String,
-    aa_aln: String,
+    _aa_aln: String,
     cds_aln: String,
 }
 
