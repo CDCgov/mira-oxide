@@ -1,4 +1,5 @@
 #![allow(dead_code, unused_imports)]
+use crate::utils::alignment::align_sequences;
 use clap::Parser;
 use csv::ReaderBuilder;
 use either::Either;
@@ -182,26 +183,6 @@ pub fn lines_to_vec<R: BufRead>(reader: R) -> std::io::Result<Vec<Vec<String>>> 
     }
 
     Ok(columns)
-}
-
-pub fn align_sequences<'a>(query: &'a [u8], reference: &'a [u8]) -> (Vec<u8>, Vec<u8>) {
-    const MAPPING: ByteIndexMap<6> = ByteIndexMap::new(*b"ACGTN*", b'N');
-    const WEIGHTS: WeightMatrix<i8, 6> = WeightMatrix::new(&MAPPING, 1, 0, Some(b'N'));
-    const GAP_OPEN: i8 = -1;
-    const GAP_EXTEND: i8 = 0;
-
-    let profile = ScalarProfile::<6>::new(query, &WEIGHTS, GAP_OPEN, GAP_EXTEND)
-        .expect("Alignment profile failed");
-    let alignment = sw_scalar_alignment(reference, &profile);
-    let alignment = match alignment {
-        MaybeAligned::Some(alignment) => alignment,
-        MaybeAligned::Overflowed => unreachable!("Scalar should not ever overflow"),
-        MaybeAligned::Unmapped => {
-            return (Vec::new(), Vec::new());
-        }
-    };
-
-    alignment.get_aligned_seqs(reference, query)
 }
 
 pub fn variants_of_interest_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {

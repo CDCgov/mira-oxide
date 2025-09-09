@@ -1,35 +1,12 @@
+use crate::utils::read_fastq::open_fastq_file;
 use clap::{Parser, ValueEnum, builder::PossibleValue};
-use flate2::read::MultiGzDecoder;
 use std::{
     fmt,
-    fs::{File, OpenOptions},
-    io::{BufReader, BufWriter, Read, Write},
+    fs::OpenOptions,
+    io::{BufWriter, Write},
     path::{Path, PathBuf},
 };
-
-use zoe::{
-    define_whichever,
-    prelude::{FastQReader, Len},
-};
-
-pub(crate) fn is_gz<P: AsRef<Path>>(path: P) -> bool {
-    path.as_ref().extension().is_some_and(|ext| ext == "gz")
-}
-
-#[inline]
-pub(crate) fn open_fastq_file<P: AsRef<Path>>(
-    path: P,
-) -> std::io::Result<FastQReader<ReadFileZip>> {
-    let file = File::open(&path)?;
-
-    if is_gz(&path) {
-        Ok(FastQReader::from_readable(ReadFileZip::Zipped(
-            MultiGzDecoder::new(file),
-        ))?)
-    } else {
-        Ok(FastQReader::from_readable(ReadFileZip::File(file))?)
-    }
-}
+use zoe::prelude::Len;
 
 #[derive(Debug, Parser)]
 #[command(about = "Get relevant IRMA configuration and modules for the current experiment.")]
