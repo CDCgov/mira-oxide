@@ -273,7 +273,7 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     //println!("{melted_reads_df:?}");
     //println!("{calculated_cov_df:?}");
     //println!("{calculated_position_cov_df:?}");
-    println!("{irma_summary:?}");
+    //println!("{irma_summary:?}");
     //println!("{subtype_data:?}");
 
     /////////////////////////////////////////////////////////////////////////////

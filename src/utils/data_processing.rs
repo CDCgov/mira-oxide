@@ -990,7 +990,6 @@ pub fn create_prelim_irma_summary_df(
 }
 
 /// Combine all df to create IRMA summary
-
 impl IRMASummary {
     pub fn create_final_irma_summary_df(
         &mut self,
@@ -999,8 +998,6 @@ impl IRMASummary {
         qc_values: &QCSettings,
     ) -> Result<Vec<IRMASummary>, Box<dyn Error>> {
         let mut irma_summary: Vec<IRMASummary> = Vec::new();
-        println!("QC {qc_values:#?}");
-        println!("QC {dais_vars:#?}");
 
         let mut premature_stop_codon_df = String::new();
         if !qc_values.allow_stop_codons {
@@ -1014,7 +1011,15 @@ impl IRMASummary {
                 }
             }
         }
-        //println!("{premature_stop_codon_df}");
+
+        if self.precent_reference_coverage < qc_values.perc_ref_covered.into() {
+            let mut new_entry = format!(
+                "Less than {}% of reference covered",
+                qc_values.perc_ref_covered
+            );
+            self.pass_fail_reason = append_with_comma(&self.pass_fail_reason, &new_entry);
+        }
+        println!("{}", qc_values.perc_ref_covered);
 
         Ok(irma_summary)
     }
