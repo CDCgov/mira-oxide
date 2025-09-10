@@ -27,6 +27,7 @@ pub struct ProcessedRecord {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DaisVarsData {
     pub sample_id: Option<String>,
+    pub ctype: String,
     pub reference_id: String,
     pub protein: String,
     pub aa_variant_count: i32,
@@ -359,6 +360,7 @@ pub fn compute_dais_variants(
 
                 let dais_vars_entry = DaisVarsData {
                     sample_id: sample_entry.sample_id.clone(),
+                    ctype: sample_entry.ctype.clone(),
                     reference_id: sample_entry.reference.clone(),
                     protein: sample_entry.protein.clone(),
                     aa_variant_count: var_aa_count,
@@ -430,6 +432,7 @@ pub fn compute_cvv_dais_variants(
         .into_values()
         .map(|entry| DaisVarsData {
             sample_id: entry.sample_id,
+            ctype: entry.ctype,
             reference_id: entry.reference.clone(),
             protein: entry.protein.clone(),
             aa_variant_count: entry.insertions_shift_frame.parse::<i32>().unwrap_or(0),
@@ -987,14 +990,32 @@ pub fn create_prelim_irma_summary_df(
 }
 
 /// Combine all df to create IRMA summary
-pub fn create_final_irma_summary_df(
-    prelim_sumamary: &[IRMASummary],
-    dais_vars: &[DaisVarsData],
-    seq_df: &[SeqData],
-    qc_values: QCSettings,
-) -> Result<Vec<IRMASummary>, Box<dyn Error>> {
-    let mut irma_summary: Vec<IRMASummary> = Vec::new();
-    println!("QC {qc_values:#?}");
 
-    Ok(irma_summary)
+impl IRMASummary {
+    pub fn create_final_irma_summary_df(
+        &mut self,
+        dais_vars: &[DaisVarsData],
+        seq_df: &[SeqData],
+        qc_values: &QCSettings,
+    ) -> Result<Vec<IRMASummary>, Box<dyn Error>> {
+        let mut irma_summary: Vec<IRMASummary> = Vec::new();
+        println!("QC {qc_values:#?}");
+        println!("QC {dais_vars:#?}");
+
+        let mut premature_stop_codon_df = String::new();
+        if !qc_values.allow_stop_codons {
+            for entry in dais_vars {
+                if self.sample_id == entry.sample_id
+                    && self.reference == Some(entry.ctype.clone())
+                    && entry.aa_variants.contains('*')
+                {
+                    self.pass_fail_reason =
+                        format!("Premature stop codon '{}'", entry.protein).into();
+                }
+            }
+        }
+        //println!("{premature_stop_codon_df}");
+
+        Ok(irma_summary)
+    }
 }

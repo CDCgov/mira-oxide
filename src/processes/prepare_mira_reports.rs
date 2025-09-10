@@ -10,14 +10,11 @@ use crate::utils::{
     data_processing::{
         DaisVarsData, ProcessedCoverage, Subtype, collect_analysis_metadata, collect_negatives,
         collect_sample_id, compute_cvv_dais_variants, compute_dais_variants,
-        create_final_irma_summary_df, create_prelim_irma_summary_df, create_vtype_data,
-        extract_field, extract_subtype_flu, extract_subtype_sc2, melt_reads_data,
-        process_position_coverage_data, process_wgs_coverage_data, return_seg_data,
+        create_prelim_irma_summary_df, create_vtype_data, extract_field, extract_subtype_flu,
+        extract_subtype_sc2, melt_reads_data, process_position_coverage_data,
+        process_wgs_coverage_data, return_seg_data,
     },
-    writing_outputs::{
-        negative_qc_statement, write_reads_to_parquet, write_ref_data_json,
-        write_structs_to_csv_file, write_structs_to_split_json_file,
-    },
+    writing_outputs::negative_qc_statement,
 };
 use clap::Parser;
 use csv::ReaderBuilder;
@@ -267,15 +264,16 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
         }
     }
 
-    let irma_summary =
-        create_final_irma_summary_df(&irma_summary, &dais_vars_data, &seq_data, qc_values);
+    for sample in &mut irma_summary {
+        sample.create_final_irma_summary_df(&dais_vars_data, &seq_data, &qc_values);
+    }
     //println!("{qc_values:?}");
     //todo:remove before end
     //println!("{dais_vars_data:?}");
     //println!("{melted_reads_df:?}");
     //println!("{calculated_cov_df:?}");
     //println!("{calculated_position_cov_df:?}");
-    //println!("{irma_summary:?}");
+    println!("{irma_summary:?}");
     //println!("{subtype_data:?}");
 
     /////////////////////////////////////////////////////////////////////////////

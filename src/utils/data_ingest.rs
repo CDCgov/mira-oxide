@@ -232,7 +232,7 @@ pub struct DaisSeqData {
     #[serde(rename = "ID")]
     pub sample_id: Option<String>,
     #[serde(rename = "C_type")]
-    pub ctype: Option<String>,
+    pub ctype: String,
     #[serde(rename = "Ref_ID")]
     pub reference: String,
     #[serde(rename = "Protein")]
