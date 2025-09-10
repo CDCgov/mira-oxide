@@ -123,7 +123,7 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     // Read in IRMA data
     let coverage_data = coverage_data_collection(&args.irma_path, &args.platform, &args.runid)?;
     let read_data = reads_data_collection(&args.irma_path, &args.platform, &args.runid)?;
-    let vtype_data = create_vtype_data(&read_data);
+    let _vtype_data = create_vtype_data(&read_data);
     let allele_data = allele_data_collection(&args.irma_path)?;
     let indel_data = indels_data_collection(&args.irma_path)?;
 
@@ -135,14 +135,14 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
             return Err(e);
         }
     };
-    let (segments, segset, segcolor) =
+    let (_segments, _segset, _segcolor) =
         return_seg_data(extract_field(coverage_data.clone(), |item| {
             item.reference_name.clone()
         }));
 
     //Read in DAIS-ribosome data
-    let dais_ins_data = dais_insertion_data_collection(&args.irma_path)?;
-    let dais_del_data = dais_deletion_data_collection(&args.irma_path)?;
+    let _dais_ins_data = dais_insertion_data_collection(&args.irma_path)?;
+    let _dais_del_data = dais_deletion_data_collection(&args.irma_path)?;
     let dais_seq_data = dais_sequence_data_collection(&args.irma_path)?;
     let mut dais_ref_data: Vec<DaisSeqData> = Vec::new();
     if args.virus.to_lowercase() == "flu" || args.virus.to_lowercase() == "rsv" {
@@ -185,7 +185,7 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     // Calculating the % coverage and median coverage for summary
     let melted_reads_df = melt_reads_data(&read_data);
     let mut calculated_cov_df: Vec<ProcessedCoverage> = Vec::new();
-    let mut calculated_position_cov_df: Vec<ProcessedCoverage> = Vec::new();
+    let mut _calculated_position_cov_df: Vec<ProcessedCoverage> = Vec::new();
 
     if args.virus.to_lowercase() == "flu" || args.virus.to_lowercase() == "rsv" {
         calculated_cov_df = process_wgs_coverage_data(&coverage_data, &ref_lengths);
@@ -194,7 +194,7 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
             process_position_coverage_data(&coverage_data, &ref_lengths, 21563, 25384);
     } else if args.virus.to_lowercase() == "sc2-wgs" {
         calculated_cov_df = process_wgs_coverage_data(&coverage_data, &ref_lengths);
-        calculated_position_cov_df =
+        _calculated_position_cov_df =
             process_position_coverage_data(&coverage_data, &ref_lengths, 21563, 25384);
     }
 
@@ -265,7 +265,7 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     }
 
     for sample in &mut irma_summary {
-        sample.create_final_irma_summary_df(&dais_vars_data, &seq_data, &qc_values);
+        sample.create_final_irma_summary_df(&dais_vars_data, &seq_data, &qc_values)?;
     }
     //println!("{qc_values:?}");
     //todo:remove before end

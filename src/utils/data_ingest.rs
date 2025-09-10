@@ -167,8 +167,8 @@ pub struct IndelsData {
 
 #[derive(Debug)]
 pub struct SeqData {
-    name: String,
-    sequence: String,
+    _name: String,
+    _sequence: String,
 }
 
 /////////////// Structs to hold dais-ribosome data ///////////////
@@ -566,8 +566,8 @@ pub fn amended_consensus_data_collection(
                         // If there's an existing sequence, save it
                         if !current_name.is_empty() {
                             seq_data.push(SeqData {
-                                name: current_name.clone(),
-                                sequence: current_sequence.clone(),
+                                _name: current_name.clone(),
+                                _sequence: current_sequence.clone(),
                             });
                         }
                         // Start a new sequence
@@ -582,8 +582,8 @@ pub fn amended_consensus_data_collection(
                 // Save the last sequence
                 if !current_name.is_empty() {
                     seq_data.push(SeqData {
-                        name: current_name,
-                        sequence: current_sequence,
+                        _name: current_name,
+                        _sequence: current_sequence,
                     });
                 }
             }

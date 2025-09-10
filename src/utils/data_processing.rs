@@ -994,12 +994,12 @@ impl IRMASummary {
     pub fn create_final_irma_summary_df(
         &mut self,
         dais_vars: &[DaisVarsData],
-        seq_df: &[SeqData],
+        _seq_df: &[SeqData],
         qc_values: &QCSettings,
     ) -> Result<Vec<IRMASummary>, Box<dyn Error>> {
-        let mut irma_summary: Vec<IRMASummary> = Vec::new();
+        let irma_summary: Vec<IRMASummary> = Vec::new();
 
-        let mut premature_stop_codon_df = String::new();
+        let _premature_stop_codon_df = String::new();
         if !qc_values.allow_stop_codons {
             for entry in dais_vars {
                 if self.sample_id == entry.sample_id
@@ -1012,12 +1012,18 @@ impl IRMASummary {
             }
         }
 
-        if self.precent_reference_coverage < qc_values.perc_ref_covered.into() {
-            let mut new_entry = format!(
+        if let Some(coverage) = self.precent_reference_coverage
+            && coverage < qc_values.perc_ref_covered.into()
+        {
+            let new_entry = format!(
                 "Less than {}% of reference covered",
                 qc_values.perc_ref_covered
             );
-            self.pass_fail_reason = append_with_comma(&self.pass_fail_reason, &new_entry);
+            if let Some(ref mut pf_reason) = self.pass_fail_reason {
+                append_with_comma(pf_reason, &new_entry);
+            } else {
+                self.pass_fail_reason = Some(new_entry);
+            }
         }
         println!("{}", qc_values.perc_ref_covered);
 
