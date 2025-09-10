@@ -135,10 +135,9 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
             return Err(e);
         }
     };
-    let (_segments, _segset, _segcolor) =
-        return_seg_data(extract_field(coverage_data.clone(), |item| {
-            item.reference_name.clone()
-        }));
+    let (_segments, _segset, _segcolor) = return_seg_data(extract_field(&coverage_data, |item| {
+        item.reference_name.clone()
+    }));
 
     //Read in DAIS-ribosome data
     let _dais_ins_data = dais_insertion_data_collection(&args.irma_path)?;
@@ -226,7 +225,7 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
         &allele_data,
         &indel_data,
         &subtype_data,
-        analysis_metadata,
+        &analysis_metadata,
     )?;
 
     //todo: see how this works with the padded amended consensus

@@ -1,10 +1,12 @@
+#![allow(clippy::cast_precision_loss)]
 use serde::{self, Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
     error::Error,
     fs::File,
+    hash::BuildHasher,
     io::{self, BufRead},
-    path::PathBuf,
+    path::Path,
 };
 
 use crate::processes::prepare_mira_reports::SamplesheetI;
@@ -107,13 +109,13 @@ pub trait HasSampleType {
 
 impl HasSampleType for SamplesheetI {
     fn sample_type(&self) -> String {
-        self.sample_type.clone().unwrap_or_else(|| "".to_string())
+        self.sample_type.clone().unwrap_or_default()
     }
 }
 
 impl HasSampleType for SamplesheetO {
     fn sample_type(&self) -> String {
-        self.sample_type.clone().unwrap_or_else(|| "".to_string())
+        self.sample_type.clone().unwrap_or_default()
     }
 }
 
@@ -145,18 +147,21 @@ impl HasSampleId for ReadsData {
 
 /// Functions to convert values in a vector of structs to vector
 /// Some perform type converions
-pub fn extract_field<T, U, F>(data: Vec<T>, extractor: F) -> Vec<U>
+pub fn extract_field<V, T, U, F>(data: V, extractor: F) -> Vec<U>
 where
+    V: AsRef<[T]>,
     F: Fn(&T) -> U,
 {
-    data.iter().map(extractor).collect()
+    data.as_ref().iter().map(extractor).collect()
 }
 
-pub fn extract_string_fields_as_float<T, F>(data: Vec<T>, extractor: F) -> Vec<f32>
+pub fn extract_string_fields_as_float<V, T, F>(data: V, extractor: F) -> Vec<f32>
 where
+    V: AsRef<[T]>,
     F: Fn(&T) -> &str,
 {
-    data.iter()
+    data.as_ref()
+        .iter()
         .map(|item| {
             let field = extractor(item);
             if field.is_empty() {
@@ -170,7 +175,7 @@ where
 
 //Function to filter struct by sample id
 //If using this with a Vec of structs then you need to add impl to HasSampleID trait above if not done already
-pub fn filter_struct_by_ids<T>(samples: &[T], ids: Vec<String>) -> Vec<T>
+pub fn filter_struct_by_ids<T>(samples: &[T], ids: &[String]) -> Vec<T>
 where
     T: Serialize + Clone,
     T: HasSampleId,
@@ -182,11 +187,13 @@ where
         .collect()
 }
 
-pub fn extract_string_fields_as_int<T, F>(data: Vec<T>, extractor: F) -> Vec<i32>
+pub fn extract_string_fields_as_int<V, T, F>(data: V, extractor: F) -> Vec<i32>
 where
+    V: AsRef<[T]>,
     F: Fn(&T) -> &str,
 {
-    data.iter()
+    data.as_ref()
+        .iter()
         .map(|item| {
             let field = extractor(item);
             if field.is_empty() {
@@ -256,7 +263,7 @@ fn read_record2type(record: &str) -> (String, String, String) {
         let subtype = if ref_type == "HA" || ref_type == "NA" {
             (*parts.last().unwrap_or(&"")).to_string()
         } else {
-            "".to_string()
+            String::new()
         };
         (vtype, ref_type, subtype)
     } else {
@@ -443,7 +450,7 @@ pub fn compute_cvv_dais_variants(
     Ok(result)
 }
 
-/// Merge sequences based on Coordspace and Protein - used by compute_cvv_dais_variants fn
+/// Merge sequences based on Coordspace and Protein - used by `compute_cvv_dais_variants` fn
 fn merge_sequences(
     ref_seqs_data: &[DaisSeqData],
     sample_seqs_data: &[DaisSeqData],
@@ -481,7 +488,7 @@ fn merge_sequences(
     merged_data
 }
 
-/// Compute AA variants - used by compute_cvv_dais_variants fn
+/// Compute AA variants - used by `compute_cvv_dais_variants` fn
 fn compute_aa_variants(aligned_aa_sequence: &str, ref_aa_sequence: &str) -> String {
     let mut aa_vars = String::new();
 
@@ -503,8 +510,8 @@ fn compute_aa_variants(aligned_aa_sequence: &str, ref_aa_sequence: &str) -> Stri
 /// Get subtypes for flu
 pub fn extract_subtype_flu(dais_vars: &[DaisVarsData]) -> Result<Vec<Subtype>, Box<dyn Error>> {
     let mut subtype_data: Vec<Subtype> = Vec::new();
-    let mut sample_ha_map: HashMap<String, String> = HashMap::new();
-    let mut sample_na_map: HashMap<String, String> = HashMap::new();
+    let mut sample_hemagglutinin_map: HashMap<String, String> = HashMap::new();
+    let mut sample_neuraminidase_map: HashMap<String, String> = HashMap::new();
 
     for entry in dais_vars {
         let hold_sample = entry.sample_id.clone().ok_or("Missing sample_id")?;
@@ -525,7 +532,7 @@ pub fn extract_subtype_flu(dais_vars: &[DaisVarsData]) -> Result<Vec<Subtype>, B
             ""
         };
         if !ha.is_empty() {
-            sample_ha_map.insert(sample_ha, ha.to_string());
+            sample_hemagglutinin_map.insert(sample_ha, ha.to_string());
         }
     }
 
@@ -537,8 +544,7 @@ pub fn extract_subtype_flu(dais_vars: &[DaisVarsData]) -> Result<Vec<Subtype>, B
                 "CALI07" => "N1",
                 "HK4801" => "N2",
                 "ONTARIO6118" => "N4",
-                "RU1526" => "N5",
-                "ALASKA4733" => "N5",
+                "RU1526" | "ALASKA4733" => "N5",
                 "SICHUAN26221" => "N6",
                 "NL219" => "N7",
                 "ASTRAKHAN3212" => "N8",
@@ -549,17 +555,17 @@ pub fn extract_subtype_flu(dais_vars: &[DaisVarsData]) -> Result<Vec<Subtype>, B
             ""
         };
         if !na.is_empty() {
-            sample_na_map.insert(sample_na, na.to_string());
+            sample_neuraminidase_map.insert(sample_na, na.to_string());
         }
     }
     //Combine ha and na from the hashmaps where sample IDs match
     let mut all_samples: HashMap<String, String> = HashMap::new();
 
-    for (sample_id, ha) in &sample_ha_map {
+    for (sample_id, ha) in &sample_hemagglutinin_map {
         all_samples.insert(sample_id.clone(), ha.clone());
     }
 
-    for (sample_id, na) in &sample_na_map {
+    for (sample_id, na) in &sample_neuraminidase_map {
         if let Some(existing) = all_samples.get_mut(sample_id) {
             *existing = format!("{existing}{na}");
         } else {
@@ -599,6 +605,7 @@ pub fn extract_subtype_sc2(dais_vars: &[DaisVarsData]) -> Result<Vec<Subtype>, B
 
 //////////////// Functions used to create irma_summary ///////////////
 /// Flip orientation of the reads structs
+#[must_use]
 pub fn melt_reads_data(records: &[ReadsData]) -> Vec<MeltedRecord> {
     let mut result = Vec::new();
     let mut sample_data: HashMap<String, (i32, i32)> = HashMap::new();
@@ -614,23 +621,22 @@ pub fn melt_reads_data(records: &[ReadsData]) -> Vec<MeltedRecord> {
     }
 
     for record in records {
-        if let Some(sample_id) = &record.sample_id {
-            if record.record.starts_with("4-") {
-                if let Some(&(total_reads, pass_qc)) = sample_data.get(sample_id) {
-                    let reference = record
-                        .record
-                        .strip_prefix("4-")
-                        .unwrap_or(&record.record)
-                        .to_string();
-                    result.push(MeltedRecord {
-                        sample_id: sample_id.to_string(),
-                        reference,
-                        reads_mapped: record.reads,
-                        total_reads,
-                        pass_qc,
-                    });
-                }
-            }
+        if let Some(sample_id) = &record.sample_id
+            && record.record.starts_with("4-")
+            && let Some(&(total_reads, pass_qc)) = sample_data.get(sample_id)
+        {
+            let reference = record
+                .record
+                .strip_prefix("4-")
+                .unwrap_or(&record.record)
+                .to_string();
+            result.push(MeltedRecord {
+                sample_id: sample_id.clone(),
+                reference,
+                reads_mapped: record.reads,
+                total_reads,
+                pass_qc,
+            });
         }
     }
 
@@ -645,17 +651,18 @@ fn calculate_median(values: &[i32]) -> f64 {
     if len == 0 {
         return 0.0;
     }
-    if len % 2 == 0 {
-        (sorted_values[len / 2 - 1] + sorted_values[len / 2]) as f64 / 2.0
+    if len.is_multiple_of(2) {
+        f64::from(sorted_values[len / 2 - 1] + sorted_values[len / 2]) / 2.0
     } else {
-        sorted_values[len / 2] as f64
+        f64::from(sorted_values[len / 2])
     }
 }
 
 /// Coverage dataframe calculations
-pub fn process_wgs_coverage_data(
+#[must_use]
+pub fn process_wgs_coverage_data<S: BuildHasher>(
     coverage_df: &[CoverageData],
-    ref_lens: &HashMap<String, usize>,
+    ref_lens: &HashMap<String, usize, S>,
 ) -> Vec<ProcessedCoverage> {
     // Filter out invalid consensus values
     let filtered_coverage: Vec<_> = coverage_df
@@ -695,7 +702,7 @@ pub fn process_wgs_coverage_data(
         );
         coverage_df_grouped
             .entry(key)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(row.coverage_depth);
     }
 
@@ -724,15 +731,16 @@ pub fn process_wgs_coverage_data(
     processed_coverage
 }
 
-pub fn process_position_coverage_data(
+#[must_use]
+pub fn process_position_coverage_data<S: BuildHasher>(
     coverage_df: &[CoverageData],
-    ref_lens: &HashMap<String, usize>,
+    ref_lens: &HashMap<String, usize, S>,
     position_1: i32,
     position_2: i32,
 ) -> Vec<ProcessedCoverage> {
     // Filter rows where position is between 21563 and 25384
     let filtered_coverage: Vec<_> = coverage_df
-        .into_iter()
+        .iter()
         .filter(|row| row.position >= position_1 && row.position <= position_2)
         .collect();
 
@@ -773,7 +781,7 @@ pub fn process_position_coverage_data(
         );
         coverage_df_grouped
             .entry(key)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(row.coverage_depth);
     }
 
@@ -802,7 +810,7 @@ pub fn process_position_coverage_data(
     processed_coverage
 }
 
-/// Count minority alleles for each unique sample_id and reference - used in IRMA summary below
+/// Count minority alleles for each unique `sample_id` and reference - used in IRMA summary below
 #[must_use]
 pub fn count_minority_alleles(data: &[AllelesData]) -> Vec<VariantCountData> {
     let mut counts: HashMap<(Option<String>, String), i32> = HashMap::new();
@@ -850,7 +858,7 @@ pub fn count_minority_indels(data: &[IndelsData]) -> Vec<VariantCountData> {
 }
 
 pub fn collect_analysis_metadata(
-    work_path: &PathBuf,
+    work_path: &Path,
     platform: &str,
     virus: &str,
     irma_config: &String,
@@ -864,12 +872,10 @@ pub fn collect_analysis_metadata(
     let reader = io::BufReader::new(file);
 
     // Read the file line by line
-    for line in reader.lines() {
-        if let Ok(line) = line {
-            let parts: Vec<&str> = line.split(':').collect();
-            if parts.len() == 2 {
-                descript_dict.insert(parts[0].trim().to_string(), parts[1].trim().to_string());
-            }
+    for line in reader.lines().map_while(Result::ok) {
+        let parts: Vec<&str> = line.split(':').collect();
+        if parts.len() == 2 {
+            descript_dict.insert(parts[0].trim().to_string(), parts[1].trim().to_string());
         }
     }
 
@@ -897,7 +903,7 @@ pub fn create_prelim_irma_summary_df(
     alleles_df: &[AllelesData],
     indels_df: &[IndelsData],
     subtype_df: &[Subtype],
-    metadata: Metadata,
+    metadata: &Metadata,
 ) -> Result<Vec<IRMASummary>, Box<dyn Error>> {
     let mut irma_summary: Vec<IRMASummary> = Vec::new();
     let allele_count_data = count_minority_alleles(alleles_df);
@@ -932,7 +938,7 @@ pub fn create_prelim_irma_summary_df(
         // If no match was found, push the default IRMASummary entry
         if !found_match {
             irma_summary.push(IRMASummary {
-                sample_id: Some(sample.to_string()),
+                sample_id: Some(sample.clone()),
                 reference: Some("Undetermined".to_owned()),
                 total_reads: Some(0),
                 pass_qc: Some(0),

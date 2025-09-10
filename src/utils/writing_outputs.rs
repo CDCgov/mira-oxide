@@ -126,17 +126,16 @@ pub fn write_reads_to_parquet(
 ) -> Result<(), Box<dyn Error>> {
     // Convert values in struct to vector of values
     let sample_ids_vec: Vec<Option<String>> =
-        extract_field(reads_data.to_owned(), |item| item.sample_id.clone());
-    let record_vec = extract_field(reads_data.to_owned(), |item| item.record.clone());
-    let reads_vec = extract_field(reads_data.to_owned(), |item| item.reads);
-    let patterns_vec = extract_string_fields_as_float(reads_data.to_owned(), |item| &item.patterns);
+        extract_field(reads_data, |item| item.sample_id.clone());
+    let record_vec = extract_field(reads_data, |item| item.record.clone());
+    let reads_vec = extract_field(reads_data, |item| item.reads);
+    let patterns_vec = extract_string_fields_as_float(reads_data, |item| &item.patterns);
     let pairs_and_windows_vec =
-        extract_string_fields_as_float(reads_data.to_owned(), |item| &item.pairs_and_windows);
-    let stages_vec = extract_string_fields_as_int(reads_data.to_owned(), |item| {
-        item.stage.as_deref().unwrap_or("")
-    });
-    let runid_vec = extract_field(reads_data.to_owned(), |item| item.run_id.clone());
-    let instrument_vec = extract_field(reads_data.to_owned(), |item| item.instrument.clone());
+        extract_string_fields_as_float(reads_data, |item| &item.pairs_and_windows);
+    let stages_vec =
+        extract_string_fields_as_int(reads_data, |item| item.stage.as_deref().unwrap_or(""));
+    let runid_vec = extract_field(reads_data, |item| item.run_id.clone());
+    let instrument_vec = extract_field(reads_data, |item| item.instrument.clone());
 
     // Convert the vectors into Arrow columns
     let sample_array: ArrayRef = Arc::new(StringArray::from(sample_ids_vec));
@@ -190,7 +189,7 @@ pub fn negative_qc_statement(
     reads_data: &[ReadsData],
     neg_control_list: &[String],
 ) -> Result<(), Box<dyn Error>> {
-    let filtered_reads_data = filter_struct_by_ids(reads_data, neg_control_list.to_vec());
+    let filtered_reads_data = filter_struct_by_ids(reads_data, neg_control_list);
 
     let mut results = Vec::new();
 

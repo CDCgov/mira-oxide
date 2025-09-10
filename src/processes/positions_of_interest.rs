@@ -181,7 +181,8 @@ pub fn lines_to_vec<R: BufRead>(reader: R) -> std::io::Result<Vec<Vec<String>>> 
 
     Ok(columns)
 }
-
+//todo: abstract/split this up
+#[allow(clippy::too_many_lines)]
 pub fn positions_of_interest_process(args: PositionsArgs) -> Result<(), Box<dyn Error>> {
     let delim = args.output_delimiter;
 
