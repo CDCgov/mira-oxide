@@ -353,7 +353,7 @@ fn extract_sample_name(path: &Path) -> Result<String, Box<dyn Error>> {
 fn process_txt_with_sample<R, T>(
     reader: R,
     has_headers: bool,
-    sample_id: &String,
+    sample_id: &str,
 ) -> Result<Vec<T>, Box<dyn std::error::Error>>
 where
     R: Read,
@@ -367,7 +367,7 @@ where
     let mut records: Vec<T> = Vec::new();
     for result in rdr.deserialize() {
         let mut record: T = result?;
-        record.set_sample_id(sample_id.clone());
+        record.set_sample_id(sample_id.to_string());
         records.push(record);
     }
 
@@ -562,7 +562,7 @@ pub fn amended_consensus_data_collection(
 
                 for line in reader.lines() {
                     let line = line?;
-                    if line.starts_with('>') {
+                    if let Some(line) = line.strip_prefix('>') {
                         // If there's an existing sequence, save it
                         if !current_name.is_empty() {
                             seq_data.push(SeqData {
@@ -571,7 +571,7 @@ pub fn amended_consensus_data_collection(
                             });
                         }
                         // Start a new sequence
-                        current_name = line[1..].to_string();
+                        current_name = line.to_string();
                         current_sequence.clear();
                     } else {
                         // Append to the current sequence
@@ -616,7 +616,7 @@ pub fn get_reference_lens(
 
                 for line in reader.lines() {
                     let line = line?;
-                    if line.starts_with('>') {
+                    if let Some(line) = line.strip_prefix('>') {
                         if !ref_name.is_empty() {
                             // Remove "{S1}" suffix if present - sc2 situations
                             if ref_name.ends_with("{S1}") {
@@ -624,7 +624,7 @@ pub fn get_reference_lens(
                             }
                             ref_len_map.insert(ref_name.clone(), current_sequence.len());
                         }
-                        ref_name = line[1..].to_string();
+                        ref_name = line.to_string();
                         current_sequence.clear();
                     } else {
                         current_sequence.push_str(&line);

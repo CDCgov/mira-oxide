@@ -2,7 +2,8 @@
 #![allow(
     unreachable_patterns,
     clippy::missing_panics_doc,
-    clippy::missing_errors_doc
+    clippy::missing_errors_doc,
+    clippy::upper_case_acronyms
 )]
 use crate::processes::{
     all_sample_hd::{HammingArgs, all_sample_hd_process},

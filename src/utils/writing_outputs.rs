@@ -1,16 +1,20 @@
-use crate::utils::data_ingest::ReadsData;
-use crate::utils::data_processing::*;
-use arrow::array::{ArrayRef, Float32Array, Int32Array, StringArray};
-use arrow::datatypes::{DataType, Field, Schema};
-use arrow::record_batch::RecordBatch;
+use crate::utils::{
+    data_ingest::ReadsData,
+    data_processing::{
+        extract_field, extract_string_fields_as_float, extract_string_fields_as_int,
+        filter_struct_by_ids,
+    },
+};
+use arrow::{
+    array::{ArrayRef, Float32Array, Int32Array, StringArray},
+    datatypes::{DataType, Field, Schema},
+    record_batch::RecordBatch,
+};
 use csv::Writer;
 use parquet::arrow::ArrowWriter;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use std::collections::HashMap;
-use std::io::Write;
-use std::sync::Arc;
-use std::{error::Error, fs::File};
+use std::{collections::HashMap, error::Error, fs::File, io::Write, sync::Arc};
 
 /////////////// Structs ///////////////
 // PassQC struct
@@ -90,13 +94,13 @@ pub fn write_structs_to_csv_file<T: Serialize>(
     Ok(())
 }
 
-/// make ref_data.json - has unique set up
-pub fn write_ref_data_json(
+/// make `ref_data.json` - has unique set up
+pub fn write_ref_data_json<S: ::std::hash::BuildHasher>(
     file_path: &str,
-    ref_lens: &HashMap<String, usize>,
+    ref_lens: &HashMap<String, usize, S>,
     segments: &[String],
     segset: &[String],
-    segcolor: &HashMap<String, &str>,
+    segcolor: &HashMap<String, &str, S>,
 ) -> Result<(), Box<dyn Error>> {
     let json_data = json!({
         "ref_lens": ref_lens,

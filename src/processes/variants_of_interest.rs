@@ -9,15 +9,13 @@ use std::{
     io::{BufRead, BufReader, BufWriter, Stdin, Write, stdin, stdout},
     path::{Path, PathBuf},
 };
-use zoe::{alignment::sw::sw_scalar_alignment, prelude::Nucleotides};
 use zoe::{
-    alignment::{ScalarProfile, pairwise_align_with_cigar},
-    data::nucleotides::GetCodons,
+    alignment::{ScalarProfile, sw::sw_scalar_alignment},
+    data::{ByteIndexMap, StdGeneticCode, WeightMatrix, nucleotides::GetCodons},
+    prelude::{Len, Nucleotides},
 };
-use zoe::{
-    data::{ByteIndexMap, StdGeneticCode, WeightMatrix},
-    prelude::Len,
-};
+
+use crate::utils::alignment::align_sequences;
 
 #[derive(Debug, Parser)]
 #[command(about = "Tool for calculating amino acid difference tables")]
@@ -130,7 +128,7 @@ impl Entry<'_> {
         self.aa_ref = aa_1 as char;
         let hold_aa_mut = self.aa_mut.to_string();
 
-        for muts_entry in muts_columns.iter() {
+        for muts_entry in muts_columns {
             // Check if the mutation matches the entry
             if subtype == muts_entry.subtype
                 && self.protein == muts_entry.protein
@@ -138,10 +136,9 @@ impl Entry<'_> {
             {
                 // Use match for cleaner handling of `hold_aa_mut` cases
                 self.phenotypic_consequences = match hold_aa_mut.as_str() {
-                    "." => "amino acid information missing".to_string(),
                     "~" => "partial amino acid".to_string(),
                     "-" => "amino acid covered".to_string(),
-                    "X" => "amino acid information missing".to_string(),
+                    "." | "X" => "amino acid information missing".to_string(),
                     aa if aa == muts_entry.aa => muts_entry.description.clone(),
                     _ => String::new(),
                 };
@@ -154,8 +151,8 @@ impl Entry<'_> {
     }
 }
 
-fn create_reader(path: Option<PathBuf>) -> std::io::Result<BufReader<Either<File, Stdin>>> {
-    let reader = if let Some(ref file_path) = path {
+fn create_reader(path: Option<&PathBuf>) -> std::io::Result<BufReader<Either<File, Stdin>>> {
+    let reader = if let Some(file_path) = path {
         let file = OpenOptions::new().read(true).open(file_path)?;
         BufReader::new(Either::Left(file))
     } else {
@@ -183,35 +180,18 @@ pub fn lines_to_vec<R: BufRead>(reader: R) -> std::io::Result<Vec<Vec<String>>> 
 
     Ok(columns)
 }
-
-pub fn align_sequences<'a>(query: &'a [u8], reference: &'a [u8]) -> (Vec<u8>, Vec<u8>) {
-    const MAPPING: ByteIndexMap<6> = ByteIndexMap::new(*b"ACGTN*", b'N');
-    const WEIGHTS: WeightMatrix<i8, 6> = WeightMatrix::new(&MAPPING, 1, 0, Some(b'N'));
-    const GAP_OPEN: i8 = -1;
-    const GAP_EXTEND: i8 = 0;
-
-    let profile = ScalarProfile::<6>::new(query, WEIGHTS, GAP_OPEN, GAP_EXTEND)
-        .expect("Alignment profile failed");
-    let alignment = sw_scalar_alignment(reference, &profile);
-
-    pairwise_align_with_cigar(
-        reference,
-        query,
-        &alignment.cigar,
-        alignment.ref_range.start,
-    )
-}
-
+// to-do: perhaps refactor this into more manageable functions
+#[allow(clippy::too_many_lines)]
 pub fn variants_of_interest_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
     let delim = args.output_delimiter;
 
-    let muts_reader = create_reader(Some(args.muts_file))?;
+    let muts_reader = create_reader(Some(&args.muts_file))?;
     let muts_interest: Vec<MutsOfInterestInput> = read_tsv(muts_reader, false)?;
 
-    let dais_reader = create_reader(Some(args.input_file))?;
+    let dais_reader = create_reader(Some(&args.input_file))?;
     let dais: Vec<DaisInput> = read_tsv(dais_reader, false)?;
 
-    let ref_reader = create_reader(Some(args.ref_file))?;
+    let ref_reader = create_reader(Some(&args.ref_file))?;
     let refs: Vec<RefInput> = read_tsv(ref_reader, true)?;
 
     let mut writer = if let Some(ref file_path) = args.output_xsv {
@@ -324,8 +304,8 @@ pub fn variants_of_interest_process(args: VariantsArgs) -> Result<(), Box<dyn Er
                             .expect("Invalid UTF-8 sequence")
                             .to_string();
                         entry.aa_position = tail_index + 1;
-                        entry.aa_ref = '~' as char;
-                        entry.aa_mut = '~' as char;
+                        entry.aa_ref = '~';
+                        entry.aa_mut = '~';
 
                         if entry.update_entry_from_alignment(
                             &ref_entry.subtype,
