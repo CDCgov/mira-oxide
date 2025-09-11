@@ -5,11 +5,11 @@
 ####################################################################################################
 FROM rustlang/rust:nightly-alpine AS builder
 
-# Required certs for apk update
-COPY ca.crt /root/ca.crt
+# Replace with other certs if needed
+COPY .certs/min-cdc-bundle-ca.crt /etc/ssl/certs/ca.crt
 
-# Put certs in /etc/ssl/certs location
-RUN cat /root/ca.crt >> /etc/ssl/certs/ca-certificates.crt
+# Required certs for gitlab and cargo
+RUN cat /etc/ssl/certs/ca.crt >> /etc/ssl/certs/ca-certificates.crt
 
 # Install required packages, including bash
 RUN apk update && apk add --no-cache \
@@ -24,7 +24,8 @@ WORKDIR /app
 COPY . .
 
 # This build step will cache the dependencies
-RUN cargo build --release
+RUN cargo build --release \
+    || CARGO_HTTP_CAINFO=/etc/ssl/certs/ca.crt cargo build --release
 
 ####################################################################################################
 # DEPLOY IMAGE
@@ -32,10 +33,10 @@ RUN cargo build --release
 FROM alpine:3.18
 
 # Required certs for apk update
-COPY ca.crt /root/ca.crt
+COPY .certs/min-cdc-bundle-ca.crt /etc/ssl/certs/ca.crt
 
 # Put certs in /etc/ssl/certs location
-RUN cat /root/ca.crt >> /etc/ssl/certs/ca-certificates.crt
+RUN cat /etc/ssl/certs/ca.crt >> /etc/ssl/certs/ca-certificates.crt
 
 RUN apk update && apk add --no-cache bash
 
