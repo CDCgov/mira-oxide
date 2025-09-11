@@ -14,7 +14,7 @@ use crate::utils::{
         extract_subtype_sc2, melt_reads_data, process_position_coverage_data,
         process_wgs_coverage_data, return_seg_data,
     },
-    writing_outputs::negative_qc_statement,
+    writing_outputs::{negative_qc_statement, write_structs_to_csv_file},
 };
 use clap::Parser;
 use csv::ReaderBuilder;
@@ -149,19 +149,6 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     } else if args.virus.to_lowercase() == "sc2-wgs" {
         dais_ref_data = dais_ref_seq_data_collection(&args.workdir_path, "sc2")?;
     }
-    //TODO: remove print statements at end
-    //println!("{vtype_data:?}");
-    //println!("{qc_config:?}")
-    //println!("cov data: {coverage_data:?}");
-    //println!("Allele data: {allele_data:?}");
-    //println!("Indel data: {indel_data:?}");
-    //println!("Seq data: {seq_data:#?}");
-    //println!("Seq data: {:#?}", seq_data);
-    //println!("dais ins data: {dais_ins_data:#?}");
-    //println!("dais del data: {dais_del_data:#?}");
-    //println!("dais seq data: {dais_seq_data:#?}");
-    //println!("dais ref data: {dais_ref_data:#?}");
-    //println!("ref length data: {ref_lengths:#?}");
 
     //Calculate AA variants for aavars.csv and dais_vars.json
     let mut dais_vars_data: Vec<DaisVarsData> = Vec::new();
@@ -184,17 +171,16 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     // Calculating the % coverage and median coverage for summary
     let melted_reads_df = melt_reads_data(&read_data);
     let mut calculated_cov_df: Vec<ProcessedCoverage> = Vec::new();
-    let mut _calculated_position_cov_df: Vec<ProcessedCoverage> = Vec::new();
+    let mut calculated_position_cov_df: Vec<ProcessedCoverage> = Vec::new();
 
-    if args.virus.to_lowercase() == "flu" || args.virus.to_lowercase() == "rsv" {
+    if args.virus.to_lowercase() == "flu"
+        || args.virus.to_lowercase() == "rsv"
+        || args.virus.to_lowercase() == "sc2-spike"
+    {
         calculated_cov_df = process_wgs_coverage_data(&coverage_data, &ref_lengths);
-    } else if args.virus.to_lowercase() == "sc2-spike" {
-        calculated_cov_df =
-            process_position_coverage_data(&coverage_data, &ref_lengths, 21563, 25384);
     } else if args.virus.to_lowercase() == "sc2-wgs" {
         calculated_cov_df = process_wgs_coverage_data(&coverage_data, &ref_lengths);
-        _calculated_position_cov_df =
-            process_position_coverage_data(&coverage_data, &ref_lengths, 21563, 25384);
+        calculated_position_cov_df = process_position_coverage_data(&coverage_data, 21563, 25384)?;
     }
 
     //Gather subtype information
@@ -217,7 +203,6 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
 
     //Build prelim irma summary "dataframe"
     //More will be added and analyzed before final irma summary created
-    //todo: fix the fix sc2-wgs spike protein coverage handling in summary
     let mut irma_summary = create_prelim_irma_summary_df(
         &sample_list,
         &melted_reads_df,
@@ -226,6 +211,7 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
         &indel_data,
         &subtype_data,
         &analysis_metadata,
+        Some(&calculated_position_cov_df),
     )?;
 
     //todo: see how this works with the padded amended consensus
@@ -264,16 +250,63 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     }
 
     for sample in &mut irma_summary {
-        sample.create_final_irma_summary_df(&dais_vars_data, &seq_data, &qc_values)?;
+        if sample.pass_fail_reason.is_none() {
+            sample.create_final_irma_summary_df(&dais_vars_data, &seq_data, &qc_values)?;
+        }
     }
     //println!("{qc_values:?}");
     //todo:remove before end
     //println!("{dais_vars_data:?}");
     //println!("{melted_reads_df:?}");
     //println!("{calculated_cov_df:?}");
-    //println!("{calculated_position_cov_df:?}");
+    println!("{calculated_position_cov_df:?}");
     //println!("{irma_summary:?}");
     //println!("{subtype_data:?}");
+
+    let summary_columns: Vec<&str> = if args.virus.to_lowercase() == "sc2-wgs" {
+        vec![
+            "sample_id",
+            "total_reads",
+            "pass_qc",
+            "reads_mapped",
+            "reference",
+            "precent_reference_coverage",
+            "median_coverage",
+            "count_minor_snv",
+            "count_minor_indel",
+            "spike_percent_coverage",
+            "spike_median_coverage",
+            "pass_fail_reason",
+            "subtype",
+            "mira_module",
+            "runid",
+            "instrument",
+        ]
+    } else {
+        vec![
+            "sample_id",
+            "total_reads",
+            "pass_qc",
+            "reads_mapped",
+            "reference",
+            "precent_reference_coverage",
+            "median_coverage",
+            "count_minor_snv",
+            "count_minor_indel",
+            "pass_fail_reason",
+            "subtype",
+            "mira_module",
+            "runid",
+            "instrument",
+        ]
+    };
+
+    write_structs_to_csv_file(
+        &format!("/home/xpa3/mira-oxide/test/{}_summary.csv", &args.runid),
+        &irma_summary,
+        &summary_columns,
+        &summary_columns,
+    )?;
 
     /////////////////////////////////////////////////////////////////////////////
     /////////////// Write the structs to JSON files and CSV files ///////////////

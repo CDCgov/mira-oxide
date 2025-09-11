@@ -8,6 +8,7 @@ use std::{
     io::{self, BufRead},
     path::Path,
 };
+use zoe::data::sam;
 
 use crate::processes::prepare_mira_reports::SamplesheetI;
 use crate::processes::prepare_mira_reports::SamplesheetO;
@@ -206,11 +207,11 @@ where
 }
 
 // Function to append a new string with a comma
-pub fn append_with_comma(base: &mut String, new_entry: &str) {
+pub fn append_with_delim(base: &mut String, new_entry: &str, delim: char) {
     if base.is_empty() {
         base.push_str(new_entry);
     } else {
-        base.push(',');
+        base.push(delim);
         base.push_str(new_entry);
     }
 }
@@ -361,7 +362,7 @@ pub fn compute_dais_variants(
                         let pos = index + 1;
                         var_aa_count += 1;
                         let variant = format!("{ref_aa}{pos}{sample_aa}");
-                        append_with_comma(&mut aa_vars, &variant);
+                        append_with_delim(&mut aa_vars, &variant, ',');
                     }
                 }
 
@@ -500,7 +501,7 @@ fn compute_aa_variants(aligned_aa_sequence: &str, ref_aa_sequence: &str) -> Stri
         if sample_aa != ref_aa {
             let pos = index + 1;
             let variant = format!("{ref_aa}{pos}{sample_aa}");
-            append_with_comma(&mut aa_vars, &variant);
+            append_with_delim(&mut aa_vars, &variant, ',');
         }
     }
 
@@ -731,17 +732,15 @@ pub fn process_wgs_coverage_data<S: BuildHasher>(
     processed_coverage
 }
 
-#[must_use]
-pub fn process_position_coverage_data<S: BuildHasher>(
+pub fn process_position_coverage_data(
     coverage_df: &[CoverageData],
-    ref_lens: &HashMap<String, usize, S>,
     position_1: i32,
     position_2: i32,
-) -> Vec<ProcessedCoverage> {
+) -> Result<Vec<ProcessedCoverage>, Box<dyn Error>> {
     // Filter rows where position is between 21563 and 25384
     let filtered_coverage: Vec<_> = coverage_df
         .iter()
-        .filter(|row| row.position >= position_1 && row.position <= position_2)
+        .filter(|row| row.position > position_1 && row.position < position_2)
         .collect();
 
     let filtered_coverage: Vec<_> = filtered_coverage
@@ -749,52 +748,54 @@ pub fn process_position_coverage_data<S: BuildHasher>(
         .filter(|row| !["-", "N", "a", "c", "t", "g"].contains(&row.consensus.as_str()))
         .collect();
 
-    let mut cov_ref_lens: HashMap<(String, String), usize> = HashMap::new();
+    let mut cov_sample_lens: HashMap<(String, String), usize> = HashMap::new();
     for row in &filtered_coverage {
         let key = (
             row.sample_id.clone().unwrap_or_default(),
             row.reference_name.clone(),
         );
-        *cov_ref_lens.entry(key).or_insert(0) += 1;
+        *cov_sample_lens.entry(key).or_insert(0) += 1;
     }
 
-    let cov_ref_lens_processed: Vec<_> = cov_ref_lens
+    let ref_len = (position_1 - position_2).abs();
+
+    //Calculate percent ref covered
+    let cov_ref_lens_processed: Vec<_> = cov_sample_lens
         .into_iter()
         .map(|((sample, reference_name), maplen)| {
-            let percent_reference_covered = ref_lens
-                .get(&reference_name)
-                .map(|&ref_len| (maplen as f64 / ref_len as f64) * 100.0);
+            let percent_reference_covered = (maplen as f64 / f64::from(ref_len)) * 100.0;
             (
                 sample,
                 reference_name,
-                percent_reference_covered.map(|x| (x * 100.0).round() / 100.0),
+                Some((percent_reference_covered * 100.0).round() / 100.0),
             )
         })
         .collect();
 
-    // Calculate Median Coverage
-    let mut coverage_df_grouped: HashMap<(String, String), Vec<i32>> = HashMap::new();
+    // Calculate median coverage
+    let mut sample_med_cov_grouped: HashMap<(String, String), Vec<i32>> = HashMap::new();
     for row in &filtered_coverage {
         let key = (
             row.sample_id.clone().unwrap_or_default(),
             row.reference_name.clone(),
         );
-        coverage_df_grouped
+
+        sample_med_cov_grouped
             .entry(key)
             .or_default()
             .push(row.coverage_depth);
     }
 
-    let mut coverage_df_processed: HashMap<(String, String), f64> = HashMap::new();
-    for (key, depths) in coverage_df_grouped {
+    let mut med_coverage_df_processed: HashMap<(String, String), f64> = HashMap::new();
+    for (key, depths) in sample_med_cov_grouped {
         let median_coverage = calculate_median(&depths);
-        coverage_df_processed.insert(key, median_coverage);
+        med_coverage_df_processed.insert(key, median_coverage);
     }
 
     // Combine results into ProcessedCoverage
     let mut processed_coverage = Vec::new();
     for (sample, reference, percent_reference_covered) in cov_ref_lens_processed {
-        let median_coverage = coverage_df_processed
+        let median_coverage = med_coverage_df_processed
             .get(&(sample.clone(), reference.clone()))
             .copied()
             .unwrap_or(0.0);
@@ -807,7 +808,7 @@ pub fn process_position_coverage_data<S: BuildHasher>(
         });
     }
 
-    processed_coverage
+    Ok(processed_coverage)
 }
 
 /// Count minority alleles for each unique `sample_id` and reference - used in IRMA summary below
@@ -896,6 +897,7 @@ pub fn collect_analysis_metadata(
 
 /////////////// Final IRMA summary file creation ///////////////
 /// Combine all df to create IRMA summary
+#[allow(clippy::too_many_arguments)]
 pub fn create_prelim_irma_summary_df(
     sample_list: &[String],
     reads_count_df: &[MeltedRecord],
@@ -904,6 +906,7 @@ pub fn create_prelim_irma_summary_df(
     indels_df: &[IndelsData],
     subtype_df: &[Subtype],
     metadata: &Metadata,
+    pos_calc_cov_df: Option<&[ProcessedCoverage]>,
 ) -> Result<Vec<IRMASummary>, Box<dyn Error>> {
     let mut irma_summary: Vec<IRMASummary> = Vec::new();
     let allele_count_data = count_minority_alleles(alleles_df);
@@ -969,6 +972,19 @@ pub fn create_prelim_irma_summary_df(
             }
         }
 
+        if pos_calc_cov_df.is_some() {
+            if let Some(result) = pos_calc_cov_df {
+                for entry in result {
+                    if sample.sample_id == Some(entry.sample.clone())
+                        && sample.reference == Some(entry.reference.clone())
+                    {
+                        sample.spike_percent_coverage = entry.percent_reference_covered;
+                        sample.spike_median_coverage = Some(entry.median_coverage);
+                    }
+                }
+            }
+        }
+
         for entry in &allele_count_data {
             if sample.sample_id == entry.sample_id.clone()
                 && sample.reference == Some(entry.reference.clone())
@@ -1026,12 +1042,40 @@ impl IRMASummary {
                 qc_values.perc_ref_covered
             );
             if let Some(ref mut pf_reason) = self.pass_fail_reason {
-                append_with_comma(pf_reason, &new_entry);
+                append_with_delim(pf_reason, &new_entry, ';');
             } else {
                 self.pass_fail_reason = Some(new_entry);
             }
         }
-        println!("{}", qc_values.perc_ref_covered);
+
+        if let Some(med_cov) = self.median_coverage
+            && med_cov < qc_values.perc_ref_covered.into()
+        {
+            let new_entry = format!("Median coverage < {}", qc_values.med_cov);
+            if let Some(ref mut pf_reason) = self.pass_fail_reason {
+                append_with_delim(pf_reason, &new_entry, ';');
+            } else {
+                self.pass_fail_reason = Some(new_entry);
+            }
+        }
+
+        if let Some(minor_snv) = self.count_minor_snv
+            && minor_snv > qc_values.minor_vars.try_into().unwrap()
+        {
+            let new_entry = format!(
+                "Count of minor variants at or over 5% > {}",
+                qc_values.minor_vars
+            );
+            if let Some(ref mut pf_reason) = self.pass_fail_reason {
+                append_with_delim(pf_reason, &new_entry, ';');
+            } else {
+                self.pass_fail_reason = Some(new_entry);
+            }
+        }
+
+        if self.pass_fail_reason.is_none() {
+            self.pass_fail_reason = Some("Pass".to_string());
+        }
 
         Ok(irma_summary)
     }
