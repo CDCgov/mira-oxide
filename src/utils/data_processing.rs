@@ -8,7 +8,6 @@ use std::{
     io::{self, BufRead},
     path::Path,
 };
-use zoe::data::sam;
 
 use crate::processes::prepare_mira_reports::SamplesheetI;
 use crate::processes::prepare_mira_reports::SamplesheetO;
