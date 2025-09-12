@@ -660,11 +660,10 @@ fn calculate_median(values: &[i32]) -> f64 {
 }
 
 /// Coverage dataframe calculations
-#[must_use]
 pub fn process_wgs_coverage_data<S: BuildHasher>(
     coverage_df: &[CoverageData],
     ref_lens: &HashMap<String, usize, S>,
-) -> Vec<ProcessedCoverage> {
+) -> Result<Vec<ProcessedCoverage>, Box<dyn Error>> {
     // Filter out invalid consensus values
     let filtered_coverage: Vec<_> = coverage_df
         .iter()
@@ -696,7 +695,7 @@ pub fn process_wgs_coverage_data<S: BuildHasher>(
 
     // Calculate Median Coverage
     let mut coverage_df_grouped: HashMap<(String, String), Vec<i32>> = HashMap::new();
-    for row in &filtered_coverage {
+    for row in coverage_df {
         let key = (
             row.sample_id.clone().unwrap_or_default(),
             row.reference_name.clone(),
@@ -715,21 +714,22 @@ pub fn process_wgs_coverage_data<S: BuildHasher>(
 
     // Combine results into ProcessedCoverage
     let mut processed_coverage = Vec::new();
-    for (sample, reference, percent_reference_covered) in cov_ref_lens_processed {
-        let median_coverage = coverage_df_processed
-            .get(&(sample.clone(), reference.clone()))
-            .copied()
-            .unwrap_or(0.0);
+
+    for ((sample, reference), &median_coverage) in &coverage_df_processed {
+        let percent_reference_covered = cov_ref_lens_processed
+            .iter()
+            .find(|(s, r, _)| s == sample && r == reference)
+            .map_or(Some(0.0), |(_, _, percent)| *percent); // Default value if not found
 
         processed_coverage.push(ProcessedCoverage {
-            sample,
-            reference,
+            sample: sample.clone(),
+            reference: reference.clone(),
             median_coverage,
             percent_reference_covered,
         });
     }
 
-    processed_coverage
+    Ok(processed_coverage)
 }
 
 pub fn process_position_coverage_data(
@@ -794,15 +794,18 @@ pub fn process_position_coverage_data(
 
     // Combine results into ProcessedCoverage
     let mut processed_coverage = Vec::new();
-    for (sample, reference, percent_reference_covered) in cov_ref_lens_processed {
-        let median_coverage = med_coverage_df_processed
-            .get(&(sample.clone(), reference.clone()))
-            .copied()
-            .unwrap_or(0.0);
+
+    for ((sample, reference), &median_coverage) in &med_coverage_df_processed {
+        let percent_reference_covered = cov_ref_lens_processed
+            .iter()
+            .find(|(s, r, _)| s == sample && r == reference)
+            .map_or(Some(0.0), |(_, _, percent)| *percent); // Default value if not found
+
+        println!("{median_coverage:?}");
 
         processed_coverage.push(ProcessedCoverage {
-            sample,
-            reference,
+            sample: sample.clone(),
+            reference: reference.clone(),
             median_coverage,
             percent_reference_covered,
         });
@@ -898,7 +901,7 @@ pub fn collect_analysis_metadata(
 /////////////// Final IRMA summary file creation ///////////////
 /// Combine all df to create IRMA summary
 #[allow(clippy::too_many_arguments)]
-pub fn create_prelim_irma_summary_df(
+pub fn create_irma_summary_df(
     sample_list: &[String],
     reads_count_df: &[MeltedRecord],
     calc_cov_df: &[ProcessedCoverage],
@@ -1013,7 +1016,7 @@ pub fn create_prelim_irma_summary_df(
 
 /// Combine all df to create IRMA summary
 impl IRMASummary {
-    pub fn create_final_irma_summary_df(
+    pub fn add_pass_fail_qc(
         &mut self,
         dais_vars: &[DaisVarsData],
         _seq_df: &[SeqData],
@@ -1070,6 +1073,39 @@ impl IRMASummary {
                 append_with_delim(pf_reason, &new_entry, ';');
             } else {
                 self.pass_fail_reason = Some(new_entry);
+            }
+        }
+
+        if self.pass_fail_reason.is_none() {
+            self.pass_fail_reason = Some("Pass".to_string());
+        }
+
+        if let Some(spike_coverage) = self.spike_percent_coverage {
+            if let Some(perc_ref_spike_covered) = qc_values.perc_ref_spike_covered {
+                if spike_coverage < f64::from(perc_ref_spike_covered) {
+                    let new_entry = format!(
+                        "Less than {}% of S gene reference covered",
+                        qc_values.perc_ref_covered
+                    );
+                    if let Some(ref mut pf_reason) = self.pass_fail_reason {
+                        append_with_delim(pf_reason, &new_entry, ';');
+                    } else {
+                        self.pass_fail_reason = Some(new_entry);
+                    }
+                }
+            }
+        }
+
+        if let Some(spike_med_cov) = self.spike_median_coverage {
+            if let Some(spike_med_covered) = qc_values.med_spike_cov {
+                if spike_med_cov < f64::from(spike_med_covered) {
+                    let new_entry = format!("Median coverage of S gene < {}", qc_values.med_cov);
+                    if let Some(ref mut pf_reason) = self.pass_fail_reason {
+                        append_with_delim(pf_reason, &new_entry, ';');
+                    } else {
+                        self.pass_fail_reason = Some(new_entry);
+                    }
+                }
             }
         }
 

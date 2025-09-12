@@ -10,7 +10,7 @@ use crate::utils::{
     data_processing::{
         DaisVarsData, ProcessedCoverage, Subtype, collect_analysis_metadata, collect_negatives,
         collect_sample_id, compute_cvv_dais_variants, compute_dais_variants,
-        create_prelim_irma_summary_df, create_vtype_data, extract_field, extract_subtype_flu,
+        create_irma_summary_df, create_vtype_data, extract_field, extract_subtype_flu,
         extract_subtype_sc2, melt_reads_data, process_position_coverage_data,
         process_wgs_coverage_data, return_seg_data,
     },
@@ -177,9 +177,9 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
         || args.virus.to_lowercase() == "rsv"
         || args.virus.to_lowercase() == "sc2-spike"
     {
-        calculated_cov_df = process_wgs_coverage_data(&coverage_data, &ref_lengths);
+        calculated_cov_df = process_wgs_coverage_data(&coverage_data, &ref_lengths)?;
     } else if args.virus.to_lowercase() == "sc2-wgs" {
-        calculated_cov_df = process_wgs_coverage_data(&coverage_data, &ref_lengths);
+        calculated_cov_df = process_wgs_coverage_data(&coverage_data, &ref_lengths)?;
         calculated_position_cov_df = process_position_coverage_data(&coverage_data, 21563, 25384)?;
     }
 
@@ -203,7 +203,7 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
 
     //Build prelim irma summary "dataframe"
     //More will be added and analyzed before final irma summary created
-    let mut irma_summary = create_prelim_irma_summary_df(
+    let mut irma_summary = create_irma_summary_df(
         &sample_list,
         &melted_reads_df,
         &calculated_cov_df,
@@ -251,7 +251,7 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
 
     for sample in &mut irma_summary {
         if sample.pass_fail_reason.is_none() {
-            sample.create_final_irma_summary_df(&dais_vars_data, &seq_data, &qc_values)?;
+            sample.add_pass_fail_qc(&dais_vars_data, &seq_data, &qc_values)?;
         }
     }
     //println!("{qc_values:?}");
@@ -259,7 +259,7 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     //println!("{dais_vars_data:?}");
     //println!("{melted_reads_df:?}");
     //println!("{calculated_cov_df:?}");
-    println!("{calculated_position_cov_df:?}");
+    //println!("{calculated_position_cov_df:?}");
     //println!("{irma_summary:?}");
     //println!("{subtype_data:?}");
 
