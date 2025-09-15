@@ -20,6 +20,7 @@ use super::data_ingest::{
 #[derive(Serialize, Debug, Clone)]
 pub struct ProcessedRecord {
     pub sample_id: Option<String>,
+    pub original_ref: String,
     pub vtype: String,
     pub ref_type: String,
     pub subtype: String,
@@ -99,6 +100,13 @@ pub struct VariantCountData {
     #[serde(rename = "Reference_Name")]
     pub reference: String,
     pub minor_variant_count: i32,
+}
+
+/// Nt Sequences Struct
+#[derive(Serialize, Deserialize, Debug)]
+pub struct NTSequences {
+    pub sample_id: String,
+    pub subtype: String,
 }
 
 /////////////// Traits ///////////////
@@ -280,9 +288,11 @@ pub fn create_vtype_data(reads_data: &Vec<ReadsData>) -> Vec<ProcessedRecord> {
     for data in reads_data {
         // Filter records where the first character of 'record' is '4'
         if data.record.starts_with('4') {
+            let stripped_ref = data.record.strip_prefix("4-").unwrap();
             let (vtype, ref_type, subtype) = read_record2type(&data.record);
             let processed_record = ProcessedRecord {
                 sample_id: data.sample_id.clone(),
+                original_ref: stripped_ref.to_string(),
                 vtype,
                 ref_type,
                 subtype,
@@ -1114,4 +1124,20 @@ impl IRMASummary {
 
         Ok(irma_summary)
     }
+}
+
+pub fn create_nt_seq_df(
+    nt_seq_df: &[SeqData],
+    vtype_df: &[ProcessedRecord],
+    irma_summary_df: &[IRMASummary],
+    virus: &str,
+) -> Result<Vec<NTSequences>, Box<dyn Error>> {
+    let hold: Vec<NTSequences> = Vec::new();
+
+    for entry in nt_seq_df {
+        let parts: Vec<&str> = entry.name.rsplitn(2, '_').collect();
+        println!("{parts:?}");
+    }
+
+    Ok(hold)
 }

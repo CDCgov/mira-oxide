@@ -14,7 +14,15 @@ use csv::Writer;
 use parquet::arrow::ArrowWriter;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use std::{collections::HashMap, error::Error, fs::File, io::Write, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    error::Error,
+    fs::File,
+    io::Write,
+    sync::Arc,
+};
+
+use super::data_processing::IRMASummary;
 
 /////////////// Structs ///////////////
 // PassQC struct
@@ -52,6 +60,67 @@ pub fn write_structs_to_split_json_file<T: Serialize>(
         }).collect::<Vec<_>>()
     });
 
+    std::fs::write(file_path, serde_json::to_string_pretty(&split_json)?)?;
+
+    println!("Split-oriented JSON written to {file_path}");
+
+    Ok(())
+}
+
+pub fn write_irma_summary_to_pass_fail_json_file(
+    file_path: &str,
+    data: &[IRMASummary],
+) -> Result<(), Box<dyn Error>> {
+    // Extract unique sample_id and reference values
+    let unique_sample_ids: Vec<String> = data
+        .iter()
+        .filter_map(|item| item.sample_id.clone())
+        .collect::<HashSet<_>>()
+        .into_iter()
+        .collect();
+
+    let unique_references: Vec<String> = data
+        .iter()
+        .filter_map(|item| item.reference.clone())
+        .collect::<HashSet<_>>()
+        .into_iter()
+        .collect();
+
+    // Create a mapping of (sample_id, reference) to pass_fail_reason
+    let mut pass_fail_map: HashMap<(String, String), Option<String>> = HashMap::new();
+    for item in data {
+        if let (Some(sample_id), Some(reference)) = (&item.sample_id, &item.reference) {
+            pass_fail_map.insert(
+                (sample_id.clone(), reference.clone()),
+                item.pass_fail_reason.clone(),
+            );
+        }
+    }
+
+    // Build the "data" field for the JSON
+    let data_matrix: Vec<Vec<Option<String>>> = unique_sample_ids
+        .iter()
+        .map(|sample_id| {
+            unique_references
+                .iter()
+                .map(|reference| {
+                    pass_fail_map
+                        .get(&(sample_id.clone(), reference.clone()))
+                        .cloned()
+                        .unwrap_or(None)
+                })
+                .collect()
+        })
+        .collect();
+
+    // Create the "split-oriented" JSON structure
+    let split_json = json!({
+        "columns": unique_references,
+        "index": unique_sample_ids,
+        "data": data_matrix,
+    });
+
+    // Write the JSON to the specified file
     std::fs::write(file_path, serde_json::to_string_pretty(&split_json)?)?;
 
     println!("Split-oriented JSON written to {file_path}");

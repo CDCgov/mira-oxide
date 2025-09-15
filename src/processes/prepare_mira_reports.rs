@@ -10,11 +10,13 @@ use crate::utils::{
     data_processing::{
         DaisVarsData, ProcessedCoverage, Subtype, collect_analysis_metadata, collect_negatives,
         collect_sample_id, compute_cvv_dais_variants, compute_dais_variants,
-        create_irma_summary_df, create_vtype_data, extract_field, extract_subtype_flu,
-        extract_subtype_sc2, melt_reads_data, process_position_coverage_data,
+        create_irma_summary_df, create_nt_seq_df, create_vtype_data, extract_field,
+        extract_subtype_flu, extract_subtype_sc2, melt_reads_data, process_position_coverage_data,
         process_wgs_coverage_data, return_seg_data,
     },
-    writing_outputs::{negative_qc_statement, write_structs_to_csv_file},
+    writing_outputs::{
+        negative_qc_statement, write_irma_summary_to_pass_fail_json_file, write_structs_to_csv_file,
+    },
 };
 use clap::Parser;
 use csv::ReaderBuilder;
@@ -123,7 +125,7 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     // Read in IRMA data
     let coverage_data = coverage_data_collection(&args.irma_path, &args.platform, &args.runid)?;
     let read_data = reads_data_collection(&args.irma_path, &args.platform, &args.runid)?;
-    let _vtype_data = create_vtype_data(&read_data);
+    let vtype_data = create_vtype_data(&read_data);
     let allele_data = allele_data_collection(&args.irma_path)?;
     let indel_data = indels_data_collection(&args.irma_path)?;
 
@@ -254,6 +256,10 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
             sample.add_pass_fail_qc(&dais_vars_data, &seq_data, &qc_values)?;
         }
     }
+
+    let nt_seq_sf = create_nt_seq_df(&seq_data, &vtype_data, &irma_summary, &args.virus)?;
+
+    println!("{vtype_data:?}");
     //println!("{qc_values:?}");
     //todo:remove before end
     //println!("{dais_vars_data:?}");
@@ -306,6 +312,11 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
         &irma_summary,
         &summary_columns,
         &summary_columns,
+    )?;
+
+    write_irma_summary_to_pass_fail_json_file(
+        "/home/xpa3/mira-oxide/test/pass_fail_qc.json",
+        &irma_summary,
     )?;
 
     /////////////////////////////////////////////////////////////////////////////
