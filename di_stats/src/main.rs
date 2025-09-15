@@ -72,7 +72,29 @@ fn di_stat_assembly(assembly_dir: &Path) -> Result<(), Box<dyn Error>> {
         .parent()
         .and_then(|p| p.file_name())
         .and_then(|s| s.to_str())
-        .unwrap_or("null");
+        .map_or("null", |id_str| {
+            let parts: Vec<&str> = id_str.split('_').collect();
+            if parts.len() != 4 {
+                return "null";
+            }
+
+            let final_parts: Vec<&str> = parts[3].split('-').collect();
+            if final_parts.len() != 2 {
+                return "null";
+            }
+
+            let is_valid = parts[0].len() == 6 && parts[0].chars().all(char::is_numeric) &&
+                           parts[1].len() == 6 && parts[1].chars().all(char::is_alphanumeric) &&
+                           parts[2].len() == 4 && parts[2].chars().all(char::is_numeric) &&
+                           final_parts[0].len() == 9 && final_parts[0].chars().all(char::is_numeric) &&
+                           final_parts[1].len() == 5 && final_parts[1].chars().all(char::is_alphabetic);
+
+            if is_valid {
+                id_str
+            } else {
+                "null"
+            }
+        });
 
     let path_pattern = format!("{}/*", assembly_dir.to_str().unwrap_or_default());
 
