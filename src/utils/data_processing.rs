@@ -107,7 +107,7 @@ pub struct VariantCountData {
 pub struct NTSequences {
     pub sample_id: String,
     pub sequence: String,
-    pub target_ref: String,
+    pub target_ref: Option<String>,
     pub reference: String,
     pub pass_fail_decision: String,
 }
@@ -1136,10 +1136,11 @@ pub fn create_nt_seq_df(
     let mut nt_seq_df: Vec<NTSequences> = Vec::new();
 
     if virus == "flu" {
+        //Split name and segemnt unmber by last underscore
         for entry in seq_data {
             let parts: Vec<&str> = entry.name.rsplitn(2, '_').collect();
             if parts.len() != 2 {
-                continue; // Skip if the name format is invalid
+                continue;
             }
 
             let segment_number = parts[0];
@@ -1187,11 +1188,10 @@ pub fn create_nt_seq_df(
                                     && record.reference == Some(sample.original_ref.clone())
                                     && assigned_segment == sample.ref_type
                                 {
-                                    // Process the segment here
                                     nt_seq_df.push(NTSequences {
                                         sample_id: sample_id.clone(),
                                         sequence: entry.sequence.clone(),
-                                        target_ref: assigned_segment.clone(),
+                                        target_ref: Some(assigned_segment.clone()),
                                         reference: sample.original_ref.clone(),
                                         pass_fail_decision: record
                                             .pass_fail_reason
@@ -1201,6 +1201,25 @@ pub fn create_nt_seq_df(
                                 }
                             }
                         }
+                    }
+                }
+            }
+        }
+    } else {
+        for entry in seq_data {
+            for record in irma_summary_df {
+                if let Some(record_sample_id) = &record.sample_id {
+                    if entry.name == *record_sample_id {
+                        nt_seq_df.push(NTSequences {
+                            sample_id: record_sample_id.clone(),
+                            sequence: entry.sequence.clone(),
+                            target_ref: None,
+                            reference: record.reference.clone().unwrap_or_else(String::new),
+                            pass_fail_decision: record
+                                .pass_fail_reason
+                                .clone()
+                                .unwrap_or_else(String::new),
+                        });
                     }
                 }
             }

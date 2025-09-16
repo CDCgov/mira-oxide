@@ -258,7 +258,7 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     }
 
     let nt_seq_df = create_nt_seq_df(&seq_data, &vtype_data, &irma_summary, &args.virus)?;
-
+    //println!("{seq_data:?}");
     println!("{nt_seq_df:?}");
     //println!("{vtype_data:?}");
     //println!("{qc_values:?}");
