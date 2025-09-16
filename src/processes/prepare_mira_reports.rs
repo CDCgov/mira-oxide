@@ -10,12 +10,13 @@ use crate::utils::{
     data_processing::{
         DaisVarsData, ProcessedCoverage, Subtype, collect_analysis_metadata, collect_negatives,
         collect_sample_id, compute_cvv_dais_variants, compute_dais_variants,
-        create_irma_summary_df, create_nt_seq_df, create_vtype_data, extract_field,
-        extract_subtype_flu, extract_subtype_sc2, melt_reads_data, process_position_coverage_data,
-        process_wgs_coverage_data, return_seg_data,
+        create_irma_summary_df, create_nt_seq_df, create_vtype_data, divide_into_pass_fail_df,
+        extract_field, extract_subtype_flu, extract_subtype_sc2, melt_reads_data,
+        process_position_coverage_data, process_wgs_coverage_data, return_seg_data,
     },
     writing_outputs::{
-        negative_qc_statement, write_irma_summary_to_pass_fail_json_file, write_structs_to_csv_file,
+        negative_qc_statement, write_irma_summary_to_pass_fail_json_file,
+        write_structs_to_csv_file, write_structs_to_split_json_file,
     },
 };
 use clap::Parser;
@@ -258,8 +259,17 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     }
 
     let nt_seq_df = create_nt_seq_df(&seq_data, &vtype_data, &irma_summary, &args.virus)?;
+
+    let processed_nt_seq = divide_into_pass_fail_df(&nt_seq_df, &args.platform, &args.virus)?;
+
+    let passed_df = &processed_nt_seq.passed_seqs;
+    let fail_df = &processed_nt_seq.failed_seqs;
+
+    println!("PASSED:   {passed_df:?}");
+    println!("FAILED:   {fail_df:?}");
+    //println!("{processed_nt_seq:?}");
     //println!("{seq_data:?}");
-    println!("{nt_seq_df:?}");
+    //println!("{nt_seq_df:?}");
     //println!("{vtype_data:?}");
     //println!("{qc_values:?}");
     //todo:remove before end
@@ -313,11 +323,6 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
         &irma_summary,
         &summary_columns,
         &summary_columns,
-    )?;
-
-    write_irma_summary_to_pass_fail_json_file(
-        "/home/xpa3/mira-oxide/test/pass_fail_qc.json",
-        &irma_summary,
     )?;
 
     /////////////////////////////////////////////////////////////////////////////
@@ -558,6 +563,25 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
             &irma_summary,
             &summary_columns,
             &summary_columns,
+        )?;
+
+        write_irma_summary_to_pass_fail_json_file(
+            "/home/xpa3/mira-oxide/test/pass_fail_qc.json",
+            &irma_summary,
+        )?;
+
+        // write out the nt_sequences.json
+        let nt_seq_columns: Vec<&str> = if args.virus.to_lowercase() == "flu" {
+            vec!["sample_id", "sequence", "target_ref", "reference"]
+        } else {
+            vec!["sample_id", "sequence", "reference"]
+        };
+
+        write_structs_to_split_json_file(
+            "/home/xpa3/mira-oxide/test/nt_sequences.json",
+            &nt_seq_df,
+            &nt_seq_columns,
+            &nt_seq_columns,
         )?;
 
         /////////////// Write the structs to parquet files if flag invoked ///////////////

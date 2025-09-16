@@ -112,6 +112,13 @@ pub struct NTSequences {
     pub pass_fail_decision: String,
 }
 
+// Processed Seqs Struct
+#[derive(Debug)]
+pub struct ProcessedSequences {
+    pub passed_seqs: Vec<SeqData>,
+    pub failed_seqs: Vec<SeqData>,
+}
+
 /////////////// Traits ///////////////
 /// check for sample type and if not there add ""
 pub trait HasSampleType {
@@ -1127,6 +1134,7 @@ impl IRMASummary {
     }
 }
 
+/// Matching sequences to samples and references for `nt_seq_df`
 pub fn create_nt_seq_df(
     seq_data: &[SeqData],
     vtype_df: &[ProcessedRecord],
@@ -1149,6 +1157,7 @@ pub fn create_nt_seq_df(
             for sample in vtype_df {
                 if let Some(vtype_sample_id) = &sample.sample_id {
                     if sample_id == *vtype_sample_id {
+                        //A vs B segemnt identificaiton logic
                         let segment = if sample.vtype == "A" {
                             match segment_number {
                                 "1" => Some("PB2"),
@@ -1226,4 +1235,52 @@ pub fn create_nt_seq_df(
         }
     }
     Ok(nt_seq_df)
+}
+
+pub fn divide_into_pass_fail_df(
+    nt_seq_df: &[NTSequences],
+    platform: &str,
+    virus: &str,
+) -> Result<ProcessedSequences, Box<dyn Error>> {
+    let mut pass_df: Vec<SeqData> = Vec::new();
+    let mut fail_df: Vec<SeqData> = Vec::new();
+
+    for entry in nt_seq_df {
+        if platform == "illumina" && virus == "flu" {
+            if entry.pass_fail_decision == "Pass"
+                || entry.pass_fail_decision == "Premature stop codon"
+                    && !entry.pass_fail_decision.contains(';')
+                    && !entry.reference.contains("HA")
+                    && !entry.reference.contains("NA")
+            {
+                pass_df.push(SeqData {
+                    name: format!("{} | {}", entry.sample_id.clone(), entry.reference),
+                    sequence: entry.sequence.clone(),
+                });
+            } else {
+                fail_df.push(SeqData {
+                    name: format!(
+                        "{} | {} | {}",
+                        entry.sample_id.clone(),
+                        entry.reference,
+                        entry.pass_fail_decision
+                    ),
+                    sequence: entry.sequence.clone(),
+                });
+            }
+        } else {
+            // If platform or virus doesn't match, treat as a failure
+            fail_df.push(SeqData {
+                name: entry.sample_id.clone(),
+                sequence: entry.sequence.clone(),
+            });
+        }
+    }
+
+    let processed_nt_seqs = ProcessedSequences {
+        passed_seqs: pass_df,
+        failed_seqs: fail_df,
+    };
+
+    Ok(processed_nt_seqs)
 }
