@@ -1248,10 +1248,33 @@ pub fn divide_into_pass_fail_df(
     for entry in nt_seq_df {
         if platform == "illumina" && virus == "flu" {
             if entry.pass_fail_decision == "Pass"
-                || entry.pass_fail_decision == "Premature stop codon"
+                || entry.pass_fail_decision.contains("Premature stop codon")
                     && !entry.pass_fail_decision.contains(';')
                     && !entry.reference.contains("HA")
                     && !entry.reference.contains("NA")
+            {
+                pass_df.push(SeqData {
+                    name: format!("{} | {}", entry.sample_id.clone(), entry.reference),
+                    sequence: entry.sequence.clone(),
+                });
+            } else {
+                fail_df.push(SeqData {
+                    name: format!(
+                        "{} | {} | {}",
+                        entry.sample_id.clone(),
+                        entry.reference,
+                        entry.pass_fail_decision
+                    ),
+                    sequence: entry.sequence.clone(),
+                });
+            }
+        } else if platform == "illumina" && virus == "sc2-wgs" {
+            if entry.pass_fail_decision == "Pass"
+                || entry.pass_fail_decision.contains("Premature stop codon")
+                    && !entry.pass_fail_decision.contains(';')
+                    && !entry
+                        .pass_fail_decision
+                        .contains("Premature stop codon 'S'")
             {
                 pass_df.push(SeqData {
                     name: format!("{} | {}", entry.sample_id.clone(), entry.reference),
