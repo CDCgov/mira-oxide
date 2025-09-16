@@ -106,7 +106,10 @@ pub struct VariantCountData {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct NTSequences {
     pub sample_id: String,
-    pub subtype: String,
+    pub sequence: String,
+    pub target_ref: String,
+    pub reference: String,
+    pub pass_fail_decision: String,
 }
 
 /////////////// Traits ///////////////
@@ -810,8 +813,6 @@ pub fn process_position_coverage_data(
             .find(|(s, r, _)| s == sample && r == reference)
             .map_or(Some(0.0), |(_, _, percent)| *percent); // Default value if not found
 
-        println!("{median_coverage:?}");
-
         processed_coverage.push(ProcessedCoverage {
             sample: sample.clone(),
             reference: reference.clone(),
@@ -1127,17 +1128,83 @@ impl IRMASummary {
 }
 
 pub fn create_nt_seq_df(
-    nt_seq_df: &[SeqData],
+    seq_data: &[SeqData],
     vtype_df: &[ProcessedRecord],
     irma_summary_df: &[IRMASummary],
     virus: &str,
 ) -> Result<Vec<NTSequences>, Box<dyn Error>> {
-    let hold: Vec<NTSequences> = Vec::new();
+    let mut nt_seq_df: Vec<NTSequences> = Vec::new();
 
-    for entry in nt_seq_df {
-        let parts: Vec<&str> = entry.name.rsplitn(2, '_').collect();
-        println!("{parts:?}");
+    if virus == "flu" {
+        for entry in seq_data {
+            let parts: Vec<&str> = entry.name.rsplitn(2, '_').collect();
+            if parts.len() != 2 {
+                continue; // Skip if the name format is invalid
+            }
+
+            let segment_number = parts[0];
+            let sample_id = parts[1].to_string();
+
+            for sample in vtype_df {
+                if let Some(vtype_sample_id) = &sample.sample_id {
+                    if sample_id == *vtype_sample_id {
+                        let segment = if sample.vtype == "A" {
+                            match segment_number {
+                                "1" => Some("PB2"),
+                                "2" => Some("PB1"),
+                                "3" => Some("PA"),
+                                "4" => Some("HA"),
+                                "5" => Some("NP"),
+                                "6" => Some("NA"),
+                                "7" => Some("MP"),
+                                "8" => Some("NS"),
+                                _ => None,
+                            }
+                        } else if sample.vtype == "B" {
+                            match segment_number {
+                                "1" => Some("PB1"),
+                                "2" => Some("PB2"),
+                                "3" => Some("PA"),
+                                "4" => Some("HA"),
+                                "5" => Some("NP"),
+                                "6" => Some("NA"),
+                                "7" => Some("MP"),
+                                "8" => Some("NS"),
+                                _ => None,
+                            }
+                        } else {
+                            None
+                        };
+
+                        let mut assigned_segment = String::new();
+                        if let Some(segment) = segment {
+                            assigned_segment = (*segment).to_string();
+                        }
+
+                        for record in irma_summary_df {
+                            if let Some(record_sample_id) = &record.sample_id {
+                                if sample_id == *record_sample_id
+                                    && record.reference == Some(sample.original_ref.clone())
+                                    && assigned_segment == sample.ref_type
+                                {
+                                    // Process the segment here
+                                    nt_seq_df.push(NTSequences {
+                                        sample_id: sample_id.clone(),
+                                        sequence: entry.sequence.clone(),
+                                        target_ref: assigned_segment.clone(),
+                                        reference: sample.original_ref.clone(),
+                                        pass_fail_decision: record
+                                            .pass_fail_reason
+                                            .clone()
+                                            .unwrap_or_else(String::new),
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
-
-    Ok(hold)
+    Ok(nt_seq_df)
 }
