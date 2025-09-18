@@ -1280,6 +1280,44 @@ pub fn divide_into_pass_fail_df(
                     name: format!("{} | {}", entry.sample_id.clone(), entry.reference),
                     sequence: entry.sequence.clone(),
                 });
+            } else if platform == "illumina" && virus == "rsv" {
+                if entry.pass_fail_decision == "Pass"
+                    || entry.pass_fail_decision.contains("Premature stop codon")
+                        && !entry.pass_fail_decision.contains(';')
+                        && !entry.reference.contains('F')
+                        && !entry.reference.contains('G')
+                {
+                    pass_df.push(SeqData {
+                        name: format!("{} | {}", entry.sample_id.clone(), entry.reference),
+                        sequence: entry.sequence.clone(),
+                    });
+                } else {
+                    fail_df.push(SeqData {
+                        name: format!(
+                            "{} | {} | {}",
+                            entry.sample_id.clone(),
+                            entry.reference,
+                            entry.pass_fail_decision
+                        ),
+                        sequence: entry.sequence.clone(),
+                    });
+                }
+            } else {
+                return Err(format!(
+                    "Unhandled case for platform '{platform}' and virus '{virus}'"
+                )
+                .into());
+            }
+        } else {
+            // ONT handling
+            if entry.pass_fail_decision == "Pass"
+                || entry.pass_fail_decision.contains("Premature stop codon")
+                    && !entry.pass_fail_decision.contains(';')
+            {
+                pass_df.push(SeqData {
+                    name: format!("{} | {}", entry.sample_id.clone(), entry.reference),
+                    sequence: entry.sequence.clone(),
+                });
             } else {
                 fail_df.push(SeqData {
                     name: format!(
@@ -1291,12 +1329,6 @@ pub fn divide_into_pass_fail_df(
                     sequence: entry.sequence.clone(),
                 });
             }
-        } else {
-            // If platform or virus doesn't match, treat as a failure
-            fail_df.push(SeqData {
-                name: entry.sample_id.clone(),
-                sequence: entry.sequence.clone(),
-            });
         }
     }
 
