@@ -52,7 +52,7 @@ pub struct Metadata {
     pub instrument: String,
 }
 
-//Melted Reads df
+//Melted Reads vec
 #[derive(Debug)]
 pub struct MeltedRecord {
     sample_id: String,
@@ -108,6 +108,16 @@ pub struct NTSequences {
     pub sample_id: String,
     pub sequence: String,
     pub target_ref: Option<String>,
+    pub reference: String,
+    pub pass_fail_decision: String,
+}
+
+/// Nt Sequences Struct
+#[derive(Serialize, Deserialize, Debug)]
+pub struct AASequences {
+    pub sample_id: String,
+    pub sequence: String,
+    pub protein: Option<String>,
     pub reference: String,
     pub pass_fail_decision: String,
 }
@@ -680,11 +690,11 @@ fn calculate_median(values: &[i32]) -> f64 {
 
 /// Coverage dataframe calculations
 pub fn process_wgs_coverage_data<S: BuildHasher>(
-    coverage_df: &[CoverageData],
+    coverage_vec: &[CoverageData],
     ref_lens: &HashMap<String, usize, S>,
 ) -> Result<Vec<ProcessedCoverage>, Box<dyn Error>> {
     // Filter out invalid consensus values
-    let filtered_coverage: Vec<_> = coverage_df
+    let filtered_coverage: Vec<_> = coverage_vec
         .iter()
         .filter(|row| !["-", "N", "a", "c", "t", "g"].contains(&row.consensus.as_str()))
         .collect();
@@ -713,28 +723,28 @@ pub fn process_wgs_coverage_data<S: BuildHasher>(
         .collect();
 
     // Calculate Median Coverage
-    let mut coverage_df_grouped: HashMap<(String, String), Vec<i32>> = HashMap::new();
-    for row in coverage_df {
+    let mut coverage_vec_grouped: HashMap<(String, String), Vec<i32>> = HashMap::new();
+    for row in coverage_vec {
         let key = (
             row.sample_id.clone().unwrap_or_default(),
             row.reference_name.clone(),
         );
-        coverage_df_grouped
+        coverage_vec_grouped
             .entry(key)
             .or_default()
             .push(row.coverage_depth);
     }
 
-    let mut coverage_df_processed: HashMap<(String, String), f64> = HashMap::new();
-    for (key, depths) in coverage_df_grouped {
+    let mut coverage_vec_processed: HashMap<(String, String), f64> = HashMap::new();
+    for (key, depths) in coverage_vec_grouped {
         let median_coverage = calculate_median(&depths);
-        coverage_df_processed.insert(key, median_coverage);
+        coverage_vec_processed.insert(key, median_coverage);
     }
 
     // Combine results into ProcessedCoverage
     let mut processed_coverage = Vec::new();
 
-    for ((sample, reference), &median_coverage) in &coverage_df_processed {
+    for ((sample, reference), &median_coverage) in &coverage_vec_processed {
         let percent_reference_covered = cov_ref_lens_processed
             .iter()
             .find(|(s, r, _)| s == sample && r == reference)
@@ -752,12 +762,12 @@ pub fn process_wgs_coverage_data<S: BuildHasher>(
 }
 
 pub fn process_position_coverage_data(
-    coverage_df: &[CoverageData],
+    coverage_vec: &[CoverageData],
     position_1: i32,
     position_2: i32,
 ) -> Result<Vec<ProcessedCoverage>, Box<dyn Error>> {
     // Filter rows where position is between 21563 and 25384
-    let filtered_coverage: Vec<_> = coverage_df
+    let filtered_coverage: Vec<_> = coverage_vec
         .iter()
         .filter(|row| row.position > position_1 && row.position < position_2)
         .collect();
@@ -805,16 +815,16 @@ pub fn process_position_coverage_data(
             .push(row.coverage_depth);
     }
 
-    let mut med_coverage_df_processed: HashMap<(String, String), f64> = HashMap::new();
+    let mut med_coverage_vec_processed: HashMap<(String, String), f64> = HashMap::new();
     for (key, depths) in sample_med_cov_grouped {
         let median_coverage = calculate_median(&depths);
-        med_coverage_df_processed.insert(key, median_coverage);
+        med_coverage_vec_processed.insert(key, median_coverage);
     }
 
     // Combine results into ProcessedCoverage
     let mut processed_coverage = Vec::new();
 
-    for ((sample, reference), &median_coverage) in &med_coverage_df_processed {
+    for ((sample, reference), &median_coverage) in &med_coverage_vec_processed {
         let percent_reference_covered = cov_ref_lens_processed
             .iter()
             .find(|(s, r, _)| s == sample && r == reference)
@@ -916,26 +926,26 @@ pub fn collect_analysis_metadata(
 }
 
 /////////////// Final IRMA summary file creation ///////////////
-/// Combine all df to create IRMA summary
+/// Combine all vec to create IRMA summary
 #[allow(clippy::too_many_arguments)]
-pub fn create_irma_summary_df(
+pub fn create_irma_summary_vec(
     sample_list: &[String],
-    reads_count_df: &[MeltedRecord],
-    calc_cov_df: &[ProcessedCoverage],
-    alleles_df: &[AllelesData],
-    indels_df: &[IndelsData],
-    subtype_df: &[Subtype],
+    reads_count_vec: &[MeltedRecord],
+    calc_cov_vec: &[ProcessedCoverage],
+    alleles_vec: &[AllelesData],
+    indels_vec: &[IndelsData],
+    subtype_vec: &[Subtype],
     metadata: &Metadata,
-    pos_calc_cov_df: Option<&[ProcessedCoverage]>,
+    pos_calc_cov_vec: Option<&[ProcessedCoverage]>,
 ) -> Result<Vec<IRMASummary>, Box<dyn Error>> {
     let mut irma_summary: Vec<IRMASummary> = Vec::new();
-    let allele_count_data = count_minority_alleles(alleles_df);
-    let indel_count_data = count_minority_indels(indels_df);
+    let allele_count_data = count_minority_alleles(alleles_vec);
+    let indel_count_data = count_minority_indels(indels_vec);
 
-    // Populate irma_summary with initial data from reads_count_df
+    // Populate irma_summary with initial data from reads_count_vec
     for sample in sample_list {
         let mut found_match = false;
-        for entry in reads_count_df {
+        for entry in reads_count_vec {
             if *sample == entry.sample_id {
                 found_match = true;
                 irma_summary.push(IRMASummary {
@@ -983,7 +993,7 @@ pub fn create_irma_summary_df(
 
     //Update irma_summary with data from other dataframes
     for sample in &mut irma_summary {
-        for entry in calc_cov_df {
+        for entry in calc_cov_vec {
             if sample.sample_id == Some(entry.sample.clone())
                 && sample.reference == Some(entry.reference.clone())
             {
@@ -992,8 +1002,8 @@ pub fn create_irma_summary_df(
             }
         }
 
-        if pos_calc_cov_df.is_some() {
-            if let Some(result) = pos_calc_cov_df {
+        if pos_calc_cov_vec.is_some() {
+            if let Some(result) = pos_calc_cov_vec {
                 for entry in result {
                     if sample.sample_id == Some(entry.sample.clone())
                         && sample.reference == Some(entry.reference.clone())
@@ -1021,7 +1031,7 @@ pub fn create_irma_summary_df(
             }
         }
 
-        for entry in subtype_df {
+        for entry in subtype_vec {
             if sample.sample_id == entry.sample_id.clone() {
                 sample.subtype = Some(entry.subtype.clone());
             }
@@ -1031,17 +1041,17 @@ pub fn create_irma_summary_df(
     Ok(irma_summary)
 }
 
-/// Combine all df to create IRMA summary
+/// Combine all vec to create IRMA summary
 impl IRMASummary {
     pub fn add_pass_fail_qc(
         &mut self,
         dais_vars: &[DaisVarsData],
-        _seq_df: &[SeqData],
+        _seq_vec: &[SeqData],
         qc_values: &QCSettings,
     ) -> Result<Vec<IRMASummary>, Box<dyn Error>> {
         let irma_summary: Vec<IRMASummary> = Vec::new();
 
-        let _premature_stop_codon_df = String::new();
+        let _premature_stop_codon_vec = String::new();
         if !qc_values.allow_stop_codons {
             for entry in dais_vars {
                 if self.sample_id == entry.sample_id
@@ -1134,14 +1144,14 @@ impl IRMASummary {
     }
 }
 
-/// Matching sequences to samples and references for `nt_seq_df`
-pub fn create_nt_seq_df(
+/// Matching sequences to samples and references for `nt_seq_vec`
+pub fn create_nt_seq_vec(
     seq_data: &[SeqData],
-    vtype_df: &[ProcessedRecord],
-    irma_summary_df: &[IRMASummary],
+    vtype_vec: &[ProcessedRecord],
+    irma_summary_vec: &[IRMASummary],
     virus: &str,
 ) -> Result<Vec<NTSequences>, Box<dyn Error>> {
-    let mut nt_seq_df: Vec<NTSequences> = Vec::new();
+    let mut nt_seq_vec: Vec<NTSequences> = Vec::new();
 
     if virus == "flu" {
         //Split name and segemnt unmber by last underscore
@@ -1154,7 +1164,7 @@ pub fn create_nt_seq_df(
             let segment_number = parts[0];
             let sample_id = parts[1].to_string();
 
-            for sample in vtype_df {
+            for sample in vtype_vec {
                 if let Some(vtype_sample_id) = &sample.sample_id {
                     if sample_id == *vtype_sample_id {
                         //A vs B segemnt identificaiton logic
@@ -1191,13 +1201,13 @@ pub fn create_nt_seq_df(
                             assigned_segment = (*segment).to_string();
                         }
 
-                        for record in irma_summary_df {
+                        for record in irma_summary_vec {
                             if let Some(record_sample_id) = &record.sample_id {
                                 if sample_id == *record_sample_id
                                     && record.reference == Some(sample.original_ref.clone())
                                     && assigned_segment == sample.ref_type
                                 {
-                                    nt_seq_df.push(NTSequences {
+                                    nt_seq_vec.push(NTSequences {
                                         sample_id: sample_id.clone(),
                                         sequence: entry.sequence.clone(),
                                         target_ref: Some(assigned_segment.clone()),
@@ -1216,10 +1226,10 @@ pub fn create_nt_seq_df(
         }
     } else {
         for entry in seq_data {
-            for record in irma_summary_df {
+            for record in irma_summary_vec {
                 if let Some(record_sample_id) = &record.sample_id {
                     if entry.name == *record_sample_id {
-                        nt_seq_df.push(NTSequences {
+                        nt_seq_vec.push(NTSequences {
                             sample_id: record_sample_id.clone(),
                             sequence: entry.sequence.clone(),
                             target_ref: None,
@@ -1234,18 +1244,18 @@ pub fn create_nt_seq_df(
             }
         }
     }
-    Ok(nt_seq_df)
+    Ok(nt_seq_vec)
 }
 
-pub fn divide_into_pass_fail_df(
-    nt_seq_df: &[NTSequences],
+pub fn divide_into_pass_fail_vec(
+    nt_seq_vec: &[NTSequences],
     platform: &str,
     virus: &str,
 ) -> Result<ProcessedSequences, Box<dyn Error>> {
-    let mut pass_df: Vec<SeqData> = Vec::new();
-    let mut fail_df: Vec<SeqData> = Vec::new();
+    let mut pass_vec: Vec<SeqData> = Vec::new();
+    let mut fail_vec: Vec<SeqData> = Vec::new();
 
-    for entry in nt_seq_df {
+    for entry in nt_seq_vec {
         if platform == "illumina" && virus == "flu" {
             if entry.pass_fail_decision == "Pass"
                 || entry.pass_fail_decision.contains("Premature stop codon")
@@ -1253,12 +1263,12 @@ pub fn divide_into_pass_fail_df(
                     && !entry.reference.contains("HA")
                     && !entry.reference.contains("NA")
             {
-                pass_df.push(SeqData {
+                pass_vec.push(SeqData {
                     name: format!("{} | {}", entry.sample_id.clone(), entry.reference),
                     sequence: entry.sequence.clone(),
                 });
             } else {
-                fail_df.push(SeqData {
+                fail_vec.push(SeqData {
                     name: format!(
                         "{} | {} | {}",
                         entry.sample_id.clone(),
@@ -1276,7 +1286,7 @@ pub fn divide_into_pass_fail_df(
                         .pass_fail_decision
                         .contains("Premature stop codon 'S'")
             {
-                pass_df.push(SeqData {
+                pass_vec.push(SeqData {
                     name: format!("{} | {}", entry.sample_id.clone(), entry.reference),
                     sequence: entry.sequence.clone(),
                 });
@@ -1287,12 +1297,12 @@ pub fn divide_into_pass_fail_df(
                         && !entry.reference.contains('F')
                         && !entry.reference.contains('G')
                 {
-                    pass_df.push(SeqData {
+                    pass_vec.push(SeqData {
                         name: format!("{} | {}", entry.sample_id.clone(), entry.reference),
                         sequence: entry.sequence.clone(),
                     });
                 } else {
-                    fail_df.push(SeqData {
+                    fail_vec.push(SeqData {
                         name: format!(
                             "{} | {} | {}",
                             entry.sample_id.clone(),
@@ -1314,12 +1324,12 @@ pub fn divide_into_pass_fail_df(
                 || entry.pass_fail_decision.contains("Premature stop codon")
                     && !entry.pass_fail_decision.contains(';')
             {
-                pass_df.push(SeqData {
+                pass_vec.push(SeqData {
                     name: format!("{} | {}", entry.sample_id.clone(), entry.reference),
                     sequence: entry.sequence.clone(),
                 });
             } else {
-                fail_df.push(SeqData {
+                fail_vec.push(SeqData {
                     name: format!(
                         "{} | {} | {}",
                         entry.sample_id.clone(),
@@ -1333,9 +1343,33 @@ pub fn divide_into_pass_fail_df(
     }
 
     let processed_nt_seqs = ProcessedSequences {
-        passed_seqs: pass_df,
-        failed_seqs: fail_df,
+        passed_seqs: pass_vec,
+        failed_seqs: fail_vec,
     };
 
     Ok(processed_nt_seqs)
+}
+
+pub fn create_aa_seq_vec(
+    aa_data: &[DaisSeqData],
+    irma_summary_vec: &[IRMASummary],
+    virus: &str,
+) -> Result<Vec<AASequences>, Box<dyn Error>> {
+    let mut aa_seq_vec: Vec<AASequences> = Vec::new();
+
+    for entry in aa_data {
+        for sample in irma_summary_vec {
+            if entry.sample_id == sample.sample_id && entry.ctype == sample.reference {
+                aa_seq_vec.push(AASequences {
+                    sample_id: entry.sample_id.clone(),
+                    sequence: entry.a.clone(),
+                    protein: Some(entry.protein),
+                    reference: record.reference.clone().unwrap_or_else(String::new),
+                    pass_fail_decision: record.pass_fail_reason.clone().unwrap_or_else(String::new),
+                });
+            }
+        }
+    }
+
+    Ok(aa_seq_vec)
 }

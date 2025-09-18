@@ -22,7 +22,7 @@ use std::{
     sync::Arc,
 };
 
-use super::data_processing::IRMASummary;
+use super::{data_ingest::SeqData, data_processing::IRMASummary};
 
 /////////////// Structs ///////////////
 // PassQC struct
@@ -313,5 +313,19 @@ pub fn negative_qc_statement(
     file.write_all(json_output.to_string().as_bytes())?;
 
     println!("JSON written to {output_file}");
+    Ok(())
+}
+
+//////////////// Writing to fasta ///////////////
+pub fn write_to_fasta(output_file: &str, seq_data_vec: &[SeqData]) -> Result<(), Box<dyn Error>> {
+    let mut file = File::create(output_file)?;
+
+    for seq_data in seq_data_vec {
+        writeln!(file, ">{}", seq_data.name)?;
+        writeln!(file, "{}", seq_data.sequence)?;
+    }
+
+    println!("FASTA written to {output_file}");
+
     Ok(())
 }

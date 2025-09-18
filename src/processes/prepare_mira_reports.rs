@@ -10,13 +10,13 @@ use crate::utils::{
     data_processing::{
         DaisVarsData, ProcessedCoverage, Subtype, collect_analysis_metadata, collect_negatives,
         collect_sample_id, compute_cvv_dais_variants, compute_dais_variants,
-        create_irma_summary_df, create_nt_seq_df, create_vtype_data, divide_into_pass_fail_df,
+        create_irma_summary_vec, create_nt_seq_vec, create_vtype_data, divide_into_pass_fail_vec,
         extract_field, extract_subtype_flu, extract_subtype_sc2, melt_reads_data,
         process_position_coverage_data, process_wgs_coverage_data, return_seg_data,
     },
     writing_outputs::{
         negative_qc_statement, write_irma_summary_to_pass_fail_json_file,
-        write_structs_to_csv_file, write_structs_to_split_json_file,
+        write_structs_to_csv_file, write_structs_to_split_json_file, write_to_fasta,
     },
 };
 use clap::Parser;
@@ -172,18 +172,18 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     )?;
 
     // Calculating the % coverage and median coverage for summary
-    let melted_reads_df = melt_reads_data(&read_data);
-    let mut calculated_cov_df: Vec<ProcessedCoverage> = Vec::new();
-    let mut calculated_position_cov_df: Vec<ProcessedCoverage> = Vec::new();
+    let melted_reads_vec = melt_reads_data(&read_data);
+    let mut calculated_cov_vec: Vec<ProcessedCoverage> = Vec::new();
+    let mut calculated_position_cov_vec: Vec<ProcessedCoverage> = Vec::new();
 
     if args.virus.to_lowercase() == "flu"
         || args.virus.to_lowercase() == "rsv"
         || args.virus.to_lowercase() == "sc2-spike"
     {
-        calculated_cov_df = process_wgs_coverage_data(&coverage_data, &ref_lengths)?;
+        calculated_cov_vec = process_wgs_coverage_data(&coverage_data, &ref_lengths)?;
     } else if args.virus.to_lowercase() == "sc2-wgs" {
-        calculated_cov_df = process_wgs_coverage_data(&coverage_data, &ref_lengths)?;
-        calculated_position_cov_df = process_position_coverage_data(&coverage_data, 21563, 25384)?;
+        calculated_cov_vec = process_wgs_coverage_data(&coverage_data, &ref_lengths)?;
+        calculated_position_cov_vec = process_position_coverage_data(&coverage_data, 21563, 25384)?;
     }
 
     //Gather subtype information
@@ -206,15 +206,15 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
 
     //Build prelim irma summary "dataframe"
     //More will be added and analyzed before final irma summary created
-    let mut irma_summary = create_irma_summary_df(
+    let mut irma_summary = create_irma_summary_vec(
         &sample_list,
-        &melted_reads_df,
-        &calculated_cov_df,
+        &melted_reads_vec,
+        &calculated_cov_vec,
         &allele_data,
         &indel_data,
         &subtype_data,
         &analysis_metadata,
-        Some(&calculated_position_cov_df),
+        Some(&calculated_position_cov_vec),
     )?;
 
     //todo: see how this works with the padded amended consensus
@@ -258,25 +258,41 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
         }
     }
 
-    let nt_seq_df = create_nt_seq_df(&seq_data, &vtype_data, &irma_summary, &args.virus)?;
+    let nt_seq_vec = create_nt_seq_vec(&seq_data, &vtype_data, &irma_summary, &args.virus)?;
 
-    let processed_nt_seq = divide_into_pass_fail_df(&nt_seq_df, &args.platform, &args.virus)?;
+    let processed_nt_seq = divide_into_pass_fail_vec(&nt_seq_vec, &args.platform, &args.virus)?;
 
-    let passed_df = &processed_nt_seq.passed_seqs;
-    let fail_df = &processed_nt_seq.failed_seqs;
+    let passed_vec = &processed_nt_seq.passed_seqs;
+    let fail_vec = &processed_nt_seq.failed_seqs;
 
-    println!("PASSED:   {passed_df:?}");
-    println!("FAILED:   {fail_df:?}");
+    println!("PASSED:   {passed_vec:?}");
+    println!("FAILED:   {fail_vec:?}");
+
+    let _ = write_to_fasta(
+        &format!(
+            "/home/xpa3/mira-oxide/test/{}_amended_consensus_summary.fasta",
+            &args.runid
+        ),
+        passed_vec,
+    );
+
+    let _ = write_to_fasta(
+        &format!(
+            "/home/xpa3/mira-oxide/test/{}_failed_amended_consensus_summary.fasta",
+            &args.runid
+        ),
+        fail_vec,
+    );
     //println!("{processed_nt_seq:?}");
     //println!("{seq_data:?}");
-    //println!("{nt_seq_df:?}");
+    //println!("{nt_seq_vec:?}");
     //println!("{vtype_data:?}");
     //println!("{qc_values:?}");
     //todo:remove before end
     //println!("{dais_vars_data:?}");
-    //println!("{melted_reads_df:?}");
-    //println!("{calculated_cov_df:?}");
-    //println!("{calculated_position_cov_df:?}");
+    //println!("{melted_reads_vec:?}");
+    //println!("{calculated_cov_vec:?}");
+    //println!("{calculated_position_cov_vec:?}");
     //println!("{irma_summary:?}");
     //println!("{subtype_data:?}");
 
@@ -579,7 +595,7 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
 
         write_structs_to_split_json_file(
             "/home/xpa3/mira-oxide/test/nt_sequences.json",
-            &nt_seq_df,
+            &nt_seq_vec,
             &nt_seq_columns,
             &nt_seq_columns,
         )?;
