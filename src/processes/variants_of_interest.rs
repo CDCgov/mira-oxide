@@ -272,7 +272,7 @@ pub fn extract_unique_samples(inputs: &Vec<DaisInput>) -> Vec<SampleSubtpyes> {
     sample_key
 }
 
-fn find_entries_with_same_except_ref_strain<'a>(
+fn find_duplicate_aa_entries_with_diff_strain<'a>(
     entries: &Vec<Entry<'a>>,
     sample_subtypes: &'a [SampleSubtpyes],
 ) -> Vec<Entry<'a>> {
@@ -324,6 +324,7 @@ fn find_entries_with_same_except_ref_strain<'a>(
                                 result.push(entry1.clone());
                             }
                         }
+                        println!("{result:?}");
                     }
                 }
             }
@@ -543,7 +544,7 @@ pub fn variants_of_interest_process(args: VariantsArgs) -> Result<(), Box<dyn Er
         let sample_subtypes = extract_unique_samples(&dais);
 
         let mutations_vec =
-            find_entries_with_same_except_ref_strain(&mutations_vec, &sample_subtypes);
+            find_duplicate_aa_entries_with_diff_strain(&mutations_vec, &sample_subtypes);
 
         // Write all entries from mutations_vec at the end
         for entry in &mutations_vec {
@@ -567,7 +568,7 @@ pub fn variants_of_interest_process(args: VariantsArgs) -> Result<(), Box<dyn Er
             writeln!(
                 &mut writer,
                 "{sample_id}{d}{ref_strain}{d}{gisaid_accession}{d}\
-                {subtype}{d}{ctype}{d}{dais_ref}{d}{protein}{d}\
+                {ctype}{d}{dais_ref}{d}{protein}{d}\
                 {ref_codon}{d}{mut_codon}{d}\
                 {aa_ref}:{aa_position}:{aa_mut}{d}\
                 {phenotypic_consequences}",
@@ -596,7 +597,7 @@ pub fn variants_of_interest_process(args: VariantsArgs) -> Result<(), Box<dyn Er
             writeln!(
                 &mut writer,
                 "{sample_id}{d}{ref_strain}{d}{gisaid_accession}{d}\
-                {subtype}{d}{ctype}{d}{dais_ref}{d}{protein}{d}\
+                {ctype}{d}{dais_ref}{d}{protein}{d}\
                 {ref_codon}{d}{mut_codon}{d}\
                 {aa_ref}:{aa_position}:{aa_mut}{d}\
                 {phenotypic_consequences}",
