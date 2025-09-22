@@ -9,10 +9,11 @@ use crate::utils::{
     },
     data_processing::{
         DaisVarsData, ProcessedCoverage, Subtype, collect_analysis_metadata, collect_negatives,
-        collect_sample_id, compute_cvv_dais_variants, compute_dais_variants,
-        create_irma_summary_vec, create_nt_seq_vec, create_vtype_data, divide_into_pass_fail_vec,
-        extract_field, extract_subtype_flu, extract_subtype_sc2, melt_reads_data,
-        process_position_coverage_data, process_wgs_coverage_data, return_seg_data,
+        collect_sample_id, compute_cvv_dais_variants, compute_dais_variants, create_aa_seq_vec,
+        create_irma_summary_vec, create_nt_seq_vec, create_vtype_data,
+        divide_aa_into_pass_fail_vec, divide_nt_into_pass_fail_vec, extract_field,
+        extract_subtype_flu, extract_subtype_sc2, melt_reads_data, process_position_coverage_data,
+        process_wgs_coverage_data, return_seg_data,
     },
     writing_outputs::{
         negative_qc_statement, write_irma_summary_to_pass_fail_json_file,
@@ -259,21 +260,26 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     }
 
     let nt_seq_vec = create_nt_seq_vec(&seq_data, &vtype_data, &irma_summary, &args.virus)?;
+    let aa_seq_vec = create_aa_seq_vec(&dais_seq_data, &irma_summary, &args.virus)?;
+    //println!("{aa_seq_vec:?}");
 
-    let processed_nt_seq = divide_into_pass_fail_vec(&nt_seq_vec, &args.platform, &args.virus)?;
+    let processed_nt_seq = divide_nt_into_pass_fail_vec(&nt_seq_vec, &args.platform, &args.virus)?;
+    let processed_aa_seq = divide_aa_into_pass_fail_vec(&aa_seq_vec, &args.platform, &args.virus)?;
 
-    let passed_vec = &processed_nt_seq.passed_seqs;
-    let fail_vec = &processed_nt_seq.failed_seqs;
+    let nt_passed_vec = &processed_nt_seq.passed_seqs;
+    let nt_fail_vec = &processed_nt_seq.failed_seqs;
+    let aa_passed_vec = &processed_aa_seq.passed_seqs;
+    let aa_fail_vec = &processed_aa_seq.failed_seqs;
 
-    println!("PASSED:   {passed_vec:?}");
-    println!("FAILED:   {fail_vec:?}");
+    println!("PASSED:   {aa_passed_vec:?}");
+    println!("FAILED:   {aa_fail_vec:?}");
 
     let _ = write_to_fasta(
         &format!(
             "/home/xpa3/mira-oxide/test/{}_amended_consensus_summary.fasta",
             &args.runid
         ),
-        passed_vec,
+        nt_passed_vec,
     );
 
     let _ = write_to_fasta(
@@ -281,8 +287,10 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
             "/home/xpa3/mira-oxide/test/{}_failed_amended_consensus_summary.fasta",
             &args.runid
         ),
-        fail_vec,
+        nt_fail_vec,
     );
+
+    //println!("{processed_aa_seq:?}");
     //println!("{processed_nt_seq:?}");
     //println!("{seq_data:?}");
     //println!("{nt_seq_vec:?}");

@@ -1233,7 +1233,7 @@ pub fn create_nt_seq_vec(
                             sample_id: record_sample_id.clone(),
                             sequence: entry.sequence.clone(),
                             target_ref: None,
-                            reference: record.reference.clone().unwrap_or_else(String::new),
+                            reference: record.reference.clone().unwrap_or(String::new()),
                             pass_fail_decision: record
                                 .pass_fail_reason
                                 .clone()
@@ -1247,7 +1247,9 @@ pub fn create_nt_seq_vec(
     Ok(nt_seq_vec)
 }
 
-pub fn divide_into_pass_fail_vec(
+//Take NTSequences and divide them into seqs that pass and seqs that fail
+//Pre step for printing the pass/fail amended concensus
+pub fn divide_nt_into_pass_fail_vec(
     nt_seq_vec: &[NTSequences],
     platform: &str,
     virus: &str,
@@ -1256,89 +1258,57 @@ pub fn divide_into_pass_fail_vec(
     let mut fail_vec: Vec<SeqData> = Vec::new();
 
     for entry in nt_seq_vec {
-        if platform == "illumina" && virus == "flu" {
-            if entry.pass_fail_decision == "Pass"
-                || entry.pass_fail_decision.contains("Premature stop codon")
-                    && !entry.pass_fail_decision.contains(';')
-                    && !entry.reference.contains("HA")
-                    && !entry.reference.contains("NA")
-            {
-                pass_vec.push(SeqData {
-                    name: format!("{} | {}", entry.sample_id.clone(), entry.reference),
-                    sequence: entry.sequence.clone(),
-                });
-            } else {
-                fail_vec.push(SeqData {
-                    name: format!(
-                        "{} | {} | {}",
-                        entry.sample_id.clone(),
-                        entry.reference,
-                        entry.pass_fail_decision
-                    ),
-                    sequence: entry.sequence.clone(),
-                });
+        let is_pass = match (platform, virus) {
+            ("illumina", "flu") => {
+                entry.pass_fail_decision == "Pass"
+                    || (entry.pass_fail_decision.contains("Premature stop codon")
+                        && !entry.pass_fail_decision.contains(';')
+                        && !entry.reference.contains("HA")
+                        && !entry.reference.contains("NA"))
             }
-        } else if platform == "illumina" && virus == "sc2-wgs" {
-            if entry.pass_fail_decision == "Pass"
-                || entry.pass_fail_decision.contains("Premature stop codon")
-                    && !entry.pass_fail_decision.contains(';')
-                    && !entry
-                        .pass_fail_decision
-                        .contains("Premature stop codon 'S'")
-            {
-                pass_vec.push(SeqData {
-                    name: format!("{} | {}", entry.sample_id.clone(), entry.reference),
-                    sequence: entry.sequence.clone(),
-                });
-            } else if platform == "illumina" && virus == "rsv" {
-                if entry.pass_fail_decision == "Pass"
-                    || entry.pass_fail_decision.contains("Premature stop codon")
+            ("illumina", "sc2-wgs") => {
+                entry.pass_fail_decision == "Pass"
+                    || (entry.pass_fail_decision.contains("Premature stop codon")
+                        && !entry.pass_fail_decision.contains(';')
+                        && !entry
+                            .pass_fail_decision
+                            .contains("Premature stop codon 'S'"))
+            }
+            ("illumina", "rsv") => {
+                entry.pass_fail_decision == "Pass"
+                    || (entry.pass_fail_decision.contains("Premature stop codon")
                         && !entry.pass_fail_decision.contains(';')
                         && !entry.reference.contains('F')
-                        && !entry.reference.contains('G')
-                {
-                    pass_vec.push(SeqData {
-                        name: format!("{} | {}", entry.sample_id.clone(), entry.reference),
-                        sequence: entry.sequence.clone(),
-                    });
-                } else {
-                    fail_vec.push(SeqData {
-                        name: format!(
-                            "{} | {} | {}",
-                            entry.sample_id.clone(),
-                            entry.reference,
-                            entry.pass_fail_decision
-                        ),
-                        sequence: entry.sequence.clone(),
-                    });
-                }
-            } else {
+                        && !entry.reference.contains('G'))
+            }
+            ("ont", _) => {
+                entry.pass_fail_decision == "Pass"
+                    || (entry.pass_fail_decision.contains("Premature stop codon")
+                        && !entry.pass_fail_decision.contains(';'))
+            }
+            _ => {
                 return Err(format!(
                     "Unhandled case for platform '{platform}' and virus '{virus}'"
                 )
                 .into());
             }
+        };
+
+        if is_pass {
+            pass_vec.push(SeqData {
+                name: format!("{} | {}", entry.sample_id.clone(), entry.reference),
+                sequence: entry.sequence.clone(),
+            });
         } else {
-            // ONT handling
-            if entry.pass_fail_decision == "Pass"
-                || entry.pass_fail_decision.contains("Premature stop codon")
-                    && !entry.pass_fail_decision.contains(';')
-            {
-                pass_vec.push(SeqData {
-                    name: format!("{} | {}", entry.sample_id.clone(), entry.reference),
-                    sequence: entry.sequence.clone(),
-                });
-            } else {
-                fail_vec.push(SeqData {
-                    name: format!(
-                        "{} | {} | {}",
-                        entry.sample_id.clone(),
-                        entry.reference,
-                        entry.pass_fail_decision
-                    ),
-                    sequence: entry.sequence.clone(),
-                });
-            }
+            fail_vec.push(SeqData {
+                name: format!(
+                    "{} | {} | {}",
+                    entry.sample_id.clone(),
+                    entry.reference,
+                    entry.pass_fail_decision
+                ),
+                sequence: entry.sequence.clone(),
+            });
         }
     }
 
@@ -1357,19 +1327,133 @@ pub fn create_aa_seq_vec(
 ) -> Result<Vec<AASequences>, Box<dyn Error>> {
     let mut aa_seq_vec: Vec<AASequences> = Vec::new();
 
-    for entry in aa_data {
-        for sample in irma_summary_vec {
-            if entry.sample_id == sample.sample_id && entry.ctype == sample.reference {
-                aa_seq_vec.push(AASequences {
-                    sample_id: entry.sample_id.clone(),
-                    sequence: entry.a.clone(),
-                    protein: Some(entry.protein),
-                    reference: record.reference.clone().unwrap_or_else(String::new),
-                    pass_fail_decision: record.pass_fail_reason.clone().unwrap_or_else(String::new),
-                });
+    if virus == "flu" {
+        for entry in aa_data {
+            if let Some(sample_id_str) = entry.sample_id.as_ref() {
+                let parts: Vec<&str> = sample_id_str.rsplitn(2, '_').collect();
+                if parts.len() != 2 {
+                    continue;
+                }
+
+                let sample_id = parts[1].to_string();
+
+                for sample in irma_summary_vec {
+                    if Some(sample_id.clone()) == sample.sample_id
+                        && Some(entry.ctype.clone()) == sample.reference
+                    {
+                        aa_seq_vec.push(AASequences {
+                            sample_id: sample_id.clone(),
+                            sequence: entry.aa_seq.clone(),
+                            protein: Some(entry.protein.clone()),
+                            reference: sample.reference.clone().unwrap_or_else(String::new),
+                            pass_fail_decision: sample
+                                .pass_fail_reason
+                                .clone()
+                                .unwrap_or_else(String::new),
+                        });
+                    }
+                }
+            }
+        }
+    } else {
+        for entry in aa_data {
+            if let Some(sample_id_str) = entry.sample_id.as_ref() {
+                for sample in irma_summary_vec {
+                    if Some(sample_id_str.clone()) == sample.sample_id
+                        && Some(entry.ctype.clone()) == sample.reference
+                    {
+                        aa_seq_vec.push(AASequences {
+                            sample_id: sample_id_str.clone(),
+                            sequence: entry.aa_seq.clone(),
+                            protein: Some(entry.protein.clone()),
+                            reference: sample.reference.clone().unwrap_or_else(String::new),
+                            pass_fail_decision: sample
+                                .pass_fail_reason
+                                .clone()
+                                .unwrap_or_else(String::new),
+                        });
+                    }
+                }
             }
         }
     }
-
     Ok(aa_seq_vec)
+}
+
+//Take AASequences and divide them into seqs that pass and seqs that fail
+//Pre step for printing the pass/fail amino acid concensus
+#[allow(clippy::too_many_lines)]
+pub fn divide_aa_into_pass_fail_vec(
+    nt_seq_vec: &[AASequences],
+    platform: &str,
+    virus: &str,
+) -> Result<ProcessedSequences, Box<dyn Error>> {
+    let mut pass_vec: Vec<SeqData> = Vec::new();
+    let mut fail_vec: Vec<SeqData> = Vec::new();
+
+    for entry in nt_seq_vec {
+        let is_pass = match (platform, virus) {
+            ("illumina", "flu") => {
+                entry.pass_fail_decision == "Pass"
+                    || (entry.pass_fail_decision.contains("Premature stop codon")
+                        && !entry.pass_fail_decision.contains(';')
+                        && !entry.reference.contains("HA")
+                        && !entry.reference.contains("NA"))
+            }
+            ("illumina", "sc2-wgs") => {
+                entry.pass_fail_decision == "Pass"
+                    || (entry.pass_fail_decision.contains("Premature stop codon")
+                        && !entry.pass_fail_decision.contains(';')
+                        && !entry
+                            .pass_fail_decision
+                            .contains("Premature stop codon 'S'"))
+            }
+            ("illumina", "rsv") => {
+                entry.pass_fail_decision == "Pass"
+                    || (entry.pass_fail_decision.contains("Premature stop codon")
+                        && !entry.pass_fail_decision.contains(';')
+                        && !entry.reference.contains('F')
+                        && !entry.reference.contains('G'))
+            }
+            ("ont", _) => {
+                entry.pass_fail_decision == "Pass"
+                    || (entry.pass_fail_decision.contains("Premature stop codon")
+                        && !entry.pass_fail_decision.contains(';'))
+            }
+            _ => {
+                return Err(format!(
+                    "Unhandled case for platform '{platform}' and virus '{virus}'"
+                )
+                .into());
+            }
+        };
+
+        if is_pass {
+            pass_vec.push(SeqData {
+                name: format!(
+                    "{} | {}",
+                    entry.sample_id.clone(),
+                    entry.protein.clone().unwrap_or_else(String::new),
+                ),
+                sequence: entry.sequence.clone(),
+            });
+        } else {
+            fail_vec.push(SeqData {
+                name: format!(
+                    "{} | {} | {}",
+                    entry.sample_id.clone(),
+                    entry.protein.clone().unwrap_or_else(String::new),
+                    entry.pass_fail_decision
+                ),
+                sequence: entry.sequence.clone(),
+            });
+        }
+    }
+
+    let processed_aa_seqs = ProcessedSequences {
+        passed_seqs: pass_vec,
+        failed_seqs: fail_vec,
+    };
+
+    Ok(processed_aa_seqs)
 }
