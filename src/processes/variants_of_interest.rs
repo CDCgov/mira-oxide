@@ -539,7 +539,7 @@ pub fn variants_of_interest_process(args: VariantsArgs) -> Result<(), Box<dyn Er
         }
     }
 
-    if &args.virus == "flu" {
+    if &args.virus == "INFLUENZA" {
         let sample_subtypes = extract_unique_samples(&dais);
 
         let mutations_vec =
