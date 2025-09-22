@@ -324,7 +324,6 @@ fn find_duplicate_aa_entries_with_diff_strain<'a>(
                                 result.push(entry1.clone());
                             }
                         }
-                        println!("{result:?}");
                     }
                 }
             }
@@ -552,7 +551,7 @@ pub fn variants_of_interest_process(args: VariantsArgs) -> Result<(), Box<dyn Er
                 sample_id,
                 ref_strain,
                 gisaid_accession,
-                subtype,
+                subtype: _,
                 ctype,
                 dais_ref,
                 protein,
@@ -581,7 +580,7 @@ pub fn variants_of_interest_process(args: VariantsArgs) -> Result<(), Box<dyn Er
                 sample_id,
                 ref_strain,
                 gisaid_accession,
-                subtype,
+                subtype: _,
                 ctype,
                 dais_ref,
                 protein,
