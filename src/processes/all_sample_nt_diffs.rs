@@ -79,8 +79,7 @@ pub fn all_sample_nt_diffs_process(args: NTDiffsArgs) {
     
         writeln!(
             &mut writer,
-            "sequence_1{}sequence_2{}nt_sequence_1{}position{}nt_sequence_2",
-            delim, delim, delim, delim
+            "sequence_1{delim}sequence_2{delim}nt_sequence_1{delim}position{delim}nt_sequence_2"
         ).unwrap();
 
         all_sequences.iter().for_each(|f| {
@@ -95,8 +94,7 @@ pub fn all_sample_nt_diffs_process(args: NTDiffsArgs) {
                         let nucleotide2 = char::from(*nt2);
                         writeln!(
                             &mut writer,
-                            "{}{}{}{}{}{}{}{}{}",
-                            name_1, delim, name_2, delim, nucleotide1, delim, i, delim, nucleotide2
+                            "{name_1}{delim}{name_2}{delim}{nucleotide1}{delim}{i}{delim}{nucleotide2}"
                         )
                         .unwrap();
                     }
