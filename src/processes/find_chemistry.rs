@@ -230,7 +230,7 @@ fn get_config_path(args: &FindChemArgs, seq_len: Option<usize>) -> String {
         .wd_path
         .to_str()
         .expect("Failed to convert work directory path to string");
-    format!("{}{}", wd_path, path_extension)
+    format!("{wd_path}{path_extension}")
 }
 
 #[derive(Debug)]
@@ -314,7 +314,7 @@ pub fn find_chemistry_process(args: FindChemArgs) -> Result<(), std::io::Error> 
     //let args = CheckChemArgs::parse();
     // handle input validation to ensure valid combinations of
     if let Err(e) = args.validate() {
-        eprintln!("Error: {}", e);
+        eprintln!("Error: {e}");
         std::process::exit(1);
     }
     // parse the arguments into output format
