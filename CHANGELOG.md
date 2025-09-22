@@ -9,7 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### `Added`
 
-- [PR #44](https://github.com/CDCgov/mira-oxide/pull/44) - Added filtering to a single subtype for the variants_of_interest outputs if the virus flu is passed to the program.
+- [PR #44](https://github.com/CDCgov/mira-oxide/pull/44) - Added filtering to a single subtype for the variants_of_interest outputs if the virus flu (as "INFLUENZA") is passed to the program.
+- [PR #46](https://github.com/CDCgov/mira-oxide/pull/46) - Added filtering to a single subtype for the positions_of_interest outputs if the virus flu (as "INFLUENZA") is passed to the program.
 
 ## [1.1.1] - 2025-09-11
 
