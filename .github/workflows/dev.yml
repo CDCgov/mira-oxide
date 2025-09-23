@@ -28,6 +28,7 @@ env:
   CARGO_TERM_COLOR: always   # Ensures colored Cargo output in logs.
   RELEASE_BIN: mira-oxide     # Canonical binary name used across packaging steps.
   REGISTRY: ghcr.io           # Container registry host (GitHub Container Registry).
+  DOCKERHUB_ORG: cdcgov       # Docker Hub org/team namespace
   # Docker Hub credentials expected: DOCKERHUB_USERNAME / DOCKERHUB_TOKEN
 
 jobs:
@@ -94,7 +95,7 @@ jobs:
         with:
           images: |
             ${{ env.REGISTRY }}/${{ github.repository }}
-            docker.io/${{ secrets.DOCKERHUB_USERNAME }}/mira-oxide
+            docker.io/${{ env.DOCKERHUB_ORG }}/mira-oxide
           tags: |
             type=raw,value=latest-${{ matrix.arch }},enable=${{ startsWith(github.ref_name, 'v') }}
             type=raw,value=${{ github.ref_name }}-${{ matrix.arch }},enable=${{ startsWith(github.ref_name, 'v') }}
@@ -186,7 +187,7 @@ jobs:
           docker manifest create $LATEST --amend ${LATEST}-x86_64 --amend ${LATEST}-aarch64
           docker manifest push $LATEST
 
-          DH_REPO="docker.io/${{ secrets.DOCKERHUB_USERNAME }}/mira-oxide"
+          DH_REPO="docker.io/${{ env.DOCKERHUB_ORG }}/mira-oxide"
           DH_VERSION=${DH_REPO}:${{ github.ref_name }}
           DH_LATEST=${DH_REPO}:latest
           docker manifest create $DH_VERSION --amend ${DH_VERSION}-x86_64 --amend ${DH_VERSION}-aarch64 || \
@@ -204,7 +205,7 @@ jobs:
           docker manifest create $TEST --amend ${TEST}-x86_64 --amend ${TEST}-aarch64
           docker manifest push $TEST
 
-          DH_REPO="docker.io/${{ secrets.DOCKERHUB_USERNAME }}/mira-oxide"
+          DH_REPO="docker.io/${{ env.DOCKERHUB_ORG }}/mira-oxide"
           DH_TEST=${DH_REPO}:test
           docker manifest create $DH_TEST --amend ${DH_TEST}-x86_64 --amend ${DH_TEST}-aarch64
           docker manifest push $DH_TEST
