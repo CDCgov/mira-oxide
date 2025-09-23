@@ -21,7 +21,6 @@ on:
   push:
     paths:
       - 'CHANGELOG.md'
-    
 
 permissions: {}  # Explicitly sets default job permissions to none (principle of least privilege). Each job grants what it needs.
 
@@ -29,6 +28,8 @@ env:
   CARGO_TERM_COLOR: always   # Ensures colored Cargo output in logs.
   RELEASE_BIN: mira-oxide     # Canonical binary name used across packaging steps.
   REGISTRY: ghcr.io           # Container registry host (GitHub Container Registry).
+  # DOCKER HUB: expects secrets DOCKERHUB_USERNAME and DOCKERHUB_TOKEN to be present.
+  # Repository on Docker Hub assumed to be 'mira-oxide' under the provided username.
 
 jobs:
   create-release:
@@ -75,18 +76,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4  # Source code for Docker build context.
 
-      - name: Log in to the Container registry
+      - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}        # ghcr.io
           username: ${{ github.actor }}        # Actor initiating the workflow (token auth is sufficient).
           password: ${{ secrets.GITHUB_TOKEN }}  # Token automatically scoped to repo; sufficient for GHCR push.
 
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
       - name: Extract metadata for Docker
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ github.repository }}  # Image repository path (may contain uppercase -> manifests later lowercase).
+          images: |
+            ${{ env.REGISTRY }}/${{ github.repository }}
+            docker.io/${{ secrets.DOCKERHUB_USERNAME }}/mira-oxide
           tags: |
             type=raw,value=latest-${{ matrix.arch }},enable=${{ startsWith(github.ref_name, 'v') }}
             type=raw,value=${{ github.ref_name }}-${{ matrix.arch }},enable=${{ startsWith(github.ref_name, 'v') }}
@@ -152,17 +161,24 @@ jobs:
       packages: write  # Required to push multi-arch manifests.
       contents: read   # Minimal read (not strictly required here, but harmless).
     steps:
-      - name: Log in to the Container registry
+      - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}  # Token automatically scoped to repo; sufficient for GHCR push.
 
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
       - name: Create and push manifests (version tags)
         if: startsWith(github.ref_name, 'v')
         shell: bash
         run: |
+          # GHCR manifests
           REPO=$(echo "${{ env.REGISTRY }}/${{ github.repository }}" | tr '[A-Z]' '[a-z]')
           VERSION=${REPO}:${{ github.ref_name }}
           LATEST=${REPO}:latest
@@ -172,14 +188,31 @@ jobs:
           docker manifest create $LATEST --amend ${LATEST}-x86_64 --amend ${LATEST}-aarch64
           docker manifest push $LATEST
 
+          # Docker Hub manifests
+          DH_REPO="docker.io/${{ secrets.DOCKERHUB_USERNAME }}/mira-oxide"
+          DH_VERSION=${DH_REPO}:${{ github.ref_name }}
+          DH_LATEST=${DH_REPO}:latest
+          docker manifest create $DH_VERSION --amend ${DH_VERSION}-x86_64 --amend ${DH_VERSION}-aarch64 || \
+            docker manifest create $DH_VERSION --amend ${DH_LATEST}-x86_64 --amend ${DH_LATEST}-aarch64
+          docker manifest push $DH_VERSION
+          docker manifest create $DH_LATEST --amend ${DH_LATEST}-x86_64 --amend ${DH_LATEST}-aarch64
+          docker manifest push $DH_LATEST
+
       - name: Create and push manifests (test tag)
         if: github.ref_name == 'test'
         shell: bash
         run: |
+          # GHCR test manifest
           REPO=$(echo "${{ env.REGISTRY }}/${{ github.repository }}" | tr '[A-Z]' '[a-z]')
           TEST=${REPO}:test
           docker manifest create $TEST --amend ${TEST}-x86_64 --amend ${TEST}-aarch64
           docker manifest push $TEST
+
+          # Docker Hub test manifest
+          DH_REPO="docker.io/${{ secrets.DOCKERHUB_USERNAME }}/mira-oxide"
+          DH_TEST=${DH_REPO}:test
+          docker manifest create $DH_TEST --amend ${DH_TEST}-x86_64 --amend ${DH_TEST}-aarch64
+          docker manifest push $DH_TEST
 
   build-mac-artifacts:
     name: Build Mac Artifacts
