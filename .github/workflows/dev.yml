@@ -1,4 +1,4 @@
-name: Release
+name: test-release
 
 # This workflow creates a GitHub Release when a tag is pushed and builds/distributes:
 #  - Multi-architecture (x86_64 + aarch64) Linux Docker images and binary tarballs
@@ -19,8 +19,9 @@ name: Release
 
 on:
   push:
-    paths:
-      - 'CHANGELOG.md'
+    tags:
+      - test                     # Special test tag to exercise the pipeline without marking release as latest.
+
     
 
 permissions: {}  # Explicitly sets default job permissions to none (principle of least privilege). Each job grants what it needs.
