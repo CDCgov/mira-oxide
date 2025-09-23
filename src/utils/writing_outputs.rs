@@ -1,28 +1,20 @@
-use crate::utils::{
-    data_ingest::ReadsData,
-    data_processing::{
-        extract_field, extract_string_fields_as_float, extract_string_fields_as_int,
-        filter_struct_by_ids,
-    },
+use crate::io::data_ingest::ReadsData;
+use crate::utils::data_processing::{
+    extract_field, extract_string_fields_as_float, extract_string_fields_as_int,
+    filter_struct_by_ids,
 };
 use arrow::{
     array::{ArrayRef, Float32Array, Int32Array, StringArray},
     datatypes::{DataType, Field, Schema},
     record_batch::RecordBatch,
 };
-use csv::Writer;
 use parquet::arrow::ArrowWriter;
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
-use std::{
-    collections::{HashMap, HashSet},
-    error::Error,
-    fs::File,
-    io::Write,
-    sync::Arc,
-};
+use serde_json::json;
+use std::collections::HashSet;
+use std::{collections::HashMap, error::Error, fs::File, io::Write, sync::Arc};
 
-use super::{data_ingest::SeqData, data_processing::IRMASummary};
+use super::data_processing::IRMASummary;
 
 /////////////// Structs ///////////////
 // PassQC struct
@@ -124,41 +116,6 @@ pub fn write_irma_summary_to_pass_fail_json_file(
     std::fs::write(file_path, serde_json::to_string_pretty(&split_json)?)?;
 
     println!("Split-oriented JSON written to {file_path}");
-
-    Ok(())
-}
-
-/// Write to CSV
-pub fn write_structs_to_csv_file<T: Serialize>(
-    file_path: &str,
-    data: &[T],
-    columns: &[&str],
-    struct_values: &[&str],
-) -> Result<(), Box<dyn Error>> {
-    let mut csv_writer = Writer::from_path(file_path)?;
-
-    csv_writer.write_record(columns)?;
-
-    for line in data {
-        // Serialize the struct into a JSON object
-        // This was the most effectient way to select columns for csv file
-        let json_value: Value = serde_json::to_value(line)?;
-
-        // Extract the specified fields from the JSON object
-        let row: Vec<String> = struct_values
-            .iter()
-            .map(|field| {
-                json_value
-                    .get(*field)
-                    .map_or(String::new(), |v| v.to_string().replace('"', ""))
-            })
-            .collect();
-
-        csv_writer.write_record(row)?;
-    }
-
-    csv_writer.flush()?;
-    println!("CSV written to {file_path}");
 
     Ok(())
 }
@@ -313,19 +270,5 @@ pub fn negative_qc_statement(
     file.write_all(json_output.to_string().as_bytes())?;
 
     println!("JSON written to {output_file}");
-    Ok(())
-}
-
-//////////////// Writing to fasta ///////////////
-pub fn write_to_fasta(output_file: &str, seq_data_vec: &[SeqData]) -> Result<(), Box<dyn Error>> {
-    let mut file = File::create(output_file)?;
-
-    for seq_data in seq_data_vec {
-        writeln!(file, ">{}", seq_data.name)?;
-        writeln!(file, "{}", seq_data.sequence)?;
-    }
-
-    println!("FASTA written to {output_file}");
-
     Ok(())
 }

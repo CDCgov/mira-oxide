@@ -74,5 +74,6 @@ fn main() {
     }
 }
 
+pub mod io;
 pub mod processes;
 pub mod utils;

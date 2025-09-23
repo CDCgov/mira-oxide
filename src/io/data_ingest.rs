@@ -165,6 +165,21 @@ pub struct IndelsData {
     pub instrument: Option<String>,
 }
 
+/// Run Info struct
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct RunInfo {
+    #[serde(rename = "program_name")]
+    pub program_name: Option<String>,
+    #[serde(rename = "PROGRAM")]
+    pub program: Option<String>,
+    #[serde(rename = "Iterative Refinement Meta-Assembler (IRMA)")]
+    pub irma: Option<String>,
+    #[serde(rename = "Run_ID")]
+    pub run_id: Option<String>,
+    #[serde(rename = "Instrument")]
+    pub instrument: Option<String>,
+}
+
 #[derive(Debug)]
 pub struct SeqData {
     pub name: String,
@@ -172,60 +187,6 @@ pub struct SeqData {
 }
 
 /////////////// Structs to hold dais-ribosome data ///////////////
-/// Insertion Data
-#[derive(Serialize, Deserialize, Debug)]
-pub struct InsertionData {
-    #[serde(rename = "ID")]
-    pub sample_id: Option<String>,
-    #[serde(rename = "C_type")]
-    pub ctype: Option<String>,
-    #[serde(rename = "Ref_ID")]
-    pub reference: String,
-    #[serde(rename = "Protein")]
-    pub protein: String,
-    #[serde(rename = "Upstream_aa")]
-    pub upstream_aa_position: String,
-    #[serde(rename = "Inserted_nucleotides")]
-    pub inserted_nucleotides: String,
-    #[serde(rename = "Inserted_residues")]
-    pub inserted_residues: String,
-    #[serde(rename = "Upstream_nt")]
-    pub upstream_nt: String,
-    #[serde(rename = "Codon_shift")]
-    pub in_frame: String,
-}
-
-/// Deletions Data
-#[derive(Serialize, Deserialize, Debug)]
-pub struct DeletionsData {
-    #[serde(rename = "ID")]
-    pub sample_id: Option<String>,
-    #[serde(rename = "C_type")]
-    pub ctype: Option<String>,
-    #[serde(rename = "Ref_ID")]
-    pub reference: String,
-    #[serde(rename = "Protein")]
-    pub protein: String,
-    #[serde(rename = "VH")]
-    pub vh: Option<String>,
-    #[serde(rename = "Del_AA_start")]
-    pub del_start_aa_position: Option<String>,
-    #[serde(rename = "Del_AA_end")]
-    pub del_end_aa_position: Option<String>,
-    #[serde(rename = "Del_AA_len")]
-    pub del_aa_length: String,
-    #[serde(rename = "In_frame")]
-    pub in_frame: String,
-    #[serde(rename = "CDS_ID")]
-    pub cds_id: Option<String>,
-    #[serde(rename = "Del_CDS_start")]
-    pub del_start_cds_position: String,
-    #[serde(rename = "Del_CDS_end")]
-    pub del_end_cds_position: String,
-    #[serde(rename = "Del_CDS_len")]
-    pub del_cds_length: Option<String>,
-}
-
 /// Dais Sequence Data
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DaisSeqData {
@@ -374,6 +335,33 @@ where
     Ok(records)
 }
 
+/// Read tab-delimited data and include the sample name
+fn process_txt_without_sample<R, T>(reader: R, has_headers: bool) -> std::vec::Vec<T>
+where
+    R: Read,
+    T: for<'de> Deserialize<'de>,
+{
+    let mut rdr = ReaderBuilder::new()
+        .has_headers(has_headers)
+        .delimiter(b'\t')
+        .from_reader(reader);
+
+    let mut records: Vec<T> = Vec::new();
+    for result in rdr.deserialize() {
+        match result {
+            Ok(record) => {
+                records.push(record);
+            }
+            Err(e) => {
+                // Log a warning and skip the invalid record
+                eprintln!("Warning: Failed to deserialize record: {e}");
+            }
+        }
+    }
+
+    records
+}
+
 /// Read in the coverage files made by IRMA and save to a vector of `CoverageData`
 pub fn coverage_data_collection(
     irma_path: impl AsRef<Path>,
@@ -452,6 +440,8 @@ pub fn reads_data_collection(
 /// Collecting allele data created by IRMA and and save to vector of `AllelesData`
 pub fn allele_data_collection(
     irma_path: &Path,
+    platform: &str,
+    runid: &str,
 ) -> Result<Vec<AllelesData>, Box<dyn std::error::Error>> {
     let pattern = format!(
         "{}/*/IRMA/*/tables/*variants.txt",
@@ -471,6 +461,11 @@ pub fn allele_data_collection(
                 // Read the data from the file and include the sample name
                 let mut records: Vec<AllelesData> = process_txt_with_sample(reader, true, &sample)?;
                 records.retain(|record| record.minority_frequency >= 0.05);
+                // Add platform and runid to each record
+                for record in &mut records {
+                    record.instrument = Some(platform.to_string());
+                    record.run_id = Some(runid.to_string());
+                }
                 alleles_data.append(&mut records);
             }
             Err(e) => println!("Error reading file: {e}"),
@@ -483,6 +478,8 @@ pub fn allele_data_collection(
 /// Note that insertions and deletions are being added  to the same Vec<Indelsdata>
 pub fn indels_data_collection(
     irma_path: impl AsRef<Path>,
+    platform: &str,
+    runid: &str,
 ) -> Result<Vec<IndelsData>, Box<dyn std::error::Error>> {
     let pattern1 = format!(
         "{}/*/IRMA/*/tables/*insertions.txt",
@@ -505,6 +502,11 @@ pub fn indels_data_collection(
 
                 // Read the data from the file and include the sample name
                 let mut records: Vec<IndelsData> = process_txt_with_sample(reader, true, &sample)?;
+                // Add platform and runid to each record
+                for record in &mut records {
+                    record.instrument = Some(platform.to_string());
+                    record.run_id = Some(runid.to_string());
+                }
                 indels_data.append(&mut records);
             }
             Err(e) => println!("Error reading file: {e}"),
@@ -646,6 +648,44 @@ pub fn get_reference_lens(
     Ok(ref_len_map)
 }
 
+/// Collect read info created by IRMA and save to struct of `RunInfo`
+pub fn run_info_collection(
+    irma_path: impl AsRef<Path>,
+    platform: &str,
+    runid: &str,
+) -> Result<Vec<RunInfo>, Box<dyn std::error::Error>> {
+    let pattern = format!(
+        "{}/*/IRMA/*/logs/run_info.txt",
+        irma_path.as_ref().display()
+    );
+
+    let mut run_info: Vec<RunInfo> = Vec::new();
+
+    // Start to iterate over all files matching the pattern
+    for entry in glob(&pattern).expect("Failed to read glob pattern") {
+        match entry {
+            Ok(path) => {
+                let file = File::open(&path)?;
+                let reader = BufReader::new(file);
+
+                // Read the data from the file
+                let mut records: Vec<RunInfo> = process_txt_without_sample(reader, true);
+                for line in &mut records {
+                    line.run_id = Some(runid.to_string());
+                    line.instrument = Some(platform.to_string());
+                }
+                run_info.extend(records);
+
+                // Break after processing the first valid file
+                break;
+            }
+            Err(e) => println!("Error reading file: {e}"),
+        }
+    }
+
+    Ok(run_info)
+}
+
 /////////////// Data reading functions for DAIS-ribosome ///////////////
 /// Read tab-delimited data a withouot including sample name
 pub fn process_txt<R, T>(reader: R, has_headers: bool) -> Result<Vec<T>, Box<dyn std::error::Error>>
@@ -665,67 +705,6 @@ where
     }
 
     Ok(records)
-}
-
-/// Read in dais-ribosome ins file fto `InsertionData` struct
-pub fn dais_insertion_data_collection(
-    dais_path: impl AsRef<Path>,
-) -> Result<Vec<InsertionData>, Box<dyn std::error::Error>> {
-    // Construct the glob pattern for matching files
-    //If using * situation, you will have to use glob
-    let pattern = format!(
-        "{}/aggregate_outputs/dais-ribosome/DAIS_ribosome.ins",
-        dais_path.as_ref().display()
-    );
-
-    let mut dais_ins_data: Vec<InsertionData> = Vec::new();
-
-    // Use the glob crate to find all matching files
-    for entry in glob(&pattern)? {
-        match entry {
-            Ok(path) => {
-                let file = File::open(&path)?;
-                let reader = BufReader::new(file);
-                let mut records: Vec<InsertionData> = process_txt(reader, false)?;
-                dais_ins_data.append(&mut records);
-            }
-            Err(e) => {
-                eprintln!("Error processing file: {e}");
-            }
-        }
-    }
-
-    Ok(dais_ins_data)
-}
-
-/// Read in dais-ribosome ins file fto `DeletionsData` struct
-pub fn dais_deletion_data_collection(
-    dais_path: impl AsRef<Path>,
-) -> Result<Vec<DeletionsData>, Box<dyn std::error::Error>> {
-    // Construct the glob pattern for matching files
-    //If using * situation, you will have to use glob
-    let pattern = format!(
-        "{}/aggregate_outputs/dais-ribosome/DAIS_ribosome.del",
-        dais_path.as_ref().display()
-    );
-
-    let mut dais_del_data: Vec<DeletionsData> = Vec::new();
-
-    // Use the glob crate to find all matching files
-    for entry in glob(&pattern)? {
-        match entry {
-            Ok(path) => {
-                let file = File::open(&path)?;
-                let reader = BufReader::new(file);
-                let mut records: Vec<DeletionsData> = process_txt(reader, false)?;
-                dais_del_data.append(&mut records);
-            }
-            Err(e) => {
-                eprintln!("Error processing file: {e}");
-            }
-        }
-    }
-    Ok(dais_del_data)
 }
 
 /// Read in dais-ribosome ins file fto `DaisSeqData` struct

@@ -12,7 +12,7 @@ use std::{
 use crate::processes::prepare_mira_reports::SamplesheetI;
 use crate::processes::prepare_mira_reports::SamplesheetO;
 
-use super::data_ingest::{
+use crate::io::data_ingest::{
     AllelesData, CoverageData, DaisSeqData, IndelsData, QCSettings, ReadsData, SeqData,
 };
 
@@ -35,6 +35,8 @@ pub struct DaisVarsData {
     pub protein: String,
     pub aa_variant_count: i32,
     pub aa_variants: String,
+    pub runid: String,
+    pub instrument: String,
 }
 
 /// Subtype Struct
@@ -109,7 +111,9 @@ pub struct NTSequences {
     pub sequence: String,
     pub target_ref: Option<String>,
     pub reference: String,
-    pub pass_fail_decision: String,
+    pub qc_decision: String,
+    pub runid: String,
+    pub instrument: String,
 }
 
 /// Nt Sequences Struct
@@ -119,7 +123,9 @@ pub struct AASequences {
     pub sequence: String,
     pub protein: Option<String>,
     pub reference: String,
-    pub pass_fail_decision: String,
+    pub qc_decision: String,
+    pub runid: String,
+    pub instrument: String,
 }
 
 // Processed Seqs Struct
@@ -369,6 +375,8 @@ pub fn return_seg_data(
 pub fn compute_dais_variants(
     ref_seqs_data: &[DaisSeqData],
     sample_seqs_data: &[DaisSeqData],
+    runid: &str,
+    instrument: &str,
 ) -> Result<Vec<DaisVarsData>, Box<dyn Error>> {
     let mut dais_vars_data: Vec<DaisVarsData> = Vec::new();
 
@@ -402,6 +410,8 @@ pub fn compute_dais_variants(
                     protein: sample_entry.protein.clone(),
                     aa_variant_count: var_aa_count,
                     aa_variants: aa_vars,
+                    runid: runid.to_owned(),
+                    instrument: instrument.to_owned(),
                 };
                 dais_vars_data.push(dais_vars_entry);
             }
@@ -434,6 +444,8 @@ pub fn compute_dais_variants(
 pub fn compute_cvv_dais_variants(
     ref_seqs_data: &[DaisSeqData],
     sample_seqs_data: &[DaisSeqData],
+    runid: &str,
+    instrument: &str,
 ) -> Result<Vec<DaisVarsData>, Box<dyn Error>> {
     let mut merged_data = merge_sequences(ref_seqs_data, sample_seqs_data);
 
@@ -474,6 +486,8 @@ pub fn compute_cvv_dais_variants(
             protein: entry.protein.clone(),
             aa_variant_count: entry.insertions_shift_frame.parse::<i32>().unwrap_or(0),
             aa_variants: entry.insertion.clone(),
+            runid: runid.to_owned(),
+            instrument: instrument.to_owned(),
         })
         .collect();
 
@@ -1150,6 +1164,8 @@ pub fn create_nt_seq_vec(
     vtype_vec: &[ProcessedRecord],
     irma_summary_vec: &[IRMASummary],
     virus: &str,
+    runid: &str,
+    instrument: &str,
 ) -> Result<Vec<NTSequences>, Box<dyn Error>> {
     let mut nt_seq_vec: Vec<NTSequences> = Vec::new();
 
@@ -1212,10 +1228,12 @@ pub fn create_nt_seq_vec(
                                         sequence: entry.sequence.clone(),
                                         target_ref: Some(assigned_segment.clone()),
                                         reference: sample.original_ref.clone(),
-                                        pass_fail_decision: record
+                                        qc_decision: record
                                             .pass_fail_reason
                                             .clone()
                                             .unwrap_or_else(String::new),
+                                        runid: runid.to_owned(),
+                                        instrument: instrument.to_owned(),
                                     });
                                 }
                             }
@@ -1234,10 +1252,12 @@ pub fn create_nt_seq_vec(
                             sequence: entry.sequence.clone(),
                             target_ref: None,
                             reference: record.reference.clone().unwrap_or(String::new()),
-                            pass_fail_decision: record
+                            qc_decision: record
                                 .pass_fail_reason
                                 .clone()
                                 .unwrap_or_else(String::new),
+                            runid: runid.to_owned(),
+                            instrument: instrument.to_owned(),
                         });
                     }
                 }
@@ -1260,31 +1280,29 @@ pub fn divide_nt_into_pass_fail_vec(
     for entry in nt_seq_vec {
         let is_pass = match (platform, virus) {
             ("illumina", "flu") => {
-                entry.pass_fail_decision == "Pass"
-                    || (entry.pass_fail_decision.contains("Premature stop codon")
-                        && !entry.pass_fail_decision.contains(';')
+                entry.qc_decision == "Pass"
+                    || (entry.qc_decision.contains("Premature stop codon")
+                        && !entry.qc_decision.contains(';')
                         && !entry.reference.contains("HA")
                         && !entry.reference.contains("NA"))
             }
             ("illumina", "sc2-wgs") => {
-                entry.pass_fail_decision == "Pass"
-                    || (entry.pass_fail_decision.contains("Premature stop codon")
-                        && !entry.pass_fail_decision.contains(';')
-                        && !entry
-                            .pass_fail_decision
-                            .contains("Premature stop codon 'S'"))
+                entry.qc_decision == "Pass"
+                    || (entry.qc_decision.contains("Premature stop codon")
+                        && !entry.qc_decision.contains(';')
+                        && !entry.qc_decision.contains("Premature stop codon 'S'"))
             }
             ("illumina", "rsv") => {
-                entry.pass_fail_decision == "Pass"
-                    || (entry.pass_fail_decision.contains("Premature stop codon")
-                        && !entry.pass_fail_decision.contains(';')
+                entry.qc_decision == "Pass"
+                    || (entry.qc_decision.contains("Premature stop codon")
+                        && !entry.qc_decision.contains(';')
                         && !entry.reference.contains('F')
                         && !entry.reference.contains('G'))
             }
             ("ont", _) => {
-                entry.pass_fail_decision == "Pass"
-                    || (entry.pass_fail_decision.contains("Premature stop codon")
-                        && !entry.pass_fail_decision.contains(';'))
+                entry.qc_decision == "Pass"
+                    || (entry.qc_decision.contains("Premature stop codon")
+                        && !entry.qc_decision.contains(';'))
             }
             _ => {
                 return Err(format!(
@@ -1305,7 +1323,7 @@ pub fn divide_nt_into_pass_fail_vec(
                     "{} | {} | {}",
                     entry.sample_id.clone(),
                     entry.reference,
-                    entry.pass_fail_decision
+                    entry.qc_decision
                 ),
                 sequence: entry.sequence.clone(),
             });
@@ -1324,6 +1342,8 @@ pub fn create_aa_seq_vec(
     aa_data: &[DaisSeqData],
     irma_summary_vec: &[IRMASummary],
     virus: &str,
+    runid: &str,
+    instrument: &str,
 ) -> Result<Vec<AASequences>, Box<dyn Error>> {
     let mut aa_seq_vec: Vec<AASequences> = Vec::new();
 
@@ -1346,10 +1366,12 @@ pub fn create_aa_seq_vec(
                             sequence: entry.aa_seq.clone(),
                             protein: Some(entry.protein.clone()),
                             reference: sample.reference.clone().unwrap_or_else(String::new),
-                            pass_fail_decision: sample
+                            qc_decision: sample
                                 .pass_fail_reason
                                 .clone()
                                 .unwrap_or_else(String::new),
+                            runid: runid.to_owned(),
+                            instrument: instrument.to_owned(),
                         });
                     }
                 }
@@ -1367,10 +1389,12 @@ pub fn create_aa_seq_vec(
                             sequence: entry.aa_seq.clone(),
                             protein: Some(entry.protein.clone()),
                             reference: sample.reference.clone().unwrap_or_else(String::new),
-                            pass_fail_decision: sample
+                            qc_decision: sample
                                 .pass_fail_reason
                                 .clone()
                                 .unwrap_or_else(String::new),
+                            runid: runid.to_owned(),
+                            instrument: instrument.to_owned(),
                         });
                     }
                 }
@@ -1394,31 +1418,29 @@ pub fn divide_aa_into_pass_fail_vec(
     for entry in nt_seq_vec {
         let is_pass = match (platform, virus) {
             ("illumina", "flu") => {
-                entry.pass_fail_decision == "Pass"
-                    || (entry.pass_fail_decision.contains("Premature stop codon")
-                        && !entry.pass_fail_decision.contains(';')
+                entry.qc_decision == "Pass"
+                    || (entry.qc_decision.contains("Premature stop codon")
+                        && !entry.qc_decision.contains(';')
                         && !entry.reference.contains("HA")
                         && !entry.reference.contains("NA"))
             }
             ("illumina", "sc2-wgs") => {
-                entry.pass_fail_decision == "Pass"
-                    || (entry.pass_fail_decision.contains("Premature stop codon")
-                        && !entry.pass_fail_decision.contains(';')
-                        && !entry
-                            .pass_fail_decision
-                            .contains("Premature stop codon 'S'"))
+                entry.qc_decision == "Pass"
+                    || (entry.qc_decision.contains("Premature stop codon")
+                        && !entry.qc_decision.contains(';')
+                        && !entry.qc_decision.contains("Premature stop codon 'S'"))
             }
             ("illumina", "rsv") => {
-                entry.pass_fail_decision == "Pass"
-                    || (entry.pass_fail_decision.contains("Premature stop codon")
-                        && !entry.pass_fail_decision.contains(';')
+                entry.qc_decision == "Pass"
+                    || (entry.qc_decision.contains("Premature stop codon")
+                        && !entry.qc_decision.contains(';')
                         && !entry.reference.contains('F')
                         && !entry.reference.contains('G'))
             }
             ("ont", _) => {
-                entry.pass_fail_decision == "Pass"
-                    || (entry.pass_fail_decision.contains("Premature stop codon")
-                        && !entry.pass_fail_decision.contains(';'))
+                entry.qc_decision == "Pass"
+                    || (entry.qc_decision.contains("Premature stop codon")
+                        && !entry.qc_decision.contains(';'))
             }
             _ => {
                 return Err(format!(
@@ -1443,7 +1465,7 @@ pub fn divide_aa_into_pass_fail_vec(
                     "{} | {} | {}",
                     entry.sample_id.clone(),
                     entry.protein.clone().unwrap_or_else(String::new),
-                    entry.pass_fail_decision
+                    entry.qc_decision
                 ),
                 sequence: entry.sequence.clone(),
             });

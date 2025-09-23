@@ -1,12 +1,15 @@
 #![allow(dead_code, unused_imports)]
-use crate::utils::{
+use crate::io::{
     data_ingest::{
         DaisSeqData, QCConfig, QCSettings, allele_data_collection,
         amended_consensus_data_collection, coverage_data_collection, create_reader,
-        dais_deletion_data_collection, dais_insertion_data_collection,
         dais_ref_seq_data_collection, dais_sequence_data_collection, get_reference_lens,
-        indels_data_collection, read_csv, read_yaml, reads_data_collection,
+        indels_data_collection, read_csv, read_yaml, reads_data_collection, run_info_collection,
     },
+    write_csv_files::write_out_all_csv_mira_reports,
+    write_fasta_files::write_out_all_fasta_files,
+};
+use crate::utils::{
     data_processing::{
         DaisVarsData, ProcessedCoverage, Subtype, collect_analysis_metadata, collect_negatives,
         collect_sample_id, compute_cvv_dais_variants, compute_dais_variants, create_aa_seq_vec,
@@ -17,7 +20,7 @@ use crate::utils::{
     },
     writing_outputs::{
         negative_qc_statement, write_irma_summary_to_pass_fail_json_file,
-        write_structs_to_csv_file, write_structs_to_split_json_file, write_to_fasta,
+        write_structs_to_split_json_file,
     },
 };
 use clap::Parser;
@@ -39,6 +42,10 @@ pub struct ReportsArgs {
     #[arg(short = 'i', long)]
     /// The file path to the IRMA outputs
     irma_path: PathBuf,
+
+    #[arg(short = 'o', long)]
+    /// The file path to the IRMA outputs
+    output_path: PathBuf,
 
     #[arg(short = 's', long)]
     /// The filepath to the input samplesheet
@@ -92,7 +99,6 @@ enum Samplesheet {
     ONT(Vec<SamplesheetO>),
 }
 
-//todo: split ingest, proccessing and writing out
 #[allow(clippy::too_many_lines)]
 pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Error>> {
     ///////////////////////////////////////////////////////////////////////////
@@ -128,8 +134,9 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     let coverage_data = coverage_data_collection(&args.irma_path, &args.platform, &args.runid)?;
     let read_data = reads_data_collection(&args.irma_path, &args.platform, &args.runid)?;
     let vtype_data = create_vtype_data(&read_data);
-    let allele_data = allele_data_collection(&args.irma_path)?;
-    let indel_data = indels_data_collection(&args.irma_path)?;
+    let allele_data = allele_data_collection(&args.irma_path, &args.platform, &args.runid)?;
+    let indel_data = indels_data_collection(&args.irma_path, &args.platform, &args.runid)?;
+    let run_info = run_info_collection(&args.irma_path, &args.platform, &args.runid)?;
 
     let seq_data = amended_consensus_data_collection(&args.irma_path, &args.virus)?;
     let ref_lengths = match get_reference_lens(&args.irma_path) {
@@ -144,8 +151,6 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     }));
 
     //Read in DAIS-ribosome data
-    let _dais_ins_data = dais_insertion_data_collection(&args.irma_path)?;
-    let _dais_del_data = dais_deletion_data_collection(&args.irma_path)?;
     let dais_seq_data = dais_sequence_data_collection(&args.irma_path)?;
     let mut dais_ref_data: Vec<DaisSeqData> = Vec::new();
     if args.virus.to_lowercase() == "flu" || args.virus.to_lowercase() == "rsv" {
@@ -158,12 +163,14 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     let mut dais_vars_data: Vec<DaisVarsData> = Vec::new();
 
     if args.virus.to_lowercase() == "flu" {
-        dais_vars_data = compute_dais_variants(&dais_ref_data, &dais_seq_data)?;
+        dais_vars_data =
+            compute_dais_variants(&dais_ref_data, &dais_seq_data, &args.runid, &args.platform)?;
     } else if args.virus.to_lowercase() == "sc2-wgs"
         || args.virus.to_lowercase() == "sc2"
         || args.virus.to_lowercase() == "rsv"
     {
-        dais_vars_data = compute_cvv_dais_variants(&dais_ref_data, &dais_seq_data)?;
+        dais_vars_data =
+            compute_cvv_dais_variants(&dais_ref_data, &dais_seq_data, &args.runid, &args.platform)?;
     }
 
     negative_qc_statement(
@@ -192,7 +199,10 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     let mut subtype_data: Vec<Subtype> = Vec::new();
     if args.virus.to_lowercase() == "flu" {
         subtype_data = extract_subtype_flu(&dais_vars_data)?;
-    } else if args.virus.to_lowercase() == "sc2-wgs" || args.virus.to_lowercase() == "sc2-spike" {
+    } else if args.virus.to_lowercase() == "sc2-wgs"
+        || args.virus.to_lowercase() == "sc2-spike"
+        || args.virus.to_lowercase() == "rsv"
+    {
         subtype_data = extract_subtype_sc2(&dais_vars_data)?;
     }
 
@@ -259,335 +269,54 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
         }
     }
 
-    let nt_seq_vec = create_nt_seq_vec(&seq_data, &vtype_data, &irma_summary, &args.virus)?;
-    let aa_seq_vec = create_aa_seq_vec(&dais_seq_data, &irma_summary, &args.virus)?;
-    //println!("{aa_seq_vec:?}");
+    let nt_seq_vec = create_nt_seq_vec(
+        &seq_data,
+        &vtype_data,
+        &irma_summary,
+        &args.virus,
+        &args.runid,
+        &args.platform,
+    )?;
+    let aa_seq_vec = create_aa_seq_vec(
+        &dais_seq_data,
+        &irma_summary,
+        &args.virus,
+        &args.runid,
+        &args.platform,
+    )?;
 
     let processed_nt_seq = divide_nt_into_pass_fail_vec(&nt_seq_vec, &args.platform, &args.virus)?;
     let processed_aa_seq = divide_aa_into_pass_fail_vec(&aa_seq_vec, &args.platform, &args.virus)?;
 
-    let nt_passed_vec = &processed_nt_seq.passed_seqs;
-    let nt_fail_vec = &processed_nt_seq.failed_seqs;
-    let aa_passed_vec = &processed_aa_seq.passed_seqs;
-    let aa_fail_vec = &processed_aa_seq.failed_seqs;
+    /////////////////////////////////////////////////////////////////////////////
+    //////////////////////////////// Write files ////////////////////////////////
+    /////////////////////////////////////////////////////////////////////////////
 
-    println!("PASSED:   {aa_passed_vec:?}");
-    println!("FAILED:   {aa_fail_vec:?}");
-
-    let _ = write_to_fasta(
-        &format!(
-            "/home/xpa3/mira-oxide/test/{}_amended_consensus_summary.fasta",
-            &args.runid
-        ),
-        nt_passed_vec,
-    );
-
-    let _ = write_to_fasta(
-        &format!(
-            "/home/xpa3/mira-oxide/test/{}_failed_amended_consensus_summary.fasta",
-            &args.runid
-        ),
-        nt_fail_vec,
-    );
-
-    //println!("{processed_aa_seq:?}");
-    //println!("{processed_nt_seq:?}");
-    //println!("{seq_data:?}");
-    //println!("{nt_seq_vec:?}");
-    //println!("{vtype_data:?}");
-    //println!("{qc_values:?}");
-    //todo:remove before end
-    //println!("{dais_vars_data:?}");
-    //println!("{melted_reads_vec:?}");
-    //println!("{calculated_cov_vec:?}");
-    //println!("{calculated_position_cov_vec:?}");
-    //println!("{irma_summary:?}");
-    //println!("{subtype_data:?}");
-
-    let summary_columns: Vec<&str> = if args.virus.to_lowercase() == "sc2-wgs" {
-        vec![
-            "sample_id",
-            "total_reads",
-            "pass_qc",
-            "reads_mapped",
-            "reference",
-            "precent_reference_coverage",
-            "median_coverage",
-            "count_minor_snv",
-            "count_minor_indel",
-            "spike_percent_coverage",
-            "spike_median_coverage",
-            "pass_fail_reason",
-            "subtype",
-            "mira_module",
-            "runid",
-            "instrument",
-        ]
-    } else {
-        vec![
-            "sample_id",
-            "total_reads",
-            "pass_qc",
-            "reads_mapped",
-            "reference",
-            "precent_reference_coverage",
-            "median_coverage",
-            "count_minor_snv",
-            "count_minor_indel",
-            "pass_fail_reason",
-            "subtype",
-            "mira_module",
-            "runid",
-            "instrument",
-        ]
-    };
-
-    write_structs_to_csv_file(
-        &format!("/home/xpa3/mira-oxide/test/{}_summary.csv", &args.runid),
-        &irma_summary,
-        &summary_columns,
-        &summary_columns,
+    write_out_all_fasta_files(
+        &args.output_path,
+        &processed_nt_seq.passed_seqs,
+        &processed_nt_seq.failed_seqs,
+        &processed_aa_seq.passed_seqs,
+        &processed_aa_seq.failed_seqs,
+        &args.runid,
     )?;
 
-    /////////////////////////////////////////////////////////////////////////////
-    /////////////// Write the structs to JSON files and CSV files ///////////////
-    /////////////////////////////////////////////////////////////////////////////
+    write_out_all_csv_mira_reports(
+        &args.output_path,
+        &coverage_data,
+        &read_data,
+        &allele_data,
+        &indel_data,
+        &dais_vars_data,
+        &irma_summary,
+        &nt_seq_vec,
+        &aa_seq_vec,
+        &run_info,
+        &args.runid,
+        &args.virus,
+    )?;
+
     /*
-        // Writing out Coverage data
-        let coverage_struct_values = vec![
-            "Sample",
-            "Reference_Name",
-            "Position",
-            "Coverage Depth",
-            "Consensus",
-            "Deletions",
-            "Ambiguous",
-            "Consensus_Count",
-            "Consensus_Average_Quality",
-        ];
-
-        let coverage_columns = vec![
-            "sample_id",
-            "reference",
-            "reference_position",
-            "depth",
-            "consensus",
-            "deletions",
-            "ambiguous",
-            "consensus_count",
-            "consensus_quality",
-        ];
-
-        write_structs_to_split_json_file(
-            "/home/xpa3/mira-oxide/test/coverage_data.json",
-            &coverage_data,
-            &coverage_columns,
-            &coverage_struct_values,
-        )?;
-        write_structs_to_csv_file(
-            "/home/xpa3/mira-oxide/test/coverage_data.csv",
-            &coverage_data,
-            &coverage_columns,
-            &coverage_struct_values,
-        )?;
-
-        // Writing out reads data
-        let reads_struct_values = vec![
-            "Sample",
-            "Record",
-            "Reads",
-            "Patterns",
-            "PairsAndWidows",
-            "Stage",
-        ];
-        let reads_columns = vec![
-            "sample_id",
-            "record",
-            "reads",
-            "patterns",
-            "pairs_and_windows",
-            "stage",
-        ];
-        write_structs_to_split_json_file(
-            "/home/xpa3/mira-oxide/test/reads.json",
-            &read_data,
-            &reads_columns,
-            &reads_struct_values,
-        )?;
-        write_structs_to_csv_file(
-            "/home/xpa3/mira-oxide/test/reads.csv",
-            &read_data,
-            &reads_columns,
-            &reads_struct_values,
-        )?;
-
-        // Writing out vtype data (json only)
-        let vtype_columns = vec!["sample_id", "vtype", "ref_type", "subtype"];
-        write_structs_to_split_json_file(
-            "/home/xpa3/mira-oxide/test/vtype.json",
-            &vtype_data,
-            &vtype_columns,
-            &vtype_columns,
-        )?;
-
-        // Writing out allele csv and json file
-        let allele_struct_values = vec![
-            "Sample",
-            "Upstream_Position",
-            "Reference_Name",
-            "Context",
-            "Length",
-            "Insert",
-            "Count",
-            "Total",
-            "Frequency",
-        ];
-        let allele_columns = vec![
-            "sample",
-            "sample_upstream_position",
-            "reference",
-            "context",
-            "length",
-            "insert",
-            "count",
-            "upstream_base_coverage",
-            "frequency",
-        ];
-        write_structs_to_split_json_file(
-            "/home/xpa3/mira-oxide/test/alleles.json",
-            &allele_data,
-            &allele_columns,
-            &allele_struct_values,
-        )?;
-
-        write_structs_to_csv_file(
-            "/home/xpa3/mira-oxide/test/alleles.csv",
-            &allele_data,
-            &allele_columns,
-            &allele_struct_values,
-        )?;
-
-        // Writing out indel csv and josn file
-        let indels_struct_values = vec![
-            "Sample",
-            "Upstream_Position",
-            "Reference_Name",
-            "Context",
-            "Length",
-            "Insert",
-            "Count",
-            "Total",
-            "Frequency",
-        ];
-        let indels_columns = vec![
-            "sample",
-            "sample_upstream_position",
-            "reference",
-            "context",
-            "length",
-            "insert",
-            "count",
-            "upstream_base_coverage",
-            "frequency",
-        ];
-        write_structs_to_split_json_file(
-            "/home/xpa3/mira-oxide/test/indels.json",
-            &indel_data,
-            &indels_columns,
-            &indels_struct_values,
-        )?;
-
-        write_structs_to_csv_file(
-            "/home/xpa3/mira-oxide/test/indels.csv",
-            &indel_data,
-            &indels_columns,
-            &indels_struct_values,
-        )?;
-
-        // Write out ref_data.json
-        write_ref_data_json(
-            "/home/xpa3/mira-oxide/test/ref_data.json",
-            &ref_lengths,
-            &segments,
-            &segset,
-            &segcolor,
-        )?;
-
-        // write out the dais_vars.json and the {runid}_aavars.csv
-        let aavars_columns = vec![
-            "sample_id",
-            "reference_id",
-            "protein",
-            "aa_variant_count",
-            "aa_variants",
-        ];
-
-        write_structs_to_split_json_file(
-            "/home/xpa3/mira-oxide/test/dais_vars.json",
-            &dais_vars_data,
-            &aavars_columns,
-            &aavars_columns,
-        )?;
-
-        write_structs_to_csv_file(
-            &format!("/home/xpa3/mira-oxide/test/{}_aavars.csv", &args.runid),
-            &dais_vars_data,
-            &aavars_columns,
-            &aavars_columns,
-        )?;
-
-        // write out the summary.json and the {runid}_summary.csv
-        let summary_columns: Vec<&str> = if args.virus.to_lowercase() == "sc2-wgs" {
-            vec![
-                "sample_id",
-                "total_reads",
-                "pass_qc",
-                "reads_mapped",
-                "reference",
-                "precent_reference_coverage",
-                "median_coverage",
-                "count_minor_snv",
-                "count_minor_indel",
-                "spike_percent_coverage",
-                "spike_median_coverage",
-                "pass_fail_reason",
-                "subtype",
-                "mira_module",
-                "runid",
-                "instrument",
-            ]
-        } else {
-            vec![
-                "sample_id",
-                "total_reads",
-                "pass_qc",
-                "reads_mapped",
-                "reference",
-                "precent_reference_coverage",
-                "median_coverage",
-                "count_minor_snv",
-                "count_minor_indel",
-                "pass_fail_reason",
-                "subtype",
-                "mira_module",
-                "runid",
-                "instrument",
-            ]
-        };
-
-        write_structs_to_split_json_file(
-            "/home/xpa3/mira-oxide/test/irma_summary.json",
-            &irma_summary,
-            &summary_columns,
-            &summary_columns,
-        )?;
-
-        write_structs_to_csv_file(
-            &format!("/home/xpa3/mira-oxide/test/{}_summary.csv", &args.runid),
-            &irma_summary,
-            &summary_columns,
-            &summary_columns,
-        )?;
 
         write_irma_summary_to_pass_fail_json_file(
             "/home/xpa3/mira-oxide/test/pass_fail_qc.json",
