@@ -1,17 +1,17 @@
-#![allow(dead_code, unused_imports)]
+use crate::utils::alignment::align_sequences;
 use clap::Parser;
 use csv::ReaderBuilder;
 use either::Either;
 use serde::{self, Deserialize, de::DeserializeOwned};
 use std::{
+    collections::{HashMap, HashSet},
     error::Error,
     fs::{File, OpenOptions},
     io::{BufRead, BufReader, BufWriter, Stdin, Write, stdin, stdout},
-    path::{Path, PathBuf},
+    path::PathBuf,
 };
 use zoe::{
-    alignment::{ScalarProfile, sw::sw_scalar_alignment},
-    data::{ByteIndexMap, StdGeneticCode, WeightMatrix, nucleotides::GetCodons},
+    data::{StdGeneticCode, nucleotides::GetCodons},
     prelude::{Len, Nucleotides},
 };
 
@@ -21,16 +21,20 @@ use crate::utils::alignment::align_sequences;
 #[command(about = "Tool for calculating amino acid difference tables")]
 pub struct VariantsArgs {
     #[arg(short = 'i', long)]
-    /// Optional input fasta
+    /// Input dais file
     input_file: PathBuf,
 
     #[arg(short = 'r', long)]
-    /// Optional input fasta
+    /// Reference strains file
     ref_file: PathBuf,
 
     #[arg(short = 'm', long)]
-    /// Optional input fasta
+    /// Variants of interest file
     muts_file: PathBuf,
+
+    #[arg(short = 'v', long)]
+    /// virus that is being analyzed
+    virus: String,
 
     #[arg(short = 'o', long)]
     /// Optional output delimited file
@@ -60,10 +64,11 @@ fn read_tsv<T: DeserializeOwned, R: std::io::Read>(
     Ok(records)
 }
 
+#[allow(dead_code)]
 #[derive(Deserialize, Debug)]
 pub struct DaisInput {
     sample_id: String,
-    subtype: String,
+    ctype: String,
     ref_strain: String,
     protein: String,
     nt_hash: String,
@@ -78,6 +83,7 @@ pub struct DaisInput {
     cds_nt_coordinates: String,
 }
 
+#[allow(dead_code)]
 #[derive(Deserialize, Debug)]
 pub struct RefInput {
     isolate_id: String,
@@ -93,6 +99,14 @@ pub struct RefInput {
 }
 
 #[derive(Deserialize, Debug)]
+pub struct SampleSubtpyes {
+    sample_id: String,
+    sample_name: String,
+    segment_number: String,
+    subtype: String,
+}
+
+#[derive(Deserialize, Debug)]
 pub struct MutsOfInterestInput {
     subtype: String,
     protein: String,
@@ -101,11 +115,13 @@ pub struct MutsOfInterestInput {
     description: String,
 }
 
+#[derive(Clone, Debug)]
 pub struct Entry<'a> {
     sample_id: &'a str,
     ref_strain: &'a str,
     gisaid_accession: &'a str,
     subtype: &'a str,
+    ctype: &'a str,
     dais_ref: &'a str,
     protein: &'a str,
     ref_codon: String,
@@ -128,7 +144,7 @@ impl Entry<'_> {
         self.aa_ref = aa_1 as char;
         let hold_aa_mut = self.aa_mut.to_string();
 
-        for muts_entry in muts_columns {
+        for muts_entry in muts_columns.iter() {
             // Check if the mutation matches the entry
             if subtype == muts_entry.subtype
                 && self.protein == muts_entry.protein
@@ -136,9 +152,10 @@ impl Entry<'_> {
             {
                 // Use match for cleaner handling of `hold_aa_mut` cases
                 self.phenotypic_consequences = match hold_aa_mut.as_str() {
+                    "." => "amino acid information missing".to_string(),
                     "~" => "partial amino acid".to_string(),
                     "-" => "amino acid covered".to_string(),
-                    "." | "X" => "amino acid information missing".to_string(),
+                    "X" => "amino acid information missing".to_string(),
                     aa if aa == muts_entry.aa => muts_entry.description.clone(),
                     _ => String::new(),
                 };
@@ -151,8 +168,24 @@ impl Entry<'_> {
     }
 }
 
-fn create_reader(path: Option<&PathBuf>) -> std::io::Result<BufReader<Either<File, Stdin>>> {
-    let reader = if let Some(file_path) = path {
+impl<'a> Entry<'a> {
+    // Helper function to compare two entries ignoring `ref_strain`
+    fn is_same_except_ref_strain(&self, other: &Entry) -> bool {
+        self.sample_id == other.sample_id
+            && self.ctype == other.ctype
+            && self.dais_ref == other.dais_ref
+            && self.protein == other.protein
+            && self.ref_codon == other.ref_codon
+            && self.mut_codon == other.mut_codon
+            && self.aa_ref == other.aa_ref
+            && self.aa_position == other.aa_position
+            && self.aa_mut == other.aa_mut
+            && self.phenotypic_consequences == other.phenotypic_consequences
+    }
+}
+
+fn create_reader(path: Option<PathBuf>) -> std::io::Result<BufReader<Either<File, Stdin>>> {
+    let reader = if let Some(ref file_path) = path {
         let file = OpenOptions::new().read(true).open(file_path)?;
         BufReader::new(Either::Left(file))
     } else {
@@ -180,12 +213,137 @@ pub fn lines_to_vec<R: BufRead>(reader: R) -> std::io::Result<Vec<Vec<String>>> 
 
     Ok(columns)
 }
-// to-do: perhaps refactor this into more manageable functions
-#[allow(clippy::too_many_lines)]
+
+pub fn extract_unique_samples(inputs: &Vec<DaisInput>) -> Vec<SampleSubtpyes> {
+    let mut unique_sample_ids = HashSet::new();
+    let mut sample_list = Vec::new();
+    let mut sample_key: Vec<SampleSubtpyes> = Vec::new();
+
+    // Collect unique sample IDs
+    for entry in inputs {
+        if unique_sample_ids.insert(entry.sample_id.clone()) {
+            sample_list.push(entry.sample_id.clone());
+        }
+    }
+
+    // Create SampleSubtypes structs
+    for sample in sample_list {
+        let parts: Vec<&str> = sample.rsplitn(2, '_').collect();
+        if parts.len() != 2 {
+            continue;
+        }
+
+        let segment_number = parts[0];
+        let sample_name = parts[1].to_string();
+
+        sample_key.push(SampleSubtpyes {
+            sample_id: sample.clone(),
+            sample_name,
+            segment_number: segment_number.to_owned(),
+            subtype: "".to_string(),
+        });
+    }
+
+    // Update subtype field based on matching sample_id and subtype containing "NA"
+    for entry in inputs {
+        if entry.ctype.contains("NA") {
+            for sample in &mut sample_key {
+                if sample.sample_id == entry.sample_id {
+                    sample.subtype = entry.ctype.clone();
+                }
+            }
+        }
+    }
+    // Find the subtype for segment_number 6 for each sample_name
+    let mut segment_6_subtypes: HashMap<String, String> = HashMap::new();
+    for sample in &sample_key {
+        if sample.segment_number == "6" {
+            segment_6_subtypes.insert(sample.sample_name.clone(), sample.subtype.clone());
+        }
+    }
+
+    // Update all entries to use the subtype from segment_number 6 or "unknown" if not found
+    for sample in &mut sample_key {
+        if let Some(subtype) = segment_6_subtypes.get(&sample.sample_name) {
+            sample.subtype = subtype.clone();
+        } else {
+            sample.subtype = "unknown".to_string();
+        }
+    }
+
+    sample_key
+}
+
+fn find_duplicate_aa_entries_with_diff_strain<'a>(
+    entries: &Vec<Entry<'a>>,
+    sample_subtypes: &'a [SampleSubtpyes],
+) -> Vec<Entry<'a>> {
+    let mut result = Vec::new();
+
+    for (i, entry1) in entries.iter().enumerate() {
+        let mut has_match = false;
+
+        // Skip entry1 if its sample_id already exists in the result
+        if result
+            .iter()
+            .any(|e: &Entry| e.sample_id == entry1.sample_id)
+        {
+            continue;
+        }
+
+        for entry2 in entries.iter().skip(i + 1) {
+            // Skip entry2 if its sample_id already exists in the result
+            if result
+                .iter()
+                .any(|e: &Entry| e.sample_id == entry2.sample_id)
+            {
+                continue;
+            }
+
+            if entry1.is_same_except_ref_strain(entry2) {
+                has_match = true;
+                for sample in sample_subtypes.iter() {
+                    if entry1.sample_id == sample.sample_id {
+                        match sample.subtype.as_str() {
+                            "A_NA_N1" => {
+                                if entry1.subtype.contains("H1N1") {
+                                    result.push(entry1.clone());
+                                } else if entry2.subtype.contains("H1N1") {
+                                    result.push(entry2.clone());
+                                }
+                            }
+                            "A_NA_N2" => {
+                                if entry1.subtype.contains("H3N2") {
+                                    result.push(entry1.clone());
+                                } else if entry2.subtype.contains("H3N2") {
+                                    result.push(entry2.clone());
+                                }
+                            }
+                            "unknown" => {
+                                result.push(entry1.clone());
+                            }
+                            _ => {
+                                result.push(entry1.clone());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // If no match was found for entry1, push it to the result
+        if !has_match {
+            result.push(entry1.clone());
+        }
+    }
+
+    result
+}
+
 pub fn variants_of_interest_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
     let delim = args.output_delimiter;
 
-    let muts_reader = create_reader(Some(&args.muts_file))?;
+    let muts_reader = create_reader(Some(args.muts_file))?;
     let muts_interest: Vec<MutsOfInterestInput> = read_tsv(muts_reader, false)?;
 
     let dais_reader = create_reader(Some(&args.input_file))?;
@@ -205,14 +363,17 @@ pub fn variants_of_interest_process(args: VariantsArgs) -> Result<(), Box<dyn Er
         BufWriter::new(Either::Right(stdout()))
     };
 
+    // Write the header
     writeln!(
         &mut writer,
-        "sample, reference_strain,gisaid_accession,ctype,dais_reference,protein,sample_codon,reference_codon,aa_mutation,phenotypic_consequence",
+        "sample,reference_strain,gisaid_accession,ctype,dais_reference,protein,sample_codon,reference_codon,aa_mutation,phenotypic_consequence",
     )?;
+
+    let mut mutations_vec: Vec<Entry> = Vec::new();
 
     for dais_entry in &dais {
         for ref_entry in &refs {
-            if dais_entry.subtype == ref_entry.ctype
+            if dais_entry.ctype == ref_entry.ctype
                 && dais_entry.ref_strain == ref_entry.reference_id
                 && dais_entry.protein == ref_entry.protein
             {
@@ -224,7 +385,8 @@ pub fn variants_of_interest_process(args: VariantsArgs) -> Result<(), Box<dyn Er
                         sample_id: &dais_entry.sample_id,
                         ref_strain: &ref_entry.isolate_name,
                         gisaid_accession: &ref_entry.isolate_id,
-                        subtype: &dais_entry.subtype,
+                        subtype: &ref_entry.subtype,
+                        ctype: &dais_entry.ctype,
                         dais_ref: &dais_entry.ref_strain,
                         protein: &dais_entry.protein,
                         ref_codon: "NNN".to_string(),
@@ -267,30 +429,7 @@ pub fn variants_of_interest_process(args: VariantsArgs) -> Result<(), Box<dyn Er
                                 query_aa,
                                 &muts_interest,
                             ) {
-                                let Entry {
-                                    sample_id,
-                                    ref_strain,
-                                    gisaid_accession,
-                                    subtype,
-                                    dais_ref,
-                                    protein,
-                                    ref_codon,
-                                    mut_codon,
-                                    aa_ref,
-                                    aa_position,
-                                    aa_mut,
-                                    phenotypic_consequences,
-                                } = &entry;
-                                let d = &delim;
-
-                                writeln!(
-                                    &mut writer,
-                                    "{sample_id}{d}{ref_strain}{d}{gisaid_accession}{d}\
-                                        {subtype}{d}{dais_ref}{d}{protein}{d}\
-                                        {ref_codon}{d}{mut_codon}{d}\
-                                        {aa_ref}:{aa_position}:{aa_mut}{d}\
-                                        {phenotypic_consequences}",
-                                )?;
+                                mutations_vec.push(entry.clone()); // Save the entry to mutations_vec
                             }
                         }
                     }
@@ -313,30 +452,7 @@ pub fn variants_of_interest_process(args: VariantsArgs) -> Result<(), Box<dyn Er
                             partial_codon,
                             &muts_interest,
                         ) {
-                            let Entry {
-                                sample_id,
-                                ref_strain,
-                                gisaid_accession,
-                                subtype,
-                                dais_ref,
-                                protein,
-                                ref_codon,
-                                mut_codon,
-                                aa_ref,
-                                aa_position,
-                                aa_mut,
-                                phenotypic_consequences,
-                            } = &entry;
-                            let d = &delim;
-
-                            writeln!(
-                                &mut writer,
-                                "{sample_id}{d}{ref_strain}{d}{gisaid_accession}{d}\
-                                    {subtype}{d}{dais_ref}{d}{protein}{d}\
-                                    {ref_codon}{d}{mut_codon}{d}\
-                                    {aa_ref}:{aa_position}:{aa_mut}{d}\
-                                    {phenotypic_consequences}",
-                            )?;
+                            mutations_vec.push(entry.clone()); // Save the entry to mutations_vec
                         }
                     }
                 } else {
@@ -351,7 +467,8 @@ pub fn variants_of_interest_process(args: VariantsArgs) -> Result<(), Box<dyn Er
                         sample_id: &dais_entry.sample_id,
                         ref_strain: &ref_entry.isolate_name,
                         gisaid_accession: &ref_entry.isolate_id,
-                        subtype: &dais_entry.subtype,
+                        subtype: &ref_entry.subtype,
+                        ctype: &dais_entry.ctype,
                         dais_ref: &dais_entry.ref_strain,
                         protein: &dais_entry.protein,
                         ref_codon: "NNN".to_string(),
@@ -394,30 +511,7 @@ pub fn variants_of_interest_process(args: VariantsArgs) -> Result<(), Box<dyn Er
                                 query_aa,
                                 &muts_interest,
                             ) {
-                                let Entry {
-                                    sample_id,
-                                    ref_strain,
-                                    gisaid_accession,
-                                    subtype,
-                                    dais_ref,
-                                    protein,
-                                    ref_codon,
-                                    mut_codon,
-                                    aa_ref,
-                                    aa_position,
-                                    aa_mut,
-                                    phenotypic_consequences,
-                                } = &entry;
-                                let d = &delim;
-
-                                writeln!(
-                                    &mut writer,
-                                    "{sample_id}{d}{ref_strain}{d}{gisaid_accession}{d}\
-                                        {subtype}{d}{dais_ref}{d}{protein}{d}\
-                                        {ref_codon}{d}{mut_codon}{d}\
-                                        {aa_ref}:{aa_position}:{aa_mut}{d}\
-                                        {phenotypic_consequences}",
-                                )?;
+                                mutations_vec.push(entry.clone()); // Save the entry to mutations_vec
                             }
                         }
                     }
@@ -439,35 +533,78 @@ pub fn variants_of_interest_process(args: VariantsArgs) -> Result<(), Box<dyn Er
                             partial_codon,
                             &muts_interest,
                         ) {
-                            let Entry {
-                                sample_id,
-                                ref_strain,
-                                gisaid_accession,
-                                subtype,
-                                dais_ref,
-                                protein,
-                                ref_codon,
-                                mut_codon,
-                                aa_ref,
-                                aa_position,
-                                aa_mut,
-                                phenotypic_consequences,
-                            } = &entry;
-                            let d = &delim;
-
-                            writeln!(
-                                &mut writer,
-                                "{sample_id}{d}{ref_strain}{d}{gisaid_accession}{d}\
-                                        {subtype}{d}{dais_ref}{d}{protein}{d}\
-                                        {ref_codon}{d}{mut_codon}{d}\
-                                        {aa_ref}:{aa_position}:{aa_mut}{d}\
-                                        {phenotypic_consequences}",
-                            )?;
+                            mutations_vec.push(entry.clone()); // Save the entry to mutations_vec
                         }
                     }
                 }
             }
         }
     }
+
+    if &args.virus == "INFLUENZA" {
+        let sample_subtypes = extract_unique_samples(&dais);
+
+        let mutations_vec =
+            find_duplicate_aa_entries_with_diff_strain(&mutations_vec, &sample_subtypes);
+
+        // Write all entries from mutations_vec at the end
+        for entry in &mutations_vec {
+            let Entry {
+                sample_id,
+                ref_strain,
+                gisaid_accession,
+                subtype: _,
+                ctype,
+                dais_ref,
+                protein,
+                ref_codon,
+                mut_codon,
+                aa_ref,
+                aa_position,
+                aa_mut,
+                phenotypic_consequences,
+            } = entry;
+            let d = &delim;
+
+            writeln!(
+                &mut writer,
+                "{sample_id}{d}{ref_strain}{d}{gisaid_accession}{d}\
+                {ctype}{d}{dais_ref}{d}{protein}{d}\
+                {ref_codon}{d}{mut_codon}{d}\
+                {aa_ref}:{aa_position}:{aa_mut}{d}\
+                {phenotypic_consequences}",
+            )?;
+        }
+    } else {
+        // Write all entries from mutations_vec at the end
+        for entry in &mutations_vec {
+            let Entry {
+                sample_id,
+                ref_strain,
+                gisaid_accession,
+                subtype: _,
+                ctype,
+                dais_ref,
+                protein,
+                ref_codon,
+                mut_codon,
+                aa_ref,
+                aa_position,
+                aa_mut,
+                phenotypic_consequences,
+            } = entry;
+            let d = &delim;
+
+            writeln!(
+                &mut writer,
+                "{sample_id}{d}{ref_strain}{d}{gisaid_accession}{d}\
+                {ctype}{d}{dais_ref}{d}{protein}{d}\
+                {ref_codon}{d}{mut_codon}{d}\
+                {aa_ref}:{aa_position}:{aa_mut}{d}\
+                {phenotypic_consequences}",
+            )?;
+        }
+    }
+
     Ok(())
 }

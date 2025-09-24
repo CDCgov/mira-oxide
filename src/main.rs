@@ -31,6 +31,8 @@ enum Commands {
     VariantsOfInterest(VariantsArgs),
     /// Positions of Interest
     PositionsOfInterest(PositionsArgs),
+    /// Positions of Interest
+    PositionsOfInterest(PositionsArgs),
     /// Find Chemistry
     FindChemistry(FindChemArgs),
     /// Hamming

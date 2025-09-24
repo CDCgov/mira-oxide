@@ -26,3 +26,4 @@ while ( my $line = <$logfile> ) {
         last;
     }
 }
+

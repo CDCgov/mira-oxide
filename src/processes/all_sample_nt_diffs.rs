@@ -80,10 +80,10 @@ pub fn all_sample_nt_diffs_process(args: &NTDiffsArgs) {
     )
     .unwrap();
 
-    for f in &all_sequences {
+    all_sequences.iter().for_each(|f| {
         let name_1 = &f.name;
         let seq1 = &f.sequence;
-        for f in &all_sequences {
+        all_sequences.iter().for_each(|f| {
             let name_2 = &f.name;
             let seq2 = &f.sequence;
             for (i, (nt1, nt2)) in seq1.iter().zip(seq2.iter()).enumerate() {
@@ -97,6 +97,6 @@ pub fn all_sample_nt_diffs_process(args: &NTDiffsArgs) {
                     .unwrap();
                 }
             }
-        }
-    }
+        });
+    });
 }

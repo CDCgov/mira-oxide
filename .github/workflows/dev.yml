@@ -1,0 +1,146 @@
+name: test-release
+
+# Simplified test workflow: builds per-arch Docker images (GHCR + Docker Hub org),
+# packages Linux and macOS artifacts, and creates multi-arch manifests – only for tag 'test'.
+
+on:
+  push:
+    tags:
+      - test
+
+permissions: {}
+
+env:
+  CARGO_TERM_COLOR: always
+  RELEASE_BIN: mira-oxide
+  REGISTRY: ghcr.io
+  DOCKERHUB_ORG: cdcgov
+
+jobs:
+  build-release-image-and-linux-artifacts:
+    name: Build Linux Artifacts and Images
+    strategy:
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-latest
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ${{ env.REGISTRY }}/${{ github.repository }}
+            docker.io/${{ env.DOCKERHUB_ORG }}/mira-oxide
+          tags: |
+            type=raw,value=test-${{ matrix.arch }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          file: Dockerfile
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+
+      - name: Prepare Linux Binary
+        shell: bash
+        run: |
+          IMAGE_TAG=$(echo "${{ steps.meta.outputs.tags }}" | grep -- '-${{ matrix.arch }}$' | head -n 1)
+          docker create --name temp-container $IMAGE_TAG \
+            && docker cp temp-container:/app/${RELEASE_BIN} ./${RELEASE_BIN} \
+            && docker rm temp-container
+          tar -czf ${RELEASE_BIN}-linux-${{ matrix.arch }}-test.tar.gz ${RELEASE_BIN}
+
+      - name: Upload Linux Test Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.RELEASE_BIN }}-linux-${{ matrix.arch }}-test
+          path: ${{ env.RELEASE_BIN }}-linux-${{ matrix.arch }}-test.tar.gz
+
+  create-image-manifest:
+    name: Create Image Manifest
+    needs: build-release-image-and-linux-artifacts
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+      contents: read
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Create and push test manifests
+        shell: bash
+        run: |
+          REPO=$(echo "${{ env.REGISTRY }}/${{ github.repository }}" | tr '[A-Z]' '[a-z]')
+          TEST=${REPO}:test
+          docker manifest create $TEST --amend ${TEST}-x86_64 --amend ${TEST}-aarch64
+          docker manifest push $TEST
+
+          DH_REPO="docker.io/${{ env.DOCKERHUB_ORG }}/mira-oxide"
+          DH_TEST=${DH_REPO}:test
+          docker manifest create $DH_TEST --amend ${DH_TEST}-x86_64 --amend ${DH_TEST}-aarch64
+          docker manifest push $DH_TEST
+
+  build-mac-artifacts:
+    name: Build Mac Artifacts
+    runs-on: macos-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        run: |
+          rustup update stable
+          rustup default stable
+          rustup target add aarch64-apple-darwin x86_64-apple-darwin
+
+      - name: Build (both archs)
+        run: |
+          cargo build --release --target aarch64-apple-darwin --target x86_64-apple-darwin
+
+      - name: Create universal binary
+        shell: bash
+        run: |
+          lipo -create -output ${RELEASE_BIN} \
+            target/aarch64-apple-darwin/release/${RELEASE_BIN} \
+            target/x86_64-apple-darwin/release/${RELEASE_BIN}
+          tar -czf ${RELEASE_BIN}-apple-universal-test.tar.gz ${RELEASE_BIN}
+
+      - name: Upload Mac Test Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.RELEASE_BIN }}-apple-universal-test
+          path: ${{ env.RELEASE_BIN }}-apple-universal-test.tar.gz
