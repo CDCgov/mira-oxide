@@ -8,20 +8,14 @@ use crate::io::{
     },
     write_csv_files::write_out_all_csv_mira_reports,
     write_fasta_files::write_out_all_fasta_files,
+    write_json_files::{negative_qc_statement, write_out_all_json_files},
 };
-use crate::utils::{
-    data_processing::{
-        DaisVarsData, ProcessedCoverage, Subtype, collect_analysis_metadata, collect_negatives,
-        collect_sample_id, compute_cvv_dais_variants, compute_dais_variants, create_aa_seq_vec,
-        create_irma_summary_vec, create_nt_seq_vec, create_vtype_data,
-        divide_aa_into_pass_fail_vec, divide_nt_into_pass_fail_vec, extract_field,
-        extract_subtype_flu, extract_subtype_sc2, melt_reads_data, process_position_coverage_data,
-        process_wgs_coverage_data, return_seg_data,
-    },
-    writing_outputs::{
-        negative_qc_statement, write_irma_summary_to_pass_fail_json_file,
-        write_structs_to_split_json_file,
-    },
+use crate::utils::data_processing::{
+    DaisVarsData, ProcessedCoverage, Subtype, collect_analysis_metadata, collect_negatives,
+    collect_sample_id, compute_cvv_dais_variants, compute_dais_variants, create_aa_seq_vec,
+    create_irma_summary_vec, create_nt_seq_vec, create_vtype_data, divide_aa_into_pass_fail_vec,
+    divide_nt_into_pass_fail_vec, extract_field, extract_subtype_flu, extract_subtype_sc2,
+    melt_reads_data, process_position_coverage_data, process_wgs_coverage_data, return_seg_data,
 };
 use clap::Parser;
 use csv::ReaderBuilder;
@@ -146,7 +140,7 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
             return Err(e);
         }
     };
-    let (_segments, _segset, _segcolor) = return_seg_data(extract_field(&coverage_data, |item| {
+    let (segments, segset, segcolor) = return_seg_data(extract_field(&coverage_data, |item| {
         item.reference_name.clone()
     }));
 
@@ -172,12 +166,6 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
         dais_vars_data =
             compute_cvv_dais_variants(&dais_ref_data, &dais_seq_data, &args.runid, &args.platform)?;
     }
-
-    negative_qc_statement(
-        "/home/xpa3/mira-oxide/test/qc_statement.json",
-        &read_data,
-        &neg_control_list,
-    )?;
 
     // Calculating the % coverage and median coverage for summary
     let melted_reads_vec = melt_reads_data(&read_data);
@@ -316,26 +304,26 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
         &args.virus,
     )?;
 
+    write_out_all_json_files(
+        &args.output_path,
+        &coverage_data,
+        &read_data,
+        &vtype_data,
+        &allele_data,
+        &indel_data,
+        &dais_vars_data,
+        &neg_control_list,
+        &irma_summary,
+        &nt_seq_vec,
+        &ref_lengths,
+        &segments,
+        &segset,
+        &segcolor,
+        &args.virus,
+    )?;
+
     /*
 
-        write_irma_summary_to_pass_fail_json_file(
-            "/home/xpa3/mira-oxide/test/pass_fail_qc.json",
-            &irma_summary,
-        )?;
-
-        // write out the nt_sequences.json
-        let nt_seq_columns: Vec<&str> = if args.virus.to_lowercase() == "flu" {
-            vec!["sample_id", "sequence", "target_ref", "reference"]
-        } else {
-            vec!["sample_id", "sequence", "reference"]
-        };
-
-        write_structs_to_split_json_file(
-            "/home/xpa3/mira-oxide/test/nt_sequences.json",
-            &nt_seq_vec,
-            &nt_seq_columns,
-            &nt_seq_columns,
-        )?;
 
         /////////////// Write the structs to parquet files if flag invoked ///////////////
         // Write fields to parq if flag given

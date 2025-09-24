@@ -8,6 +8,7 @@ use std::{
     fs::{File, OpenOptions},
     io::{self, BufRead, BufReader, Read, Stdin},
     path::{Path, PathBuf},
+    time::{SystemTime, UNIX_EPOCH},
 };
 
 /////////////// Structs to hold IRMA data ///////////////
@@ -84,9 +85,9 @@ pub struct ReadsData {
     #[serde(rename = "Reads")]
     pub reads: i32,
     #[serde(rename = "Patterns")]
-    pub patterns: String,
+    pub patterns: Option<f32>,
     #[serde(rename = "PairsAndWidows")]
-    pub pairs_and_windows: String,
+    pub pairs_and_windows: Option<f32>,
     #[serde(rename = "Stage")]
     pub stage: Option<String>,
     #[serde(rename = "Run_ID")]
@@ -178,6 +179,8 @@ pub struct RunInfo {
     pub run_id: Option<String>,
     #[serde(rename = "Instrument")]
     pub instrument: Option<String>,
+    #[serde(rename = "Timestamp")]
+    pub timestamp: Option<String>,
 }
 
 #[derive(Debug)]
@@ -648,6 +651,89 @@ pub fn get_reference_lens(
     Ok(ref_len_map)
 }
 
+// Function to get the current timestamp in the desired format
+// For irma_config file - ingest of run_info.txt
+fn get_current_timestamp() -> String {
+    let now = SystemTime::now();
+    match now.duration_since(UNIX_EPOCH) {
+        Ok(duration) => {
+            let secs = duration.as_secs();
+            let nanos = duration.subsec_nanos();
+            format_timestamp(secs, nanos)
+        }
+        Err(_) => "1970-01-01 00:00:00.000000".to_string(), // Fallback in case of error
+    }
+}
+
+// Function to get timestamp into correct format for CDP
+// Accounts for leap years
+// For irma_config file - ingest of run_info.txt
+fn format_timestamp(secs: u64, nanos: u32) -> String {
+    const SECONDS_IN_MINUTE: u64 = 60;
+    const SECONDS_IN_HOUR: u64 = 3600;
+    const SECONDS_IN_DAY: u64 = 86400;
+
+    // Days in each month (non-leap year)
+    const DAYS_IN_MONTH: [u32; 12] = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+    // Calculate days since UNIX epoch
+    let mut days_since_epoch = secs / SECONDS_IN_DAY;
+
+    // Calculate year
+    let mut year = 1970;
+    while days_since_epoch >= days_in_year(year) {
+        days_since_epoch -= days_in_year(year);
+        year += 1;
+    }
+
+    // Determine if current year is a leap year
+    let is_leap_year = is_leap_year(year);
+
+    // Calculate month and day
+    let mut month = 0;
+    let mut day = days_since_epoch + 1; // Days are 1-based
+    for (i, &days_in_month) in DAYS_IN_MONTH.iter().enumerate() {
+        let days_in_this_month = if i == 1 && is_leap_year {
+            29
+        } else {
+            days_in_month
+        };
+        if day > u64::from(days_in_this_month) {
+            day -= u64::from(days_in_this_month);
+        } else {
+            month = i + 1; // Months are 1-based
+            break;
+        }
+    }
+
+    // Calculate hours, minutes, seconds
+    let remaining_secs = secs % SECONDS_IN_DAY;
+    let hours = remaining_secs / SECONDS_IN_HOUR;
+    let minutes = (remaining_secs % SECONDS_IN_HOUR) / SECONDS_IN_MINUTE;
+    let seconds = remaining_secs % SECONDS_IN_MINUTE;
+
+    format!(
+        "{:04}-{:02}-{:02} {:02}:{:02}:{:02}.{:06}",
+        year,
+        month,
+        day,
+        hours,
+        minutes,
+        seconds,
+        nanos / 1000
+    )
+}
+
+// Helper function to determine if a year is a leap year
+fn is_leap_year(year: u64) -> bool {
+    (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0)
+}
+
+// Helper function to calculate the number of days in a year
+fn days_in_year(year: u64) -> u64 {
+    if is_leap_year(year) { 366 } else { 365 }
+}
+
 /// Collect read info created by IRMA and save to struct of `RunInfo`
 pub fn run_info_collection(
     irma_path: impl AsRef<Path>,
@@ -673,6 +759,7 @@ pub fn run_info_collection(
                 for line in &mut records {
                     line.run_id = Some(runid.to_string());
                     line.instrument = Some(platform.to_string());
+                    line.timestamp = Some(get_current_timestamp());
                 }
                 run_info.extend(records);
 

@@ -82,7 +82,7 @@ pub fn write_out_all_csv_mira_reports(
         "deletions",
         "ambiguous",
         "consensus_count",
-        "consensus_quality",
+        "consensus_average_quality",
         "run_id",
         "instrument",
     ];
@@ -284,8 +284,16 @@ pub fn write_out_all_csv_mira_reports(
         "Iterative Refinement Meta-Assembler (IRMA)",
         "Run_ID",
         "Instrument",
+        "Timestamp",
     ];
-    let run_info_columns = vec!["program_name", "program", "irma", "runid", "instrument"];
+    let run_info_columns = vec![
+        "program_name",
+        "program",
+        "irma",
+        "runid",
+        "instrument",
+        "timestamp",
+    ];
     write_structs_to_csv_file(
         &format!("{}/{runid}_irma_config.csv", output_path.display()),
         run_info,

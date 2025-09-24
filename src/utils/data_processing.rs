@@ -189,24 +189,6 @@ where
     data.as_ref().iter().map(extractor).collect()
 }
 
-pub fn extract_string_fields_as_float<V, T, F>(data: V, extractor: F) -> Vec<f32>
-where
-    V: AsRef<[T]>,
-    F: Fn(&T) -> &str,
-{
-    data.as_ref()
-        .iter()
-        .map(|item| {
-            let field = extractor(item);
-            if field.is_empty() {
-                0.0
-            } else {
-                field.parse::<f32>().unwrap_or(0.0)
-            }
-        })
-        .collect()
-}
-
 //Function to filter struct by sample id
 //If using this with a Vec of structs then you need to add impl to HasSampleID trait above if not done already
 pub fn filter_struct_by_ids<T>(samples: &[T], ids: &[String]) -> Vec<T>
