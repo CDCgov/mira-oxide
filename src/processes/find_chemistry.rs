@@ -1,15 +1,17 @@
 use clap::{Parser, ValueEnum, builder::PossibleValue};
 use std::{
     fmt,
-    fs::{File, OpenOptions},
-    io::{BufReader, BufWriter, Write},
-    path::PathBuf,
+    fs::OpenOptions,
+    io::{BufWriter, Write},
+    path::{Path, PathBuf},
 };
 use zoe::prelude::*;
 
+use crate::utils::fastq_read::open_fastq_file;
+
 #[derive(Debug, Parser)]
 #[command(about = "Get relevant IRMA configuration and modules for the current experiment.")]
-pub struct CheckChemArgs {
+pub struct FindChemArgs {
     #[arg(short = 's', long)]
     /// Name of sample
     pub sample: String,
@@ -40,7 +42,7 @@ pub struct CheckChemArgs {
     pub irma_config_path: Option<PathBuf>,
 }
 
-impl CheckChemArgs {
+impl FindChemArgs {
     /// Function for ensuring that specific IRMA configs are only used with the
     /// proper experiment. Secondary, Sensitive, and UTR must be matched with a
     /// Flu experiment.
@@ -176,7 +178,7 @@ impl ValueEnum for IRMAConfig {
 
 /// Selects the correct config file based on experiment, custom config path, and
 /// length of sequences
-fn get_config_path(args: &CheckChemArgs, seq_len: Option<usize>) -> String {
+fn get_config_path(args: &FindChemArgs, seq_len: Option<usize>) -> String {
     if args.irma_config == IRMAConfig::Custom {
         return args
             .irma_config_path
@@ -228,7 +230,7 @@ fn get_config_path(args: &CheckChemArgs, seq_len: Option<usize>) -> String {
         .wd_path
         .to_str()
         .expect("Failed to convert work directory path to string");
-    format!("{}{}", wd_path, path_extension)
+    format!("{wd_path}{path_extension}")
 }
 
 #[derive(Debug)]
@@ -272,16 +274,15 @@ impl fmt::Display for ChemistryOutput {
 
 /// Averages the first five sequence lengths if possible. If the file has no
 /// sequences, returns None
-fn get_average_line_length(fastq: &PathBuf) -> Result<Option<usize>, std::io::Error> {
-    let sample_size = 5;
-    let file = File::open(&fastq)?;
-    let buf_reader = BufReader::new(file);
-    let fastq_reader = FastQReader::new(buf_reader);
+fn get_average_line_length<P: AsRef<Path>>(fastq_path: P) -> Result<Option<usize>, std::io::Error> {
+    const SAMPLE_SIZE: usize = 5;
+
+    let fastq_reader = open_fastq_file(fastq_path)?;
 
     let mut total_len = 0;
     let mut count = 0;
 
-    for result in fastq_reader.take(sample_size) {
+    for result in fastq_reader.take(SAMPLE_SIZE) {
         let record = result?;
         total_len += record.sequence.len();
         count += 1;
@@ -295,7 +296,7 @@ fn get_average_line_length(fastq: &PathBuf) -> Result<Option<usize>, std::io::Er
 }
 
 /// Takes user input arguments and prepares them for output
-fn parse_chemistry_args(args: &CheckChemArgs) -> Result<ChemistryOutput, std::io::Error> {
+fn parse_chemistry_args(args: &FindChemArgs) -> Result<ChemistryOutput, std::io::Error> {
     let line_length = get_average_line_length(&args.fastq)?;
 
     let irma_custom = get_config_path(args, line_length);
@@ -309,11 +310,11 @@ fn parse_chemistry_args(args: &CheckChemArgs) -> Result<ChemistryOutput, std::io
     Ok(out)
 }
 
-fn main() -> Result<(), std::io::Error> {
-    let args = CheckChemArgs::parse();
+pub fn find_chemistry_process(args: FindChemArgs) -> Result<(), std::io::Error> {
+    //let args = CheckChemArgs::parse();
     // handle input validation to ensure valid combinations of
     if let Err(e) = args.validate() {
-        eprintln!("Error: {}", e);
+        eprintln!("Error: {e}");
         std::process::exit(1);
     }
     // parse the arguments into output format

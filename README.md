@@ -1,7 +1,8 @@
 # MIRA-Oxide
-![](./assets/images/mira_logo_gemini_oxide_web_small.png)
 
-**General disclaimer** This repository was created for use by CDC programs to collaborate on public health related projects in support of the [CDC mission](https://www.cdc.gov/about/cdc/#cdc_about_cio_mission-our-mission).  GitHub is not hosted by the CDC, but is a third party website used by CDC and its partners to share information and collaborate on software. CDC use of GitHub does not imply an endorsement of any one particular service, product, or enterprise. 
+![MIRA-Oxide](./assets/images/mira_logo_gemini_oxide_web_small.png "MIRA, but rusty")
+
+**General disclaimer** This repository was created for use by CDC programs to collaborate on public health related projects in support of the [CDC mission](https://www.cdc.gov/about/cdc/#cdc_about_cio_mission-our-mission).  GitHub is not hosted by the CDC, but is a third party website used by CDC and its partners to share information and collaborate on software. CDC use of GitHub does not imply an endorsement of any one particular service, product, or enterprise.
 
 Use of this service is limited only to non-sensitive and publicly available data. Users must not use, share, or store any kind of sensitive data like health status, provision or payment of healthcare, Personally Identifiable Information (PII) and/or Protected Health Information (PHI), etc. under ANY circumstance.
 
@@ -11,9 +12,27 @@ The material embodied in this software is provided to you "as-is" and without wa
 
 ## Overview
 
-MIRA-Oxide is a RUST workspace that is utilized by [MIRA-NF](https://github.com/CDCgov/MIRA-NF) to perform assembly and annotation of Influenza genomes, SARS-CoV-2 genomes, the SARS-CoV-2 spike-gene and RSV genomes.
+MIRA-Oxide is a RUST package that is utilized by [MIRA-NF](https://github.com/CDCgov/MIRA-NF) to perform assembly and annotation of Influenza genomes, SARS-CoV-2 genomes, the SARS-CoV-2 spike-gene and RSV genomes.
 
-## Adding New Package to the MIRA-Oxide Workspace
+### Subprocesses
+
+MIRA-Oxide has standalone subprocesses within it that perform different tasks. These are run on their own with
+
+```bash
+mira-oxide <SUBPROCESS> [subprocess arguments]
+```
+
+Current subprocesses include:
+
+- Hamming Distance between all samples
+- Nucleotide Diffs between all samples
+- Find Chemistry, for selecting the correct module and configs for IRMA
+- Plotter, for plotting,
+- Variants of Interest, for taking DAIS-ribosome outputs and a list of sequences to find mutations that will cause variants
+
+Each subprocess has its own README, found in `docs/`.
+
+## Adding New Subprocess to MIRA-Oxide
 
 Before starting be sure that you have rust nightly installed and set as default. You will also need to have Cargo installed. If you need more information about how to install those, [see here](https://rust-book.cs.brown.edu/ch01-00-getting-started.html).
 
@@ -23,17 +42,17 @@ If you are using VScode the rust-analyzer extension is very help with formatting
 
 Clone the repository.
 
-```
+```bash
 git clone https://github.com/CDCgov/mira-oxide.git
 ```
 
 ### Step 2
 
-Move into the folder made by Cargo and create new branch for your package.
+Move into the folder made by Cargo and create new branch for your subprocess.
 
-```
+```bash
 cd mira-oxide
-git checkout -b add_new_package_name
+git checkout -b add_new_subprocess_name
 ```
 
 ### Step 3
@@ -42,46 +61,37 @@ Mira-oxide requires rust-nightly to run the [zoe](https://github.com/CDCgov/zoe)
 
 Install the nightly version of rust.
 
-```
+```bash
 rustup toolchain install nightly
 ```
+
 Using nightly for mira-oxide
 
-```
+```bash
 rustup override set nightly
 ```
 
 ### Step 4
-Create a new package using Cargo
 
-```
-cargo new new_package_name
-```
-
-A folder with a the name that you specified should have been created. Inside that folder there should be a Cargo.toml file and a src folder containing a main.rs file.
-
-### Step 4
-Create a new package using Cargo
-
-```
-cargo new new_package_name
+```bash
+touch src/processes/subprocess_name.rs
 ```
 
-A folder with a the name that you specified should have been created. Inside that folder there should be a Cargo.toml file and a src folder containing a main.rs file.
+1. Create a new process under `src/processes`
+
+2. Add that process to `src/processs/mod.rs` by editing `mod.rs` with `pub mod subprocess_name;`
+
+3. Import the file in `src/main.rs` by adding the subprocess to the list: `use crate::processes::{[other processes], subprocess_name::*};`
+
+4. Add your subprocess to the `enum Commands`
 
 ### Step 5
 
-Start Working! 
+Start Working!
 
-Be sure that your package added itself to the main mira-oxide Cargo.toml. Then add any dependencies you will need to the main mira-oxide Cargo.toml.
-
-Then you can start working on your package.
-
-```
-cd new_package_name
-```
-
-Add your dependencies to the package's Cargo.toml and start editing your src/main.rs
+1. Work on your subprocess in `src/processes/subprocess_name.rs`. You can add a new `struct` with specific arguments for this process: `pub struct ProcessArgs`.
+2. You should should have a "main" function called something like `pub fn name_process(args: ProcessArgs)`. It can call off to helper functions in the same file, or for shared functionality, something in `src/utils`
+3. Once you have created the `name_process(args)` function, add it to the `match` statement in `main.rs`.
 
 ### Step 6
 
@@ -89,24 +99,24 @@ Run your program!
 
 To be sure that your package is working within the workspace go the workspace area (path-to-repo-folder/mira-oxide) and run this command:
 
+```bash
+cargo run -- <SUBPROCESS-NAME> [SUBPROCESS ARGS]
 ```
-cargo run -p new_package_name -- #any inputs needed to run your package
+
+Or, if it is compiled, you can find the `debug` or `release` binary in the `target/` directory, and run it directly via
+
+```bash
+./target/debug/mira-oxide <SUBPROCESS-NAME> [SUBPROCESS ARGS]
 ```
 
 ### Step 7
 
 Provide usage documentation.
 
-Create a README.md within your package folder. Within that README provide a description of the package, it's inputs, it's outputs and how to execute the package.
-
-For additional information on rust workspaces, [see here](https://rust-book.cs.brown.edu/ch14-03-cargo-workspaces.html).
-
-## Current Packages
-- [mutations_of_interest_table](mutations_of_interest_table/)
-- [all_sample_hamming_dist](all_sample_hamming_dist/)
-- [all_sample_nt_diffs](all_sample_nt_diffs/)
+Create a README.md within the `docs/` folder. Within that README provide a description of the subprocess, its inputs, its outputs and how to execute it.
   
 ## Public Domain Standard Notice
+
 This repository constitutes a work of the United States Government and is not
 subject to domestic copyright protection under 17 USC § 105. This repository is in
 the public domain within the United States, and copyright and related rights in
@@ -116,6 +126,7 @@ submitting a pull request you are agreeing to comply with this waiver of
 copyright interest.
 
 ## License Standard Notice
+
 The repository utilizes code licensed under the terms of the Apache Software
 License and therefore is licensed under ASL v2 or later.
 
@@ -128,11 +139,12 @@ WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
 PARTICULAR PURPOSE. See the Apache Software License for more details.
 
 You should have received a copy of the Apache Software License along with this
-program. If not, see http://www.apache.org/licenses/LICENSE-2.0.html
+program. If not, see [http://www.apache.org/licenses/LICENSE-2.0.html]
 
 The source code forked from other open source projects will inherit its license.
 
 ## Privacy Standard Notice
+
 This repository contains only non-sensitive, publicly available data and
 information. All material and community participation is covered by the
 [Disclaimer](DISCLAIMER.md)
@@ -140,6 +152,7 @@ and [Code of Conduct](code-of-conduct.md).
 For more information about CDC's privacy policy, please visit [http://www.cdc.gov/other/privacy.html](https://www.cdc.gov/other/privacy.html).
 
 ## Contributing Standard Notice
+
 Anyone is encouraged to contribute to the repository by [forking](https://help.github.com/articles/fork-a-repo)
 and submitting a pull request. (If you are new to GitHub, you might start with a
 [basic tutorial](https://help.github.com/articles/set-up-git).) By contributing
@@ -152,9 +165,11 @@ All comments, messages, pull requests, and other submissions received through
 CDC including this GitHub page may be subject to applicable federal law, including but not limited to the Federal Records Act, and may be archived. Learn more at [http://www.cdc.gov/other/privacy.html](http://www.cdc.gov/other/privacy.html).
 
 ## Records Management Standard Notice
+
 This repository is not a source of government records, but is a copy to increase
 collaboration and collaborative potential. All government records will be
 published through the [CDC web site](http://www.cdc.gov).
 
 ## Additional Standard Notices
+
 Please refer to [CDC's Template Repository](https://github.com/CDCgov/template) for more information about [contributing to this repository](https://github.com/CDCgov/template/blob/main/CONTRIBUTING.md), [public domain notices and disclaimers](https://github.com/CDCgov/template/blob/main/DISCLAIMER.md), and [code of conduct](https://github.com/CDCgov/template/blob/main/code-of-conduct.md).

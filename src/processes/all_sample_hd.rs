@@ -5,16 +5,13 @@ use std::{
     io::{BufReader, BufWriter, Write, stdin, stdout},
     path::PathBuf,
 };
-use zoe::{
-    data::fasta::FastaNT,
-    prelude::*,
-};
+use zoe::{data::fasta::FastaNT, distance::dna::NucleotidesDistance, prelude::*};
 
 #[derive(Debug, Parser)]
 #[command(
     about = "Tool for calculating hamming distances between all samples within a given fasta file"
 )]
-pub struct APDArgs {
+pub struct HammingArgs {
     #[arg(short = 'i', long)]
     /// Input fasta
     input_fasta: Option<PathBuf>,
@@ -34,15 +31,8 @@ struct ValidSeq {
     sequence: Nucleotides,
 }
 
-fn hamm(seq1: &Nucleotides, seq2: &Nucleotides) -> usize {
-    seq1.into_iter()
-        .zip(seq2)
-        .filter(|(c1, c2)| c1 != c2)
-        .count()
-}
-
-fn main() {
-    let args = APDArgs::parse();
+pub fn all_sample_hd_process(args: HammingArgs) -> Result<(), std::io::Error> {
+    //let args = APDArgs::parse();
     let delim = args.output_delimiter.unwrap_or(',');
 
     //read in fasta file
@@ -77,39 +67,41 @@ fn main() {
             record.map(|r| {
                 let FastaNT { name, sequence } = r.recode_to_dna();
                 ValidSeq {
-                    name, 
+                    name,
                     sequence,
                 }
               }))
-        .collect::<Result<Vec<_>, _>>()
-        .unwrap_or_die("Could not process other data.");
-    
-    //write out header
-    let mut buffer = format!("seqeunces");
-    let mut header_hold: Vec<String> = Vec::new();
+        .collect::<Result<Vec<_>, _>>()?;
+
+    write!(&mut writer, "sequences")?;
     for query_header in all_sequences.iter().map(|f| f.name.as_str()) {
-        buffer.push(delim);
-        buffer.push_str(query_header);
-        header_hold.push(query_header.to_string());
+        write!(&mut writer, "{delim}{query_header}")?;
     }
-    writeln!(&mut writer, "{buffer}").unwrap_or_fail();
+    writeln!(&mut writer)?;
 
-    //Initialize vectors to store headers and sequences
-    all_sequences.iter().for_each(|f| {
-        let mut distances = format!("{seq_name}", seq_name = &f.name);
-        let seqs_1 = &f.sequence;
-        for seqs_2 in all_sequences.iter().map(|f| &f.sequence) {
-            let total_mismatch = hamm(seqs_1, seqs_2);
-            distances.push(delim);
-            distances.push_str(&format!(" {}", total_mismatch));
-            
+    let n = all_sequences.len();
+    let mut matrix_cache = Vec::with_capacity(n * (n + 1) / 2);
+    for (r, sequence) in all_sequences.iter().map(|v| &v.sequence).enumerate() {
+        for (c, seq2) in all_sequences.iter().map(|v| &v.sequence).enumerate() {
+            if r <= c {
+                matrix_cache.push(sequence.distance_hamming(seq2));
+            }
         }
-        writeln!(
-            &mut writer,
-            "{distances}",
-        )
-        .unwrap_or_fail();
-    }); 
-        
+    }
 
+    for (r, sequence_name) in all_sequences.iter().map(|v| &v.name).enumerate() {
+        write!(&mut writer, "{sequence_name}")?;
+        for c in 0..n {
+            let index = if r <= c {
+                r * n - r * (r + 1) / 2 + c
+            } else {
+                c * n - c * (c + 1) / 2 + r
+            };
+            // This space was in the original
+            write!(&mut writer, "{delim} {dist}", dist = matrix_cache[index])?;
+        }
+        writeln!(&mut writer)?;
+    }
+
+    Ok(())
 }
