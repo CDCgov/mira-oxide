@@ -9,7 +9,22 @@ use parquet::arrow::ArrowWriter;
 use std::{error::Error, fs::File, sync::Arc};
 
 /////////////// Functions to write parquet files out ///////////////
-
+pub fn extract_string_fields_as_float<V, T, F>(data: V, extractor: F) -> Vec<f32>
+where
+    V: AsRef<[T]>,
+    F: Fn(&T) -> Option<String>,
+{
+    data.as_ref()
+        .iter()
+        .map(|item| {
+            if let Some(field) = extractor(item) {
+                field.parse::<f32>().unwrap_or(0.0)
+            } else {
+                0.0
+            }
+        })
+        .collect()
+}
 /// Write the reads data to parquet file.
 pub fn write_reads_to_parquet(
     reads_data: &[ReadsData],
@@ -20,8 +35,9 @@ pub fn write_reads_to_parquet(
         extract_field(reads_data, |item| item.sample_id.clone());
     let record_vec = extract_field(reads_data, |item| item.record.clone());
     let reads_vec = extract_field(reads_data, |item| item.reads);
-    let patterns_vec = extract_field(reads_data, |item| item.patterns);
-    let pairs_and_windows_vec = extract_field(reads_data, |item| item.pairs_and_windows);
+    let patterns_vec = extract_string_fields_as_float(reads_data, |item| item.patterns.clone());
+    let pairs_and_windows_vec =
+        extract_string_fields_as_float(reads_data, |item| item.pairs_and_windows.clone());
     let stages_vec =
         extract_string_fields_as_int(reads_data, |item| item.stage.as_deref().unwrap_or(""));
     let runid_vec = extract_field(reads_data, |item| item.run_id.clone());

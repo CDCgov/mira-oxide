@@ -39,7 +39,11 @@ pub fn write_structs_to_split_json_file<T: Serialize>(
             // Extract fields in the order specified by `columns`
             struct_values.iter().map(|&struct_value| {
                 if let Some(value) = object.get(struct_value) {
-                    value.clone()
+                    if value == "NA" {
+                        json!(null)
+                    } else {
+                        value.clone()
+                    }
                 } else {
                     json!(null)
                 }

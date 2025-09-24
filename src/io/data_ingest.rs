@@ -85,9 +85,9 @@ pub struct ReadsData {
     #[serde(rename = "Reads")]
     pub reads: i32,
     #[serde(rename = "Patterns")]
-    pub patterns: Option<f32>,
+    pub patterns: Option<String>,
     #[serde(rename = "PairsAndWidows")]
-    pub pairs_and_windows: Option<f32>,
+    pub pairs_and_windows: Option<String>,
     #[serde(rename = "Stage")]
     pub stage: Option<String>,
     #[serde(rename = "Run_ID")]
@@ -339,7 +339,7 @@ where
 }
 
 /// Read tab-delimited data and include the sample name
-fn process_txt_without_sample<R, T>(reader: R, has_headers: bool) -> std::vec::Vec<T>
+fn process_txt_without_sample<R, T>(reader: R, has_headers: bool) -> Vec<T>
 where
     R: Read,
     T: for<'de> Deserialize<'de>,
@@ -353,6 +353,7 @@ where
     for result in rdr.deserialize() {
         match result {
             Ok(record) => {
+                // Successfully deserialized record
                 records.push(record);
             }
             Err(e) => {
@@ -364,7 +365,6 @@ where
 
     records
 }
-
 /// Read in the coverage files made by IRMA and save to a vector of `CoverageData`
 pub fn coverage_data_collection(
     irma_path: impl AsRef<Path>,
