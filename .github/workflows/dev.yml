@@ -121,10 +121,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust
+      - name: Install latest nightly Rust
         run: |
-          rustup update stable
-          rustup default stable
+          # Nightly toolchain installation; replace with stable if not using nightly-only features.
+          rustup update nightly
+          rustup default nightly
           rustup target add aarch64-apple-darwin x86_64-apple-darwin
 
       - name: Build (both archs)

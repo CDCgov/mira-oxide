@@ -20,7 +20,7 @@ name: Release
 on:
   push:
     paths:
-      - 'CHANGELOG.md'
+      - "CHANGELOG.md"
 
 permissions: {}  # Explicitly sets default job permissions to none (principle of least privilege). Each job grants what it needs.
 
