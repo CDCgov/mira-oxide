@@ -18,6 +18,8 @@ plotly = "0.13.5"
 zoe = { version = "0.0.21", default-features = false, features = [
     "multiversion",
 ] }
+chrono = "0.4.42"
+regex = "1.11.2"
 
 [profile.release]
 strip = true

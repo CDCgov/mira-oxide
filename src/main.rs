@@ -1,6 +1,6 @@
 #![allow(unreachable_patterns)]
 use crate::processes::{
-    all_sample_hd::*, all_sample_nt_diffs::*, find_chemistry::*, plotter::*,
+    all_sample_hd::*, all_sample_nt_diffs::*, find_chemistry::*, nf_status::*, plotter::*,
     positions_of_interest::*, variants_of_interest::*,
 };
 use clap::{Parser, Subcommand};
@@ -28,6 +28,8 @@ enum Commands {
     NTDiffs(NTDiffsArgs),
     /// Plotter
     Plotter(PlotterArgs),
+    /// NF Status
+    NFStatus(NFStatusArgs),
 }
 
 fn main() {
@@ -48,6 +50,9 @@ fn main() {
         Commands::NTDiffs(cmd_args) => all_sample_nt_diffs_process(cmd_args),
         Commands::Plotter(cmd_args) => {
             plotter_process(cmd_args).unwrap_or_else(|_| panic!("{module}::Plotter"))
+        }
+        Commands::NFStatus(cmd_args) => {
+            nf_status_process(cmd_args).unwrap_or_else(|_| panic!("{module}::NFStatus"))
         }
         _ => {
             eprintln!("mira-oxide: unrecognized command {:?}", args.command);
