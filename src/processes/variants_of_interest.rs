@@ -15,8 +15,6 @@ use zoe::{
     prelude::{Len, Nucleotides},
 };
 
-use crate::utils::alignment::align_sequences;
-
 #[derive(Debug, Parser)]
 #[command(about = "Tool for calculating amino acid difference tables")]
 pub struct VariantsArgs {
@@ -65,7 +63,7 @@ fn read_tsv<T: DeserializeOwned, R: std::io::Read>(
 }
 
 #[allow(dead_code)]
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct DaisInput {
     sample_id: String,
     ctype: String,
@@ -144,7 +142,7 @@ impl Entry<'_> {
         self.aa_ref = aa_1 as char;
         let hold_aa_mut = self.aa_mut.to_string();
 
-        for muts_entry in muts_columns.iter() {
+        for muts_entry in muts_columns {
             // Check if the mutation matches the entry
             if subtype == muts_entry.subtype
                 && self.protein == muts_entry.protein
@@ -152,10 +150,9 @@ impl Entry<'_> {
             {
                 // Use match for cleaner handling of `hold_aa_mut` cases
                 self.phenotypic_consequences = match hold_aa_mut.as_str() {
-                    "." => "amino acid information missing".to_string(),
                     "~" => "partial amino acid".to_string(),
                     "-" => "amino acid covered".to_string(),
-                    "X" => "amino acid information missing".to_string(),
+                    "X" | "." => "amino acid information missing".to_string(),
                     aa if aa == muts_entry.aa => muts_entry.description.clone(),
                     _ => String::new(),
                 };
@@ -168,7 +165,7 @@ impl Entry<'_> {
     }
 }
 
-impl<'a> Entry<'a> {
+impl Entry<'_> {
     // Helper function to compare two entries ignoring `ref_strain`
     fn is_same_except_ref_strain(&self, other: &Entry) -> bool {
         self.sample_id == other.sample_id
@@ -184,7 +181,7 @@ impl<'a> Entry<'a> {
     }
 }
 
-fn create_reader(path: Option<PathBuf>) -> std::io::Result<BufReader<Either<File, Stdin>>> {
+fn create_reader(path: Option<&PathBuf>) -> std::io::Result<BufReader<Either<File, Stdin>>> {
     let reader = if let Some(ref file_path) = path {
         let file = OpenOptions::new().read(true).open(file_path)?;
         BufReader::new(Either::Left(file))
@@ -214,6 +211,7 @@ pub fn lines_to_vec<R: BufRead>(reader: R) -> std::io::Result<Vec<Vec<String>>> 
     Ok(columns)
 }
 
+#[must_use]
 pub fn extract_unique_samples(inputs: &Vec<DaisInput>) -> Vec<SampleSubtpyes> {
     let mut unique_sample_ids = HashSet::new();
     let mut sample_list = Vec::new();
@@ -240,10 +238,10 @@ pub fn extract_unique_samples(inputs: &Vec<DaisInput>) -> Vec<SampleSubtpyes> {
             sample_id: sample.clone(),
             sample_name,
             segment_number: segment_number.to_owned(),
-            subtype: "".to_string(),
+            subtype: String::new(),
         });
     }
-
+    #[allow(clippy::assigning_clones)]
     // Update subtype field based on matching sample_id and subtype containing "NA"
     for entry in inputs {
         if entry.ctype.contains("NA") {
@@ -302,7 +300,7 @@ fn find_duplicate_aa_entries_with_diff_strain<'a>(
 
             if entry1.is_same_except_ref_strain(entry2) {
                 has_match = true;
-                for sample in sample_subtypes.iter() {
+                for sample in sample_subtypes {
                     if entry1.sample_id == sample.sample_id {
                         match sample.subtype.as_str() {
                             "A_NA_N1" => {
@@ -318,9 +316,6 @@ fn find_duplicate_aa_entries_with_diff_strain<'a>(
                                 } else if entry2.subtype.contains("H3N2") {
                                     result.push(entry2.clone());
                                 }
-                            }
-                            "unknown" => {
-                                result.push(entry1.clone());
                             }
                             _ => {
                                 result.push(entry1.clone());
@@ -340,10 +335,11 @@ fn find_duplicate_aa_entries_with_diff_strain<'a>(
     result
 }
 
+#[allow(clippy::too_many_lines)]
 pub fn variants_of_interest_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
     let delim = args.output_delimiter;
 
-    let muts_reader = create_reader(Some(args.muts_file))?;
+    let muts_reader = create_reader(Some(&args.muts_file))?;
     let muts_interest: Vec<MutsOfInterestInput> = read_tsv(muts_reader, false)?;
 
     let dais_reader = create_reader(Some(&args.input_file))?;

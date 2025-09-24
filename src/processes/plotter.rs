@@ -15,19 +15,6 @@ use std::{
     io::{BufRead, BufReader},
     path::{Path, PathBuf},
 };
-use plotly::{
-    Layout, Plot, Sankey, Scatter,
-    common::{Mode, Title},
-    configuration::{ImageButtonFormats, ToImageButtonOptions},
-    layout::{Axis, GridPattern, LayoutGrid},
-};
-use std::{
-    collections::HashMap,
-    error::Error,
-    fs::File,
-    io::{BufRead, BufReader},
-    path::{Path, PathBuf},
-};
 
 // Add this function to generate consistent colors for segment names
 fn get_segment_color(segment_name: &str) -> &'static str {
@@ -124,7 +111,6 @@ pub struct PlotterArgs {
 }
 
 fn generate_plot_coverage(input_directory: &Path) -> Result<Plot, Box<dyn Error>> {
-fn generate_plot_coverage(input_directory: &Path) -> Result<Plot, Box<dyn Error>> {
     // Create a Plotly plot
     let mut plot = Plot::new();
 
@@ -181,7 +167,6 @@ fn generate_plot_coverage(input_directory: &Path) -> Result<Plot, Box<dyn Error>
 
     // Set the figure title
     let layout = Layout::new()
-        .title(format!(
         .title(format!(
             "Coverage | {}",
             input_directory
@@ -255,11 +240,6 @@ fn generate_plot_coverage_seg(input_directory: &Path) -> Result<Plot, Box<dyn Er
             .delimiter(b'\t')
             .has_headers(true)
             .from_reader(file);
-        // Create a TSV reader
-        let mut rdr = ReaderBuilder::new()
-            .delimiter(b'\t')
-            .has_headers(true)
-            .from_reader(file);
 
         for result in rdr.records() {
             let record = result?;
@@ -271,25 +251,7 @@ fn generate_plot_coverage_seg(input_directory: &Path) -> Result<Plot, Box<dyn Er
                 let consensus_count: u32 = record[5].parse()?;
                 let minority_count: u32 = record[6].parse()?;
                 let minority_frequency: f32 = record[8].parse()?;
-        for result in rdr.records() {
-            let record = result?;
-            if record.len() >= 8 {
-                let segment_name = record[0].to_string();
-                let position: u32 = record[1].parse()?;
-                let consensus_allele: String = record[3].to_string();
-                let minority_allele: String = record[4].to_string();
-                let consensus_count: u32 = record[5].parse()?;
-                let minority_count: u32 = record[6].parse()?;
-                let minority_frequency: f32 = record[8].parse()?;
 
-                variants_data.entry(segment_name).or_default().push((
-                    position,
-                    consensus_allele,
-                    minority_allele,
-                    consensus_count,
-                    minority_count,
-                    minority_frequency,
-                ));
                 variants_data.entry(segment_name).or_default().push((
                     position,
                     consensus_allele,
@@ -399,7 +361,6 @@ fn generate_plot_coverage_seg(input_directory: &Path) -> Result<Plot, Box<dyn Er
             let minority_trace = Scatter::new(variant_positions, minority_values)
                 .mode(Mode::Markers)
                 .name(&segment_name)
-                .name(&segment_name)
                 .marker(
                     plotly::common::Marker::new()
                         .color(segment_color)
@@ -426,7 +387,6 @@ fn generate_plot_coverage_seg(input_directory: &Path) -> Result<Plot, Box<dyn Er
                 .columns(cols)
                 .pattern(GridPattern::Independent),
         )
-        .title(format!(
         .title(format!(
             "Segment Coverage | {}",
             input_directory
@@ -617,7 +577,6 @@ fn generate_sankey_plot(input_directory: &Path) -> Result<Plot, Box<dyn Error>> 
             "3-chimeric" | "3-altmatch" => chi_alt_reads += *reads,
             _ => {
                 if let Some(stripped) = record.strip_prefix("4-") {
-                if let Some(stripped) = record.strip_prefix("4-") {
                     primary_match_sum += *reads;
                     let segment = stripped.to_string();
                     four_segments.push((segment, *reads));
@@ -663,14 +622,15 @@ fn generate_sankey_plot(input_directory: &Path) -> Result<Plot, Box<dyn Error>> 
             let segment = stripped.to_string();
             let segment_color = get_segment_color(&segment);
             add_node(
-                segment,
+                &segment,
                 &mut node_labels,
                 &mut node_map,
                 &mut node_colors,
                 segment_color,
             );
+            // Link from Alt Match to this segment
             source_indices.push(node_map["Alt Match"]);
-            target_indices.push(node_map[segment]);
+            target_indices.push(node_map[&segment]);
             values.push(*reads);
         }
     }
@@ -779,7 +739,6 @@ fn generate_sankey_plot(input_directory: &Path) -> Result<Plot, Box<dyn Error>> 
 
     // Set layout
     let layout = Layout::new()
-        .title(format!(
         .title(format!(
             "Read Assignment | {}",
             input_directory
