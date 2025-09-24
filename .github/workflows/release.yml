@@ -1,109 +1,82 @@
 name: Release
 
-# This workflow creates a GitHub Release when a tag is pushed and builds/distributes:
-#  - Multi-architecture (x86_64 + aarch64) Linux Docker images and binary tarballs
-#  - A universal (fat) macOS binary (combining aarch64 + x86_64) packaged as a tarball
-#  - Multi-arch container manifest referencing per-arch images
-#
-# Key notes / caveats:
-#  - Tag filter currently uses a regex-like pattern string ("v[0-9]+.[0-9]+.[0-9]+") but GitHub interprets these as globs, not regex.
-#    This pattern will literally match tags containing brackets/plus signs only if such tags are pushed. Consider replacing with 'v*.*.*'.
-#  - Additional explicit tag 'test' triggers a non-latest release (see Create Release step logic).
-#  - Runner label 'ubuntu-24.04-arm' may not exist in GitHub-hosted runners at all times; verify actual available ARM labels.
-#  - Docker images are only tagged as latest-<arch>; version-specific per-arch tags are not produced (manifest step synthesizes version tag from those latest-* tags).
-#  - Release creation is not idempotent on reruns (gh release create fails if release already exists). Consider guarding or using 'gh release view || gh release edit'.
-#  - Using nightly Rust on macOS; unless nightly features are required, stable may improve reproducibility.
-#  - No build caching is configured (Cargo + Docker) which could lengthen CI times.
-#  - Security hardening (e.g., minimal permissions, SBOM, provenance attestations) could be added in future.
-#  - File now contains verbose comments for clarity; functional YAML content unchanged.
-
 on:
   push:
+    branches:
+      - 'main'
     paths:
-      - "CHANGELOG.md"
+      - 'CHANGELOG.md'  # Only trigger when this file is modified
 
-permissions: {}  # Explicitly sets default job permissions to none (principle of least privilege). Each job grants what it needs.
+permissions: {}
 
 env:
-  CARGO_TERM_COLOR: always   # Ensures colored Cargo output in logs.
-  RELEASE_BIN: mira-oxide     # Canonical binary name used across packaging steps.
-  REGISTRY: ghcr.io           # Container registry host (GitHub Container Registry).
-  DOCKERHUB_ORG: cdcgov       # Docker Hub org/team namespace owning mira-oxide repo.
-  # Docker Hub credentials expected: DOCKERHUB_USERNAME (push-capable user in org) and DOCKERHUB_TOKEN.
+  CARGO_TERM_COLOR: always
+  RELEASE_BIN: mira-oxide
+  REGISTRY: ghcr.io
 
 jobs:
   create-release:
     name: Create New Release
-    runs-on: ubuntu-latest   # Standard Linux runner for release orchestration.
+    runs-on: ubuntu-latest
     permissions:
-      contents: write        # Required to create a GitHub Release and upload assets.
+      contents: write
     outputs:
-      upload_url: ${{ steps.create_release.outputs.upload_url }}  # (Currently unused downstream; could remove if not consumed.)
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
     steps:
-      - uses: actions/checkout@v4  # Fetch repository code to access changelog script and metadata.
+      - uses: actions/checkout@v4
 
       - name: Extract Changelog
         id: extract_changelog
         shell: bash
-        run: perl .github/scripts/last_release_notes.pl > $RUNNER_TEMP/release_notes.md  # Generates notes for this release.
+        run: perl .github/scripts/last_release_notes.pl > $RUNNER_TEMP/release_notes.md
 
       - name: Create Release
         id: create_release
-        if: startsWith(github.ref_name, 'v')  # Only create a release for version tags, skip entirely for 'test'.
         shell: bash
         run: |
-          # Create the GitHub Release using GitHub CLI. Fails if release with same tag already exists.
+          [[ "${{ github.ref_name }}" == "test" ]] && latest="--latest=false" || latest=
+
           gh release create "${{ github.ref_name }}" \
           --title "${RELEASE_BIN} ${{ github.ref_name }}" \
-          --notes-file "$RUNNER_TEMP/release_notes.md"
+          --notes-file "$RUNNER_TEMP/release_notes.md" \
+          $latest
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # GitHub-provided token with contents:write permission.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   build-release-image-and-linux-artifacts:
     name: Build Linux Artifacts and Images
-    needs: [create-release]   # Ensures the release exists before uploading assets.
+    needs: [create-release]
     strategy:
       matrix:
         include:
           - arch: x86_64
-            runner: ubuntu-latest       # Standard x86_64 runner.
+            runner: ubuntu-latest
           - arch: aarch64
-            runner: ubuntu-24.04-arm    # Intended ARM64 runner label (verify availability; may differ, e.g., ubuntu-22.04-arm64).
-    runs-on: ${{ matrix.runner }}       # Dynamically select runner based on matrix entry.
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
     permissions:
-      contents: write   # Needed to upload release assets.
-      packages: write   # Needed to push images to GHCR.
+      contents: write
+      packages: write
     steps:
-      - uses: actions/checkout@v4  # Source code for Docker build context.
+      - uses: actions/checkout@v4
 
-      - name: Log in to GHCR
+      - name: Log in to the Container registry
         uses: docker/login-action@v3
         with:
-          registry: ${{ env.REGISTRY }}        # ghcr.io
-          username: ${{ github.actor }}        # Actor initiating the workflow (token auth is sufficient).
-          password: ${{ secrets.GITHUB_TOKEN }}  # Token automatically scoped to repo; sufficient for GHCR push.
-
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Extract metadata for Docker
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: |
-            ${{ env.REGISTRY }}/${{ github.repository }}
-            docker.io/${{ env.DOCKERHUB_ORG }}/mira-oxide
+          images: ${{ env.REGISTRY }}/${{ github.repository }}
           tags: |
-            type=raw,value=latest-${{ matrix.arch }},enable=${{ startsWith(github.ref_name, 'v') }}
-            type=raw,value=${{ github.ref_name }}-${{ matrix.arch }},enable=${{ startsWith(github.ref_name, 'v') }}
-            type=raw,value=test-${{ matrix.arch }},enable=${{ github.ref_name == 'test' }}
+            type=raw,value=latest-${{ matrix.arch }}
 
       - name: Debug Git ref
         run: |
-          # Helpful diagnostic output to confirm tag context and repository naming.
           echo "GITHUB_REF: $GITHUB_REF"
           echo "GITHUB_REF_NAME: $GITHUB_REF_NAME"
           echo "GITHUB_SHA: $GITHUB_SHA"
@@ -112,161 +85,87 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
         with:
-          file: Dockerfile        # Uses repository Dockerfile at root.
-          context: .              # Full repo as build context.
-          push: true              # Push images to registry.
-          tags: ${{ steps.meta.outputs.tags }}  # Tag list from metadata action (only latest-arch currently).
-          # Potential enhancements: buildx cache-from/to for faster rebuilds; provenance/SBOM generation.
+          file: Dockerfile
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
 
       - name: Prepare Linux Binary
         shell: bash
         run: |
-          # Pull the just-built image tag matching this architecture and extract the compiled binary from /app.
           IMAGE_TAG=$(echo "${{ steps.meta.outputs.tags }}" | grep -- '-${{ matrix.arch }}$' | head -n 1)
           docker create --name temp-container $IMAGE_TAG \
           && docker cp temp-container:/app/${RELEASE_BIN} ./${RELEASE_BIN} \
-          && docker rm temp-container
-
-          # If this is a version tag (v*), append the version to the binary filename inside the archive.
-          if [[ "${GITHUB_REF_NAME}" == v* ]]; then
-            mv "${RELEASE_BIN}" "${RELEASE_BIN}-${GITHUB_REF_NAME}"
-            BIN_NAME="${RELEASE_BIN}-${GITHUB_REF_NAME}"
-          else
-            BIN_NAME="${RELEASE_BIN}"
-          fi
-
-          tar -czf ${RELEASE_BIN}-linux-${{ matrix.arch }}-${{ github.ref_name }}.tar.gz "$BIN_NAME"
+          && docker rm temp-container \
+          && tar -czf ${RELEASE_BIN}-linux-${{ matrix.arch }}-${{ github.ref_name }}.tar.gz ${RELEASE_BIN}
 
       - name: Upload Linux Release Asset
-        if: startsWith(github.ref_name, 'v')  # Only upload to a GitHub Release for version tags.
         shell: bash
         run: |
-          # Upload architecture-specific Linux binary tarball to the existing GitHub Release.
           gh release upload "${{ github.ref_name }}" ${RELEASE_BIN}-linux-${{ matrix.arch }}-${{ github.ref_name }}.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload Linux Test Artifact
-        if: github.ref_name == 'test'  # For test tag, store as workflow artifact instead of release asset.
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ env.RELEASE_BIN }}-linux-${{ matrix.arch }}-test
-          path: ${{ env.RELEASE_BIN }}-linux-${{ matrix.arch }}-${{ github.ref_name }}.tar.gz
-
   create-image-manifest:
     name: Create Image Manifest
-    needs: build-release-image-and-linux-artifacts  # Wait until both arch images are pushed.
+    needs: build-release-image-and-linux-artifacts
     runs-on: ubuntu-latest
     permissions:
-      packages: write  # Required to push multi-arch manifests.
-      contents: read   # Minimal read (not strictly required here, but harmless).
+      packages: write
+      contents: read
     steps:
-      - name: Log in to GHCR
+      - name: Log in to the Container registry
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}  # Token automatically scoped to repo; sufficient for GHCR push.
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Create and push manifests (version tags)
-        if: startsWith(github.ref_name, 'v')
+      - name: Create and push manifests
         shell: bash
         run: |
-          # GHCR manifests
           REPO=$(echo "${{ env.REGISTRY }}/${{ github.repository }}" | tr '[A-Z]' '[a-z]')
           VERSION=${REPO}:${{ github.ref_name }}
           LATEST=${REPO}:latest
-          docker manifest create $VERSION --amend ${VERSION}-x86_64 --amend ${VERSION}-aarch64 || \
-            docker manifest create $VERSION --amend ${LATEST}-x86_64 --amend ${LATEST}-aarch64
-          docker manifest push $VERSION
-          docker manifest create $LATEST --amend ${LATEST}-x86_64 --amend ${LATEST}-aarch64
-          docker manifest push $LATEST
 
-          # Docker Hub manifests (org namespace)
-          DH_REPO="docker.io/${{ env.DOCKERHUB_ORG }}/mira-oxide"
-          DH_VERSION=${DH_REPO}:${{ github.ref_name }}
-          DH_LATEST=${DH_REPO}:latest
-          docker manifest create $DH_VERSION --amend ${DH_VERSION}-x86_64 --amend ${DH_VERSION}-aarch64 || \
-            docker manifest create $DH_VERSION --amend ${DH_LATEST}-x86_64 --amend ${DH_LATEST}-aarch64
-          docker manifest push $DH_VERSION
-          docker manifest create $DH_LATEST --amend ${DH_LATEST}-x86_64 --amend ${DH_LATEST}-aarch64
-          docker manifest push $DH_LATEST
+          docker manifest create $VERSION --amend ${LATEST}-x86_64 --amend ${LATEST}-aarch64 \
+            && docker manifest push $VERSION
 
-      - name: Create and push manifests (test tag)
-        if: github.ref_name == 'test'
-        shell: bash
-        run: |
-          # GHCR test manifest
-          REPO=$(echo "${{ env.REGISTRY }}/${{ github.repository }}" | tr '[A-Z]' '[a-z]')
-          TEST=${REPO}:test
-          docker manifest create $TEST --amend ${TEST}-x86_64 --amend ${TEST}-aarch64
-          docker manifest push $TEST
-
-          # Docker Hub test manifest (org namespace)
-          DH_REPO="docker.io/${{ env.DOCKERHUB_ORG }}/mira-oxide"
-          DH_TEST=${DH_REPO}:test
-          docker manifest create $DH_TEST --amend ${DH_TEST}-x86_64 --amend ${DH_TEST}-aarch64
-          docker manifest push $DH_TEST
+          docker manifest create $LATEST --amend ${LATEST}-x86_64 --amend ${LATEST}-aarch64 \
+            && docker manifest push $LATEST
 
   build-mac-artifacts:
     name: Build Mac Artifacts
-    needs: create-release         # Independent of Linux build path; both upload assets to same release.
+    needs: create-release
     runs-on: macos-latest
 
     permissions:
-      contents: write             # Needed for asset upload.
+      contents: write
 
     steps:
-      - uses: actions/checkout@v4 # Fetch code.
+      - uses: actions/checkout@v4
 
       - name: Install latest nightly Rust
         run: |
-          # Nightly toolchain installation; replace with stable if not using nightly-only features.
           rustup update nightly
           rustup default nightly
           rustup target add aarch64-apple-darwin x86_64-apple-darwin
 
       - name: Build
         run: |
-          # Compile both target architectures in release mode.
-            cargo build --release --target aarch64-apple-darwin --target x86_64-apple-darwin
+          cargo build --release --target aarch64-apple-darwin --target x86_64-apple-darwin
 
       - name: Package Binary
         shell: bash
         run: |
-          # Combine the two architecture-specific binaries into one universal (fat) binary via lipo.
           lipo -create -output ${{ env.RELEASE_BIN }} \
             target/aarch64-apple-darwin/release/${{ env.RELEASE_BIN }} \
             target/x86_64-apple-darwin/release/${{ env.RELEASE_BIN }}
-
-          # Rename binary to include version if tag is v*
-          if [[ "${GITHUB_REF_NAME}" == v* ]]; then
-            mv "${{ env.RELEASE_BIN }}" "${{ env.RELEASE_BIN }}-${GITHUB_REF_NAME}"
-            MAC_BIN="${{ env.RELEASE_BIN }}-${GITHUB_REF_NAME}"
-          else
-            MAC_BIN="${{ env.RELEASE_BIN }}"
-          fi
-
-          tar -czf ${{ env.RELEASE_BIN }}-apple-universal-${{ github.ref_name }}.tar.gz "$MAC_BIN"
+          tar -czf ${{ env.RELEASE_BIN }}-apple-universal-${{ github.ref_name }}.tar.gz ${{ env.RELEASE_BIN }}
 
       - name: Upload Release Asset
-        if: startsWith(github.ref_name, 'v')  # Only upload to release for version tags.
         shell: bash
         run: |
-          # Upload macOS universal binary tarball (wildcard allows potential accompanying files; could be made explicit).
           gh release upload "${{ github.ref_name }}" ${{ env.RELEASE_BIN }}-apple-universal-${{ github.ref_name }}.*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload Mac Test Artifact
-        if: github.ref_name == 'test'
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ env.RELEASE_BIN }}-apple-universal-test
-          path: ${{ env.RELEASE_BIN }}-apple-universal-${{ github.ref_name }}.tar.gz
