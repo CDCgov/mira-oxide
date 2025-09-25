@@ -9,7 +9,7 @@ use crate::io::{
     write_csv_files::write_out_all_csv_mira_reports,
     write_fasta_files::write_out_all_fasta_files,
     write_json_files::{negative_qc_statement, write_out_all_json_files},
-    write_parquet_files::write_reads_to_parquet,
+    write_parquet_files::{write_coverage_to_parquet, write_reads_to_parquet},
 };
 use crate::utils::data_processing::{
     DaisVarsData, ProcessedCoverage, Subtype, collect_analysis_metadata, collect_negatives,
@@ -329,6 +329,14 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
 
     // Write fields to parq if flag given
     if args.parq {
+        write_coverage_to_parquet(
+            &coverage_data,
+            &format!(
+                "{}/{}_coverage.parq",
+                &args.output_path.display(),
+                args.runid
+            ),
+        )?;
         write_reads_to_parquet(
             &read_data,
             &format!("{}/{}_reads.parq", &args.output_path.display(), args.runid),
