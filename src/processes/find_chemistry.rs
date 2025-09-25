@@ -310,7 +310,7 @@ fn parse_chemistry_args(args: &FindChemArgs) -> Result<ChemistryOutput, std::io:
     Ok(out)
 }
 
-pub fn find_chemistry_process(args: FindChemArgs) -> Result<(), std::io::Error> {
+pub fn find_chemistry_process(args: &FindChemArgs) -> Result<(), std::io::Error> {
     //let args = CheckChemArgs::parse();
     // handle input validation to ensure valid combinations of
     if let Err(e) = args.validate() {
@@ -318,7 +318,7 @@ pub fn find_chemistry_process(args: FindChemArgs) -> Result<(), std::io::Error> 
         std::process::exit(1);
     }
     // parse the arguments into output format
-    let output = parse_chemistry_args(&args)?;
+    let output = parse_chemistry_args(args)?;
     let filename = format!("{}_chemistry.csv", args.sample);
     let headers = "sample_ID,irma_custom,subsample,irma_module";
 

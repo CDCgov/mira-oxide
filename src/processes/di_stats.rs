@@ -7,14 +7,14 @@ use std::path::{Path, PathBuf};
 /// A Rust utility for calculating DI metric statistics from IRMA output
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
-struct Args {
+pub struct DIStatArgs {
     /// Path to the IRMA assembly directory
     #[arg(required = true)]
     assembly_dir: PathBuf,
 }
 
 #[derive(Debug, Deserialize)]
-struct CoverageRecord {
+pub struct CoverageRecord {
     #[serde(rename = "Coverage Depth")]
     coverage_depth: f64,
 }
@@ -23,7 +23,7 @@ struct CoverageRecord {
 /// end and one for the 3' end. The ratio is calculated as the mean
 /// coverage for [length] bases at either end / the coverage for [length]
 /// bases in the center of the segment.
-fn di_stat(cov_file: &Path, length: usize) -> Result<(f64, f64), Box<dyn Error>> {
+pub fn di_stat(cov_file: &Path, length: usize) -> Result<(f64, f64), Box<dyn Error>> {
     let mut rdr = csv::ReaderBuilder::new()
         .delimiter(b'\t')
         .from_path(cov_file)?;
@@ -67,7 +67,7 @@ fn di_stat(cov_file: &Path, length: usize) -> Result<(f64, f64), Box<dyn Error>>
 }
 
 /// Calculate 5p and 3p DI stats for an entire assembly directory.
-fn di_stat_assembly(assembly_dir: &Path) -> Result<(), Box<dyn Error>> {
+pub fn di_stat_assembly(assembly_dir: &Path) -> Result<(), Box<dyn Error>> {
     let run_id = assembly_dir
         .parent()
         .and_then(|p| p.file_name())
@@ -78,17 +78,28 @@ fn di_stat_assembly(assembly_dir: &Path) -> Result<(), Box<dyn Error>> {
 
     for entry in glob(&path_pattern)?.filter_map(Result::ok) {
         if entry.is_dir() {
-            let sample_id = entry.file_name().unwrap_or_default().to_str().unwrap_or_default();
-            let cov_pattern = format!("{}/tables/*coverage.txt", entry.to_str().unwrap_or_default());
+            let sample_id = entry
+                .file_name()
+                .unwrap_or_default()
+                .to_str()
+                .unwrap_or_default();
+            let cov_pattern = format!(
+                "{}/tables/*coverage.txt",
+                entry.to_str().unwrap_or_default()
+            );
 
             for cov_path in glob(&cov_pattern)?.filter_map(Result::ok) {
                 let cov_str = cov_path.to_str().unwrap_or_default();
-                if let Some(seg) = cov_str.split("tables/").nth(1).and_then(|s| s.split('-').next()) {
+                if let Some(seg) = cov_str
+                    .split("tables/")
+                    .nth(1)
+                    .and_then(|s| s.split('-').next())
+                {
                     match di_stat(&cov_path, 300) {
                         Ok((prime5, prime3)) => {
-                            println!("{}\t{}\t{}\t{}\t{}", run_id, sample_id, seg, prime5, prime3);
+                            println!("{run_id}\t{sample_id}\t{seg}\t{prime5}\t{prime3}");
                         }
-                        Err(e) => eprintln!("Could not process file {:?}: {}", cov_path, e),
+                        Err(e) => eprintln!("Could not process file {cov_path:?}: {e}"),
                     }
                 }
             }
@@ -97,9 +108,9 @@ fn di_stat_assembly(assembly_dir: &Path) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn main() {
-        let args = Args::parse();
+pub fn di_stats_process(args: DIStatArgs) {
+    //let args = Args::parse();
     if let Err(e) = di_stat_assembly(&args.assembly_dir) {
-        eprintln!("Application error: {}", e);
+        eprintln!("Application error: {e}");
     }
 }
