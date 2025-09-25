@@ -9,7 +9,10 @@ use crate::io::{
     write_csv_files::write_out_all_csv_mira_reports,
     write_fasta_files::write_out_all_fasta_files,
     write_json_files::{negative_qc_statement, write_out_all_json_files},
-    write_parquet_files::{write_coverage_to_parquet, write_reads_to_parquet},
+    write_parquet_files::{
+        write_aa_seq_to_parquet, write_alleles_to_parquet, write_coverage_to_parquet,
+        write_indels_to_parquet, write_nt_seq_to_parquet, write_reads_to_parquet,
+    },
 };
 use crate::utils::data_processing::{
     DaisVarsData, ProcessedCoverage, Subtype, collect_analysis_metadata, collect_negatives,
@@ -100,9 +103,7 @@ enum Samplesheet {
 
 #[allow(clippy::too_many_lines)]
 pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Error>> {
-    ///////////////////////////////////////////////////////////////////////////
     /////////////// Read in and process data from IRMA and Dais ///////////////
-    ///////////////////////////////////////////////////////////////////////////
     // Read in samplesheet
     let samplesheet_path = create_reader(args.samplesheet)?;
     let samplesheet = if &args.platform == "illumina" {
@@ -136,7 +137,6 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     let allele_data = allele_data_collection(&args.irma_path, &args.platform, &args.runid)?;
     let indel_data = indels_data_collection(&args.irma_path, &args.platform, &args.runid)?;
     let run_info = run_info_collection(&args.irma_path, &args.platform, &args.runid)?;
-
     let seq_data = amended_consensus_data_collection(&args.irma_path, &args.virus)?;
     let ref_lengths = match get_reference_lens(&args.irma_path) {
         Ok(data) => data,
@@ -158,9 +158,9 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
         dais_ref_data = dais_ref_seq_data_collection(&args.workdir_path, "sc2")?;
     }
 
+    /////////////// Processing ingested IRMA and Dais data ///////////////
     //Calculate AA variants for aavars.csv and dais_vars.json
     let mut dais_vars_data: Vec<DaisVarsData> = Vec::new();
-
     if args.virus.to_lowercase() == "flu" {
         dais_vars_data =
             compute_dais_variants(&dais_ref_data, &dais_seq_data, &args.runid, &args.platform)?;
@@ -209,7 +209,6 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     )?;
 
     //Build prelim irma summary "dataframe"
-    //More will be added and analyzed before final irma summary created
     let mut irma_summary = create_irma_summary_vec(
         &sample_list,
         &melted_reads_vec,
@@ -234,6 +233,7 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
         med_spike_cov: None,
         perc_ref_spike_covered: None,
     };
+    // Set qc values based on given virus and platform
     if args.virus.to_lowercase() == "flu" {
         if args.platform.to_lowercase() == "illumina" {
             qc_values = qc_config.illumina_flu;
@@ -256,12 +256,14 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
         }
     }
 
+    // Add pass fail information to irma summary
     for sample in &mut irma_summary {
         if sample.pass_fail_reason.is_none() {
             sample.add_pass_fail_qc(&dais_vars_data, &seq_data, &qc_values)?;
         }
     }
 
+    // Construct seq info and add pass fail information
     let nt_seq_vec = create_nt_seq_vec(
         &seq_data,
         &vtype_data,
@@ -278,12 +280,11 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
         &args.platform,
     )?;
 
+    //Sort into passing and failing
     let processed_nt_seq = divide_nt_into_pass_fail_vec(&nt_seq_vec, &args.platform, &args.virus)?;
     let processed_aa_seq = divide_aa_into_pass_fail_vec(&aa_seq_vec, &args.platform, &args.virus)?;
 
-    /////////////////////////////////////////////////////////////////////////////
-    //////////////////////////////// Write files ////////////////////////////////
-    /////////////////////////////////////////////////////////////////////////////
+    //////////////////////////////// Write all files ////////////////////////////////
 
     write_out_all_fasta_files(
         &args.output_path,
@@ -328,6 +329,7 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     )?;
 
     // Write fields to parq if flag given
+    // Why separate you ask? parquet set up it niche
     if args.parq {
         write_coverage_to_parquet(
             &coverage_data,
@@ -340,6 +342,34 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
         write_reads_to_parquet(
             &read_data,
             &format!("{}/{}_reads.parq", &args.output_path.display(), args.runid),
+        )?;
+        write_alleles_to_parquet(
+            &allele_data,
+            &format!(
+                "{}/{}_alleles.parq",
+                &args.output_path.display(),
+                args.runid
+            ),
+        )?;
+        write_indels_to_parquet(
+            &indel_data,
+            &format!("{}/{}_indels.parq", &args.output_path.display(), args.runid),
+        )?;
+        write_nt_seq_to_parquet(
+            &nt_seq_vec,
+            &format!(
+                "{}/{}_amended_consensus.parq",
+                &args.output_path.display(),
+                args.runid
+            ),
+        )?;
+        write_aa_seq_to_parquet(
+            &aa_seq_vec,
+            &format!(
+                "{}/{}_amino_acid_consensus.parq",
+                &args.output_path.display(),
+                args.runid
+            ),
         )?;
     }
 

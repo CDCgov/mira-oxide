@@ -141,7 +141,7 @@ pub struct IndelsData {
     #[serde(rename = "Insert")]
     pub insert: Option<String>,
     #[serde(rename = "Length")]
-    pub length: Option<String>,
+    pub length: Option<i32>,
     #[serde(rename = "Context")]
     pub context: String,
     #[serde(rename = "Called")]
@@ -149,7 +149,7 @@ pub struct IndelsData {
     #[serde(rename = "Count")]
     pub count: i32,
     #[serde(rename = "Total")]
-    pub total: String,
+    pub total: i32,
     #[serde(rename = "Frequency")]
     pub frequency: f64,
     #[serde(rename = "Average_Quality")]

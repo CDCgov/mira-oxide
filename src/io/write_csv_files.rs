@@ -172,7 +172,7 @@ pub fn write_out_all_csv_mira_reports(
     let indels_columns = vec![
         "sample",
         "sample_upstream_position",
-        "reference",
+        "reference_name",
         "context",
         "length",
         "insert",
@@ -253,7 +253,7 @@ pub fn write_out_all_csv_mira_reports(
         &summary_columns,
     )?;
 
-    // write out the {runid}_aavars.csv
+    // write out the amended_consensus
     let seq_columns = vec![
         "sample_id",
         "reference",
@@ -270,11 +270,22 @@ pub fn write_out_all_csv_mira_reports(
         &seq_columns,
     )?;
 
+    // write out the amino_acid_consensus
+    // Note that the struct values are different but the column values are the same
+    let aa_struct_values = vec![
+        "sample_id",
+        "protein",
+        "qc_decision",
+        "sequence",
+        "runid",
+        "instrument",
+    ];
+
     write_structs_to_csv_file(
         &format!("{}/{runid}_amino_acid_consensus.csv", output_path.display()),
         aa_seq_vec,
         &seq_columns,
-        &seq_columns,
+        &aa_struct_values,
     )?;
 
     // Writing out run information
