@@ -1,6 +1,6 @@
 #![allow(unreachable_patterns)]
 use crate::processes::{
-    all_sample_hd::*, all_sample_nt_diffs::*, find_chemistry::*, plotter::*,
+    all_sample_hd::*, all_sample_nt_diffs::*, di_stats::*, find_chemistry::*, plotter::*,
     positions_of_interest::*, variants_of_interest::*,
 };
 use clap::{Parser, Subcommand};
@@ -24,10 +24,12 @@ enum Commands {
     FindChemistry(FindChemArgs),
     /// Hamming
     Hamming(HammingArgs),
-    /// nt diffs
+    /// NT diffs
     NTDiffs(NTDiffsArgs),
     /// Plotter
     Plotter(PlotterArgs),
+    /// DI Stats
+    DIStats(DIStatArgs),
 }
 
 fn main() {
@@ -40,18 +42,17 @@ fn main() {
         Commands::PositionsOfInterest(cmd_args) => positions_of_interest_process(cmd_args)
             .unwrap_or_else(|_| panic!("{module}::PositionsOfInterest")),
         Commands::FindChemistry(cmd_args) => {
-            find_chemistry_process(cmd_args).unwrap_or_die(&format!("{module}::FindChemistry"))
+            find_chemistry_process(&cmd_args).unwrap_or_die(&format!("{module}::FindChemistry"))
         }
         Commands::Hamming(cmd_args) => {
-            all_sample_hd_process(cmd_args).unwrap_or_die(&format!("{module}::Hamming"))
+            all_sample_hd_process(&cmd_args).unwrap_or_die(&format!("{module}::Hamming"))
         }
-        Commands::NTDiffs(cmd_args) => all_sample_nt_diffs_process(cmd_args),
+        Commands::NTDiffs(cmd_args) => all_sample_nt_diffs_process(&cmd_args),
         Commands::Plotter(cmd_args) => {
             plotter_process(cmd_args).unwrap_or_else(|_| panic!("{module}::Plotter"))
         }
-        _ => {
-            eprintln!("mira-oxide: unrecognized command {:?}", args.command);
-            std::process::exit(1)
+        Commands::DIStats(cmd_args) => {
+            di_stats_process(&cmd_args).unwrap_or_die(&format!("{module}::DIStats"))
         }
     }
 }

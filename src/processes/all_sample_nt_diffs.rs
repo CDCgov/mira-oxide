@@ -34,7 +34,7 @@ struct ValidSeq {
     sequence: Nucleotides,
 }
 
-pub fn all_sample_nt_diffs_process(args: NTDiffsArgs) {
+pub fn all_sample_nt_diffs_process(args: &NTDiffsArgs) {
     //let args = NTDiffsArgs::parse();
     let delim = args.output_delimiter.unwrap_or(',');
 
