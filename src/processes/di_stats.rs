@@ -6,10 +6,10 @@ use std::path::{Path, PathBuf};
 
 /// A Rust utility for calculating DI metric statistics from IRMA output
 #[derive(Parser, Debug)]
-#[command(version, about, long_about = None)]
+#[command(about = "Tool for calculating DI stats")]
 pub struct DIStatArgs {
     /// Path to the IRMA assembly directory
-    #[arg(required = true)]
+    #[arg(short = 'a', long)]
     assembly_dir: PathBuf,
 }
 
@@ -108,9 +108,11 @@ pub fn di_stat_assembly(assembly_dir: &Path) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-pub fn di_stats_process(args: DIStatArgs) {
+pub fn di_stats_process(args: &DIStatArgs) -> Result<(), std::io::Error> {
     //let args = Args::parse();
     if let Err(e) = di_stat_assembly(&args.assembly_dir) {
         eprintln!("Application error: {e}");
     }
+
+    Ok(())
 }

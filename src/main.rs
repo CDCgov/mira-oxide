@@ -51,11 +51,9 @@ fn main() {
         Commands::Plotter(cmd_args) => {
             plotter_process(cmd_args).unwrap_or_else(|_| panic!("{module}::Plotter"))
         }
-        _ => {
-            eprintln!("mira-oxide: unrecognized command {:?}", args.command);
-            std::process::exit(1)
+        Commands::DIStats(cmd_args) => {
+            di_stats_process(&cmd_args).unwrap_or_die(&format!("{module}::DIStats"))
         }
-        Commands::DIStats(cmd_args) => di_stats_process(cmd_args),
     }
 }
 
