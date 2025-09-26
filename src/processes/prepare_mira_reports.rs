@@ -11,7 +11,8 @@ use crate::io::{
     write_json_files::{negative_qc_statement, write_out_all_json_files},
     write_parquet_files::{
         write_aa_seq_to_parquet, write_alleles_to_parquet, write_coverage_to_parquet,
-        write_indels_to_parquet, write_nt_seq_to_parquet, write_reads_to_parquet,
+        write_dais_vars_to_parquet, write_indels_to_parquet, write_irma_summary_to_parquet,
+        write_nt_seq_to_parquet, write_reads_to_parquet, write_run_info_to_parquet,
     },
 };
 use crate::utils::data_processing::{
@@ -355,6 +356,23 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
             &indel_data,
             &format!("{}/{}_indels.parq", &args.output_path.display(), args.runid),
         )?;
+        write_dais_vars_to_parquet(
+            &dais_vars_data,
+            &format!(
+                "{}/{}_variants.parq",
+                &args.output_path.display(),
+                args.runid
+            ),
+        )?;
+        write_irma_summary_to_parquet(
+            &irma_summary,
+            &args.virus,
+            &format!(
+                "{}/{}_summary.parq",
+                &args.output_path.display(),
+                args.runid
+            ),
+        )?;
         write_nt_seq_to_parquet(
             &nt_seq_vec,
             &format!(
@@ -367,6 +385,14 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
             &aa_seq_vec,
             &format!(
                 "{}/{}_amino_acid_consensus.parq",
+                &args.output_path.display(),
+                args.runid
+            ),
+        )?;
+        write_run_info_to_parquet(
+            &run_info,
+            &format!(
+                "{}/{}_irma_config.parq",
                 &args.output_path.display(),
                 args.runid
             ),

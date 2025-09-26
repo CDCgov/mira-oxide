@@ -81,7 +81,7 @@ pub struct IRMASummary {
     pub pass_qc: Option<i32>,
     pub reads_mapped: Option<i32>,
     pub reference: Option<String>,
-    pub precent_reference_coverage: Option<f64>,
+    pub percent_reference_coverage: Option<f64>,
     pub median_coverage: Option<f64>,
     pub count_minor_snv: Option<i32>,
     pub count_minor_indel: Option<i32>,
@@ -950,7 +950,7 @@ pub fn create_irma_summary_vec(
                     total_reads: Some(entry.total_reads),
                     pass_qc: Some(entry.pass_qc),
                     reads_mapped: Some(entry.reads_mapped),
-                    precent_reference_coverage: None,
+                    percent_reference_coverage: None,
                     median_coverage: None,
                     count_minor_snv: Some(0),
                     count_minor_indel: Some(0),
@@ -972,7 +972,7 @@ pub fn create_irma_summary_vec(
                 total_reads: Some(0),
                 pass_qc: Some(0),
                 reads_mapped: Some(0),
-                precent_reference_coverage: Some(0.0),
+                percent_reference_coverage: Some(0.0),
                 median_coverage: Some(0.0),
                 count_minor_snv: Some(0),
                 count_minor_indel: Some(0),
@@ -993,7 +993,7 @@ pub fn create_irma_summary_vec(
             if sample.sample_id == Some(entry.sample.clone())
                 && sample.reference == Some(entry.reference.clone())
             {
-                sample.precent_reference_coverage = entry.percent_reference_covered;
+                sample.percent_reference_coverage = entry.percent_reference_covered;
                 sample.median_coverage = Some(entry.median_coverage);
             }
         }
@@ -1060,7 +1060,7 @@ impl IRMASummary {
             }
         }
 
-        if let Some(coverage) = self.precent_reference_coverage
+        if let Some(coverage) = self.percent_reference_coverage
             && coverage < qc_values.perc_ref_covered.into()
         {
             let new_entry = format!(

@@ -1,6 +1,7 @@
 use crate::io::data_ingest::ReadsData;
 use crate::utils::data_processing::{
-    AASequences, NTSequences, extract_field, extract_string_fields_as_int,
+    AASequences, DaisVarsData, IRMASummary, NTSequences, extract_field,
+    extract_string_fields_as_int,
 };
 use arrow::array::Float64Array;
 use arrow::{
@@ -11,7 +12,7 @@ use arrow::{
 use parquet::arrow::ArrowWriter;
 use std::{error::Error, fs::File, sync::Arc};
 
-use super::data_ingest::{AllelesData, CoverageData, IndelsData};
+use super::data_ingest::{AllelesData, CoverageData, IndelsData, RunInfo};
 
 /////////////// Functions to write parquet files out ///////////////
 pub fn extract_string_fields_as_float<V, T, F>(data: V, extractor: F) -> Vec<f32>
@@ -253,7 +254,7 @@ pub fn write_alleles_to_parquet(
     Ok(())
 }
 
-/// Write the alleles data to parquet file.
+/// Write the indels data to parquet file.
 pub fn write_indels_to_parquet(
     indels_data: &[IndelsData],
     output_file: &str,
@@ -323,6 +324,180 @@ pub fn write_indels_to_parquet(
     )?;
 
     // Write the RecordBatch to a Parquet file
+    let file = File::create(output_file)?;
+    let mut writer = ArrowWriter::try_new(file, schema.clone(), None)?;
+    writer.write(&record_batch)?;
+    writer.close()?;
+
+    println!("PARQUET written to {output_file}");
+
+    Ok(())
+}
+
+/// Write the dais variant data to parquet file.
+pub fn write_dais_vars_to_parquet(
+    dais_vars_data: &[DaisVarsData],
+    output_file: &str,
+) -> Result<(), Box<dyn Error>> {
+    // Convert values in struct to vector of values
+    let sample_ids_vec: Vec<Option<String>> =
+        extract_field(dais_vars_data, |item| item.sample_id.clone());
+    let reference_id_vec = extract_field(dais_vars_data, |item| item.reference_id.clone());
+    let protein_vec = extract_field(dais_vars_data, |item| item.protein.clone());
+    let aa_variant_count_vec = extract_field(dais_vars_data, |item| item.aa_variant_count);
+    let aa_variants_vec = extract_field(dais_vars_data, |item| item.aa_variants.clone());
+    let runid_vec = extract_field(dais_vars_data, |item| item.runid.clone());
+    let instrument_vec = extract_field(dais_vars_data, |item| item.instrument.clone());
+
+    // Convert the vectors into Arrow columns
+    let sample_array: ArrayRef = Arc::new(StringArray::from(sample_ids_vec));
+    let reference_id_array: ArrayRef = Arc::new(StringArray::from(reference_id_vec));
+    let protein_array: ArrayRef = Arc::new(StringArray::from(protein_vec));
+    let aa_variant_count_array: ArrayRef = Arc::new(Int32Array::from(aa_variant_count_vec));
+    let aa_variants_array: ArrayRef = Arc::new(StringArray::from(aa_variants_vec));
+    let runid_array: ArrayRef = Arc::new(StringArray::from(runid_vec));
+    let instrument_array: ArrayRef = Arc::new(StringArray::from(instrument_vec));
+
+    // Define the schema for the Arrow IPC file
+    let fields = vec![
+        Field::new("sample_id", DataType::Utf8, true),
+        Field::new("reference_id", DataType::Utf8, true),
+        Field::new("protein", DataType::Utf8, true),
+        Field::new("aa_variant_count", DataType::Int32, true),
+        Field::new("aa_variants", DataType::Utf8, true),
+        Field::new("runid", DataType::Utf8, true),
+        Field::new("machine", DataType::Utf8, true),
+    ];
+    let schema = Arc::new(Schema::new(fields));
+
+    // Create a RecordBatch
+    let record_batch = RecordBatch::try_new(
+        schema.clone(),
+        vec![
+            sample_array,
+            reference_id_array,
+            protein_array,
+            aa_variant_count_array,
+            aa_variants_array,
+            runid_array,
+            instrument_array,
+        ],
+    )?;
+
+    // Write the RecordBatch to a Parquet file
+    let file = File::create(output_file)?;
+    let mut writer = ArrowWriter::try_new(file, schema.clone(), None)?;
+    writer.write(&record_batch)?;
+    writer.close()?;
+
+    println!("PARQUET written to {output_file}");
+
+    Ok(())
+}
+
+/// Write the irma summary data to parquet file.
+pub fn write_irma_summary_to_parquet(
+    irma_summary_data: &[IRMASummary],
+    virus: &str,
+    output_file: &str,
+) -> Result<(), Box<dyn Error>> {
+    if irma_summary_data.is_empty() {
+        return Err("Input data is empty".into());
+    }
+
+    let sample_ids_vec: Vec<Option<String>> =
+        extract_field(irma_summary_data, |item| item.sample_id.clone());
+    let total_reads_vec = extract_field(irma_summary_data, |item| item.total_reads);
+    let pass_qc_vec = extract_field(irma_summary_data, |item| item.pass_qc);
+    let reads_mapped_vec = extract_field(irma_summary_data, |item| item.reads_mapped);
+    let reference_vec = extract_field(irma_summary_data, |item| item.reference.clone());
+    let percent_reference_coverage_vec =
+        extract_field(irma_summary_data, |item| item.percent_reference_coverage);
+    let median_coverage_vec = extract_field(irma_summary_data, |item| item.median_coverage);
+    let count_minor_snv_vec = extract_field(irma_summary_data, |item| item.count_minor_snv);
+    let count_minor_indel_vec = extract_field(irma_summary_data, |item| item.count_minor_indel);
+    let spike_percent_coverage_vec =
+        extract_field(irma_summary_data, |item| item.spike_percent_coverage);
+    let spike_median_coverage_vec =
+        extract_field(irma_summary_data, |item| item.spike_median_coverage);
+    let pass_fail_reason_vec =
+        extract_field(irma_summary_data, |item| item.pass_fail_reason.clone());
+    let subtype_vec = extract_field(irma_summary_data, |item| item.subtype.clone());
+    let mira_module_vec = extract_field(irma_summary_data, |item| item.mira_module.clone());
+    let runid_vec = extract_field(irma_summary_data, |item| item.runid.clone());
+    let instrument_vec = extract_field(irma_summary_data, |item| item.instrument.clone());
+
+    let sample_array: ArrayRef = Arc::new(StringArray::from(sample_ids_vec));
+    let total_reads_array: ArrayRef = Arc::new(Int32Array::from(total_reads_vec));
+    let pass_qc_array: ArrayRef = Arc::new(Int32Array::from(pass_qc_vec));
+    let reads_mapped_array: ArrayRef = Arc::new(Int32Array::from(reads_mapped_vec));
+    let reference_array: ArrayRef = Arc::new(StringArray::from(reference_vec));
+    let percent_reference_coverage_array: ArrayRef =
+        Arc::new(Float64Array::from(percent_reference_coverage_vec));
+    let median_coverage_array: ArrayRef = Arc::new(Float64Array::from(median_coverage_vec));
+    let count_minor_snv_array: ArrayRef = Arc::new(Int32Array::from(count_minor_snv_vec));
+    let count_minor_indel_array: ArrayRef = Arc::new(Int32Array::from(count_minor_indel_vec));
+    let spike_percent_coverage_array: ArrayRef =
+        Arc::new(Float64Array::from(spike_percent_coverage_vec));
+    let spike_median_coverage_array: ArrayRef =
+        Arc::new(Float64Array::from(spike_median_coverage_vec));
+    let pass_fail_reason_array: ArrayRef = Arc::new(StringArray::from(pass_fail_reason_vec));
+    let subtype_array: ArrayRef = Arc::new(StringArray::from(subtype_vec));
+    let mira_module_array: ArrayRef = Arc::new(StringArray::from(mira_module_vec));
+    let runid_array: ArrayRef = Arc::new(StringArray::from(runid_vec));
+    let instrument_array: ArrayRef = Arc::new(StringArray::from(instrument_vec));
+
+    let mut fields = vec![
+        Field::new("sample_id", DataType::Utf8, true),
+        Field::new("total_reads", DataType::Int32, true),
+        Field::new("pass_qc", DataType::Int32, true),
+        Field::new("reads_mapped", DataType::Int32, true),
+        Field::new("reference", DataType::Utf8, true),
+        Field::new("percent_reference_coverage", DataType::Float64, true),
+        Field::new("median_coverage", DataType::Float64, true),
+        Field::new("count_minor_snv", DataType::Int32, true),
+        Field::new("count_minor_indel", DataType::Int32, true),
+        Field::new("pass_fail_reason", DataType::Utf8, true),
+        Field::new("mira_module", DataType::Utf8, true),
+        Field::new("runid", DataType::Utf8, true),
+        Field::new("machine", DataType::Utf8, true),
+        Field::new("subtype", DataType::Utf8, true),
+    ];
+
+    if virus == "sc2-wgs" {
+        fields.push(Field::new(
+            "spike_percent_coverage",
+            DataType::Float64,
+            true,
+        ));
+        fields.push(Field::new("spike_median_coverage", DataType::Float64, true));
+    }
+    let schema = Arc::new(Schema::new(fields));
+
+    let mut arrays = vec![
+        sample_array,
+        total_reads_array,
+        pass_qc_array,
+        reads_mapped_array,
+        reference_array,
+        percent_reference_coverage_array,
+        median_coverage_array,
+        count_minor_snv_array,
+        count_minor_indel_array,
+        pass_fail_reason_array,
+        mira_module_array,
+        runid_array,
+        instrument_array,
+        subtype_array,
+    ];
+
+    if virus == "sc2-wgs" {
+        arrays.push(spike_percent_coverage_array);
+        arrays.push(spike_median_coverage_array);
+    }
+
+    let record_batch = RecordBatch::try_new(schema.clone(), arrays)?;
+
     let file = File::create(output_file)?;
     let mut writer = ArrowWriter::try_new(file, schema.clone(), None)?;
     writer.write(&record_batch)?;
@@ -429,6 +604,59 @@ pub fn write_aa_seq_to_parquet(
             protein_array,
             qc_decision_array,
             sequence_array,
+            runid_array,
+            instrument_array,
+        ],
+    )?;
+
+    // Write the RecordBatch to a Parquet file
+    let file = File::create(output_file)?;
+    let mut writer = ArrowWriter::try_new(file, schema.clone(), None)?;
+    writer.write(&record_batch)?;
+    writer.close()?;
+
+    println!("PARQUET written to {output_file}");
+
+    Ok(())
+}
+
+/// Write the aa seqeunce data to parquet file.
+pub fn write_run_info_to_parquet(
+    run_info_data: &[RunInfo],
+    output_file: &str,
+) -> Result<(), Box<dyn Error>> {
+    // Convert values in struct to vector of values
+    let program_name_vec: Vec<Option<String>> =
+        extract_field(run_info_data, |item| item.program_name.clone());
+    let program_vec = extract_field(run_info_data, |item| item.program.clone());
+    let irma_vec = extract_field(run_info_data, |item| item.irma.clone());
+    let runid_vec = extract_field(run_info_data, |item| item.run_id.clone());
+    let instrument_vec = extract_field(run_info_data, |item| item.instrument.clone());
+
+    // Convert the vectors into Arrow columns
+    let program_name_array: ArrayRef = Arc::new(StringArray::from(program_name_vec));
+    let program_array: ArrayRef = Arc::new(StringArray::from(program_vec));
+    let irma_array: ArrayRef = Arc::new(StringArray::from(irma_vec));
+    let runid_array: ArrayRef = Arc::new(StringArray::from(runid_vec));
+    let instrument_array: ArrayRef = Arc::new(StringArray::from(instrument_vec));
+
+    // Define the schema for the Arrow IPC file
+    let fields = vec![
+        Field::new("program_name", DataType::Utf8, true),
+        Field::new("program", DataType::Utf8, true),
+        Field::new("irma", DataType::Utf8, true),
+        Field::new("runid", DataType::Utf8, true),
+        Field::new("machine", DataType::Utf8, true),
+    ];
+    let schema = Arc::new(Schema::new(fields));
+
+    // Create a RecordBatch
+    let record_batch = RecordBatch::try_new(
+        schema.clone(),
+        vec![
+            program_name_array,
+            program_array,
+            irma_array,
             runid_array,
             instrument_array,
         ],
