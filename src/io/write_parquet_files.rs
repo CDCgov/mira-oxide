@@ -1,7 +1,6 @@
 use crate::io::data_ingest::ReadsData;
 use crate::utils::data_processing::{
     AASequences, DaisVarsData, IRMASummary, NTSequences, extract_field,
-    extract_string_fields_as_int,
 };
 use arrow::array::Float64Array;
 use arrow::{
@@ -15,6 +14,49 @@ use std::{error::Error, fs::File, sync::Arc};
 use super::data_ingest::{AllelesData, CoverageData, IndelsData, RunInfo};
 
 /////////////// Functions to write parquet files out ///////////////
+
+pub fn extract_string_fields_as_int<V, T, F>(data: V, extractor: F) -> Vec<i32>
+where
+    V: AsRef<[T]>,
+    F: Fn(&T) -> &str,
+{
+    data.as_ref()
+        .iter()
+        .map(|item| {
+            let field = extractor(item);
+            if field.is_empty() {
+                0
+            } else {
+                field.parse::<i32>().unwrap_or(0)
+            }
+        })
+        .collect()
+}
+
+pub fn extract_option_string_fields_as_option_int<V, T, F>(
+    data: V,
+    extractor: F,
+) -> Vec<Option<i32>>
+where
+    V: AsRef<[T]>,
+    F: Fn(&T) -> Option<String>,
+{
+    data.as_ref()
+        .iter()
+        .map(|item| {
+            if let Some(field) = extractor(item) {
+                if field.is_empty() {
+                    Some(0)
+                } else {
+                    field.parse::<i32>().ok()
+                }
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
 pub fn extract_string_fields_as_float<V, T, F>(data: V, extractor: F) -> Vec<f32>
 where
     V: AsRef<[T]>,
@@ -263,7 +305,9 @@ pub fn write_indels_to_parquet(
     let sample_ids_vec: Vec<Option<String>> =
         extract_field(indels_data, |item| item.sample_id.clone());
     let sample_upstream_position_vec =
-        extract_field(indels_data, |item| item.sample_upstream_position.clone());
+        extract_option_string_fields_as_option_int(indels_data, |item| {
+            item.sample_upstream_position.clone()
+        });
     let reference_name_vec = extract_field(indels_data, |item| item.reference_name.clone());
     let context_vec = extract_field(indels_data, |item| item.context.clone());
     let length_vec = extract_field(indels_data, |item| item.length);
@@ -277,7 +321,7 @@ pub fn write_indels_to_parquet(
     // Convert the vectors into Arrow columns
     let sample_array: ArrayRef = Arc::new(StringArray::from(sample_ids_vec));
     let sample_upstream_position_array: ArrayRef =
-        Arc::new(StringArray::from(sample_upstream_position_vec));
+        Arc::new(Int32Array::from(sample_upstream_position_vec));
     let reference_name_array: ArrayRef = Arc::new(StringArray::from(reference_name_vec));
     let context_array: ArrayRef = Arc::new(StringArray::from(context_vec));
     let length_array: ArrayRef = Arc::new(Int32Array::from(length_vec));
@@ -292,7 +336,7 @@ pub fn write_indels_to_parquet(
     // Define the schema for the Arrow IPC file
     let fields = vec![
         Field::new("sample_id", DataType::Utf8, true),
-        Field::new("sample_upstream_position", DataType::Utf8, true),
+        Field::new("sample_upstream_position", DataType::Int32, true),
         Field::new("reference_name", DataType::Utf8, true),
         Field::new("context", DataType::Utf8, true),
         Field::new("length", DataType::Int32, true),

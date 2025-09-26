@@ -69,7 +69,7 @@ pub struct ReportsArgs {
     virus: String,
 
     #[arg(short = 'r', long)]
-    /// The run id. Used to create custom file names associated with run_id.
+    /// The run id. Used to create custom file names associated with `run_id`.
     runid: String,
 
     #[arg(short = 'w', long)]

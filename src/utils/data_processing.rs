@@ -203,24 +203,6 @@ where
         .collect()
 }
 
-pub fn extract_string_fields_as_int<V, T, F>(data: V, extractor: F) -> Vec<i32>
-where
-    V: AsRef<[T]>,
-    F: Fn(&T) -> &str,
-{
-    data.as_ref()
-        .iter()
-        .map(|item| {
-            let field = extractor(item);
-            if field.is_empty() {
-                0
-            } else {
-                field.parse::<i32>().unwrap_or(0)
-            }
-        })
-        .collect()
-}
-
 // Function to append a new string with a comma
 pub fn append_with_delim(base: &mut String, new_entry: &str, delim: char) {
     if base.is_empty() {
