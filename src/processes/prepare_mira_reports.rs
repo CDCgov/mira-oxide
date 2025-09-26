@@ -1,26 +1,30 @@
 #![allow(dead_code, unused_imports)]
-use crate::io::{
-    data_ingest::{
-        DaisSeqData, QCConfig, QCSettings, allele_data_collection,
-        amended_consensus_data_collection, coverage_data_collection, create_reader,
-        dais_ref_seq_data_collection, dais_sequence_data_collection, get_reference_lens,
-        indels_data_collection, read_csv, read_yaml, reads_data_collection, run_info_collection,
-    },
-    write_csv_files::write_out_all_csv_mira_reports,
-    write_fasta_files::write_out_all_fasta_files,
-    write_json_files::{negative_qc_statement, write_out_all_json_files},
-    write_parquet_files::{
-        write_aa_seq_to_parquet, write_alleles_to_parquet, write_coverage_to_parquet,
-        write_dais_vars_to_parquet, write_indels_to_parquet, write_irma_summary_to_parquet,
-        write_nt_seq_to_parquet, write_reads_to_parquet, write_run_info_to_parquet,
-    },
-};
 use crate::utils::data_processing::{
     DaisVarsData, ProcessedCoverage, Subtype, collect_analysis_metadata, collect_negatives,
     collect_sample_id, compute_cvv_dais_variants, compute_dais_variants, create_aa_seq_vec,
     create_irma_summary_vec, create_nt_seq_vec, create_vtype_data, divide_aa_into_pass_fail_vec,
     divide_nt_into_pass_fail_vec, extract_field, extract_subtype_flu, extract_subtype_sc2,
     melt_reads_data, process_position_coverage_data, process_wgs_coverage_data, return_seg_data,
+};
+use crate::{
+    io::{
+        data_ingest::{
+            DaisSeqData, QCConfig, QCSettings, allele_data_collection,
+            amended_consensus_data_collection, coverage_data_collection, create_reader,
+            dais_ref_seq_data_collection, dais_sequence_data_collection, get_reference_lens,
+            indels_data_collection, read_csv, read_yaml, reads_data_collection,
+            run_info_collection,
+        },
+        write_csv_files::write_out_all_csv_mira_reports,
+        write_fasta_files::write_out_all_fasta_files,
+        write_json_files::{negative_qc_statement, write_out_all_json_files},
+        write_parquet_files::{
+            write_aa_seq_to_parquet, write_alleles_to_parquet, write_coverage_to_parquet,
+            write_dais_vars_to_parquet, write_indels_to_parquet, write_irma_summary_to_parquet,
+            write_nt_seq_to_parquet, write_reads_to_parquet, write_run_info_to_parquet,
+        },
+    },
+    utils::data_processing::extract_subtype_rsv,
 };
 use clap::Parser;
 use csv::ReaderBuilder;
@@ -39,11 +43,11 @@ use std::{
 #[command(about = "Package for aggregating MIRA outputs into json files")]
 pub struct ReportsArgs {
     #[arg(short = 'i', long)]
-    /// The file path to the IRMA outputs
+    /// The file path to the samples folders with IRMA outputs.
     irma_path: PathBuf,
 
     #[arg(short = 'o', long)]
-    /// The file path to the IRMA outputs
+    /// The file path where the `prepare_mira_report` outputs will be saved.
     output_path: PathBuf,
 
     #[arg(short = 's', long)]
@@ -55,27 +59,29 @@ pub struct ReportsArgs {
     qc_yaml: PathBuf,
 
     #[arg(short = 'p', long)]
-    /// The platform used to generate the data
+    /// The platform used to generate the data.
+    /// Options: illumina or ont
     platform: String,
 
     #[arg(short = 'v', long)]
-    /// The virus the the data was generated from
+    /// The virus the the data was generated from.
+    /// Options: flu, sc2-wgs, sc2-spike or rsv
     virus: String,
 
     #[arg(short = 'r', long)]
-    /// The run id
+    /// The run id. Used to create custom file names associated with run_id.
     runid: String,
 
     #[arg(short = 'w', long)]
-    /// The file path to the working directory
+    /// The file path to the user's cloned MIRA-NF repo.
     workdir_path: PathBuf,
 
     #[arg(short = 'f', long)]
-    /// create parq files
+    /// (Optional) A flag to indicate whether to create parquet files.
     parq: bool,
 
     #[arg(short = 'c', long, default_value = "default-config")]
-    /// the irma config used for IRMA
+    /// (Optional) The IRMA configuration used for processing.
     irma_config: String,
 }
 
@@ -155,22 +161,27 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     let mut dais_ref_data: Vec<DaisSeqData> = Vec::new();
     if args.virus.to_lowercase() == "flu" || args.virus.to_lowercase() == "rsv" {
         dais_ref_data = dais_ref_seq_data_collection(&args.workdir_path, &args.virus)?;
-    } else if args.virus.to_lowercase() == "sc2-wgs" {
+    } else if args.virus.to_lowercase() == "sc2-wgs" || args.virus.to_lowercase() == "sc2-spike" {
         dais_ref_data = dais_ref_seq_data_collection(&args.workdir_path, "sc2")?;
     }
 
-    /////////////// Processing ingested IRMA and Dais data ///////////////
+    //////////////////////////////// Processing ingested IRMA and Dais data ////////////////////////////////
     //Calculate AA variants for aavars.csv and dais_vars.json
     let mut dais_vars_data: Vec<DaisVarsData> = Vec::new();
     if args.virus.to_lowercase() == "flu" {
         dais_vars_data =
             compute_dais_variants(&dais_ref_data, &dais_seq_data, &args.runid, &args.platform)?;
     } else if args.virus.to_lowercase() == "sc2-wgs"
-        || args.virus.to_lowercase() == "sc2"
+        || args.virus.to_lowercase() == "sc2-spike"
         || args.virus.to_lowercase() == "rsv"
     {
-        dais_vars_data =
-            compute_cvv_dais_variants(&dais_ref_data, &dais_seq_data, &args.runid, &args.platform)?;
+        dais_vars_data = compute_cvv_dais_variants(
+            &dais_ref_data,
+            &dais_seq_data,
+            &args.runid,
+            &args.platform,
+            &args.virus,
+        )?;
     }
 
     // Calculating the % coverage and median coverage for summary
@@ -193,11 +204,10 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     let mut subtype_data: Vec<Subtype> = Vec::new();
     if args.virus.to_lowercase() == "flu" {
         subtype_data = extract_subtype_flu(&dais_vars_data)?;
-    } else if args.virus.to_lowercase() == "sc2-wgs"
-        || args.virus.to_lowercase() == "sc2-spike"
-        || args.virus.to_lowercase() == "rsv"
-    {
+    } else if args.virus.to_lowercase() == "sc2-wgs" || args.virus.to_lowercase() == "sc2-spike" {
         subtype_data = extract_subtype_sc2(&dais_vars_data)?;
+    } else if args.virus.to_lowercase() == "rsv" {
+        subtype_data = extract_subtype_rsv(&dais_vars_data)?;
     }
 
     //Gather Anlysis Metadata for irma_summary
@@ -221,7 +231,6 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
         Some(&calculated_position_cov_vec),
     )?;
 
-    //todo: see how this works with the padded amended consensus
     let mut qc_values = QCSettings {
         med_cov: 0,
         minor_vars: 0,

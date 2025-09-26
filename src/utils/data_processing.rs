@@ -428,6 +428,7 @@ pub fn compute_cvv_dais_variants(
     sample_seqs_data: &[DaisSeqData],
     runid: &str,
     instrument: &str,
+    virus: &str,
 ) -> Result<Vec<DaisVarsData>, Box<dyn Error>> {
     let mut merged_data = merge_sequences(ref_seqs_data, sample_seqs_data);
 
@@ -458,9 +459,19 @@ pub fn compute_cvv_dais_variants(
         unique_data.entry(key).or_insert(entry);
     }
 
+    // Filter dais var data based on virus type
+    let filtered_data: Vec<DaisSeqData> = if virus == "sc2-spike" {
+        unique_data
+            .into_values()
+            .filter(|entry| entry.protein == "S")
+            .collect()
+    } else {
+        unique_data.into_values().collect()
+    };
+
     // Convert DaisSeqData to DaisVarsData and collect into a Vec
-    let result: Vec<DaisVarsData> = unique_data
-        .into_values()
+    let result: Vec<DaisVarsData> = filtered_data
+        .into_iter()
         .map(|entry| DaisVarsData {
             sample_id: entry.sample_id,
             ctype: entry.ctype,
@@ -623,6 +634,19 @@ pub fn extract_subtype_sc2(dais_vars: &[DaisVarsData]) -> Result<Vec<Subtype>, B
         subtype_data.push(Subtype {
             sample_id: entry.sample_id.clone(),
             subtype: entry.reference_id.clone(),
+        });
+    }
+
+    Ok(subtype_data)
+}
+
+pub fn extract_subtype_rsv(dais_vars: &[DaisVarsData]) -> Result<Vec<Subtype>, Box<dyn Error>> {
+    let mut subtype_data: Vec<Subtype> = Vec::new();
+
+    for entry in dais_vars {
+        subtype_data.push(Subtype {
+            sample_id: entry.sample_id.clone(),
+            subtype: entry.ctype.clone(),
         });
     }
 
@@ -964,7 +988,7 @@ pub fn create_irma_summary_vec(
                 });
             }
         }
-        // If no match was found, push the default IRMASummary entry
+        // If no match was found, push the default IRMASummary entry that will indicate failed
         if !found_match {
             irma_summary.push(IRMASummary {
                 sample_id: Some(sample.clone()),
@@ -980,9 +1004,9 @@ pub fn create_irma_summary_vec(
                 spike_median_coverage: None,
                 pass_fail_reason: Some("Fail".to_owned()),
                 subtype: Some("Undetermined".to_owned()),
-                mira_module: None,
-                runid: None,
-                instrument: None,
+                mira_module: Some(metadata.module.clone()),
+                runid: Some(metadata.runid.clone()),
+                instrument: Some(metadata.instrument.clone()),
             });
         }
     }
