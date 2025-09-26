@@ -31,7 +31,7 @@ struct ValidSeq {
     sequence: Nucleotides,
 }
 
-pub fn all_sample_hd_process(args: HammingArgs) -> Result<(), std::io::Error> {
+pub fn all_sample_hd_process(args: &HammingArgs) -> Result<(), std::io::Error> {
     //let args = APDArgs::parse();
     let delim = args.output_delimiter.unwrap_or(',');
 
