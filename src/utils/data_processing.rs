@@ -69,7 +69,7 @@ pub struct MeltedRecord {
 pub struct ProcessedCoverage {
     pub sample: String,
     pub reference: String,
-    pub median_coverage: f64,
+    pub median_coverage: i32,
     pub percent_reference_covered: Option<f64>,
 }
 
@@ -82,11 +82,11 @@ pub struct IRMASummary {
     pub reads_mapped: Option<i32>,
     pub reference: Option<String>,
     pub percent_reference_coverage: Option<f64>,
-    pub median_coverage: Option<f64>,
+    pub median_coverage: Option<i32>,
     pub count_minor_snv: Option<i32>,
     pub count_minor_indel: Option<i32>,
     pub spike_percent_coverage: Option<f64>,
-    pub spike_median_coverage: Option<f64>,
+    pub spike_median_coverage: Option<i32>,
     pub pass_fail_reason: Option<String>,
     pub subtype: Option<String>,
     pub mira_module: Option<String>,
@@ -675,22 +675,22 @@ pub fn melt_reads_data(records: &[ReadsData]) -> Vec<MeltedRecord> {
     result
 }
 
-//Calculate Median - needed in coverage functions below
-fn calculate_median(values: &[i32]) -> f64 {
+fn calculate_median(values: &[i32]) -> i32 {
     let mut sorted_values = values.to_vec();
     sorted_values.sort_unstable();
     let len = sorted_values.len();
     if len == 0 {
-        return 0.0;
+        return 0; // Return 0 for empty input
     }
-    if len.is_multiple_of(2) {
-        f64::from(sorted_values[len / 2 - 1] + sorted_values[len / 2]) / 2.0
+    if len % 2 == 0 {
+        // For even-length arrays, calculate the average of the two middle values
+        i32::midpoint(sorted_values[len / 2 - 1], sorted_values[len / 2])
     } else {
-        f64::from(sorted_values[len / 2])
+        // For odd-length arrays, return the middle value
+        sorted_values[len / 2]
     }
 }
 
-/// Coverage dataframe calculations
 pub fn process_wgs_coverage_data<S: BuildHasher>(
     coverage_vec: &[CoverageData],
     ref_lens: &HashMap<String, usize, S>,
@@ -737,7 +737,7 @@ pub fn process_wgs_coverage_data<S: BuildHasher>(
             .push(row.coverage_depth);
     }
 
-    let mut coverage_vec_processed: HashMap<(String, String), f64> = HashMap::new();
+    let mut coverage_vec_processed: HashMap<(String, String), i32> = HashMap::new();
     for (key, depths) in coverage_vec_grouped {
         let median_coverage = calculate_median(&depths);
         coverage_vec_processed.insert(key, median_coverage);
@@ -755,7 +755,7 @@ pub fn process_wgs_coverage_data<S: BuildHasher>(
         processed_coverage.push(ProcessedCoverage {
             sample: sample.clone(),
             reference: reference.clone(),
-            median_coverage,
+            median_coverage, // Already an i32
             percent_reference_covered,
         });
     }
@@ -768,7 +768,7 @@ pub fn process_position_coverage_data(
     position_1: i32,
     position_2: i32,
 ) -> Result<Vec<ProcessedCoverage>, Box<dyn Error>> {
-    // Filter rows where position is between 21563 and 25384
+    // Filter rows where position is between position_1 and position_2
     let filtered_coverage: Vec<_> = coverage_vec
         .iter()
         .filter(|row| row.position > position_1 && row.position < position_2)
@@ -790,7 +790,7 @@ pub fn process_position_coverage_data(
 
     let ref_len = (position_1 - position_2).abs();
 
-    //Calculate percent ref covered
+    // Calculate percent reference covered
     let cov_ref_lens_processed: Vec<_> = cov_sample_lens
         .into_iter()
         .map(|((sample, reference_name), maplen)| {
@@ -817,7 +817,7 @@ pub fn process_position_coverage_data(
             .push(row.coverage_depth);
     }
 
-    let mut med_coverage_vec_processed: HashMap<(String, String), f64> = HashMap::new();
+    let mut med_coverage_vec_processed: HashMap<(String, String), i32> = HashMap::new();
     for (key, depths) in sample_med_cov_grouped {
         let median_coverage = calculate_median(&depths);
         med_coverage_vec_processed.insert(key, median_coverage);
@@ -835,7 +835,7 @@ pub fn process_position_coverage_data(
         processed_coverage.push(ProcessedCoverage {
             sample: sample.clone(),
             reference: reference.clone(),
-            median_coverage,
+            median_coverage, // Already an i32
             percent_reference_covered,
         });
     }
@@ -979,7 +979,7 @@ pub fn create_irma_summary_vec(
                 pass_qc: Some(0),
                 reads_mapped: Some(0),
                 percent_reference_coverage: Some(0.0),
-                median_coverage: Some(0.0),
+                median_coverage: Some(0),
                 count_minor_snv: Some(0),
                 count_minor_indel: Some(0),
                 spike_percent_coverage: None,
@@ -1081,7 +1081,7 @@ impl IRMASummary {
         }
 
         if let Some(med_cov) = self.median_coverage
-            && med_cov < qc_values.perc_ref_covered.into()
+            && med_cov < qc_values.perc_ref_covered.try_into().unwrap()
         {
             let new_entry = format!("Median coverage < {}", qc_values.med_cov);
             if let Some(ref mut pf_reason) = self.pass_fail_reason {
@@ -1127,7 +1127,7 @@ impl IRMASummary {
 
         if let Some(spike_med_cov) = self.spike_median_coverage {
             if let Some(spike_med_covered) = qc_values.med_spike_cov {
-                if spike_med_cov < f64::from(spike_med_covered) {
+                if spike_med_cov < spike_med_covered.try_into().unwrap() {
                     let new_entry = format!("Median coverage of S gene < {}", qc_values.med_cov);
                     if let Some(ref mut pf_reason) = self.pass_fail_reason {
                         append_with_delim(pf_reason, &new_entry, ';');

@@ -478,13 +478,13 @@ pub fn write_irma_summary_to_parquet(
     let reference_array: ArrayRef = Arc::new(StringArray::from(reference_vec));
     let percent_reference_coverage_array: ArrayRef =
         Arc::new(Float64Array::from(percent_reference_coverage_vec));
-    let median_coverage_array: ArrayRef = Arc::new(Float64Array::from(median_coverage_vec));
+    let median_coverage_array: ArrayRef = Arc::new(Int32Array::from(median_coverage_vec));
     let count_minor_snv_array: ArrayRef = Arc::new(Int32Array::from(count_minor_snv_vec));
     let count_minor_indel_array: ArrayRef = Arc::new(Int32Array::from(count_minor_indel_vec));
     let spike_percent_coverage_array: ArrayRef =
         Arc::new(Float64Array::from(spike_percent_coverage_vec));
     let spike_median_coverage_array: ArrayRef =
-        Arc::new(Float64Array::from(spike_median_coverage_vec));
+        Arc::new(Int32Array::from(spike_median_coverage_vec));
     let pass_fail_reason_array: ArrayRef = Arc::new(StringArray::from(pass_fail_reason_vec));
     let subtype_array: ArrayRef = Arc::new(StringArray::from(subtype_vec));
     let mira_module_array: ArrayRef = Arc::new(StringArray::from(mira_module_vec));
@@ -498,7 +498,7 @@ pub fn write_irma_summary_to_parquet(
         Field::new("reads_mapped", DataType::Int32, true),
         Field::new("reference", DataType::Utf8, true),
         Field::new("percent_reference_coverage", DataType::Float64, true),
-        Field::new("median_coverage", DataType::Float64, true),
+        Field::new("median_coverage", DataType::Int32, true),
         Field::new("count_minor_snv", DataType::Int32, true),
         Field::new("count_minor_indel", DataType::Int32, true),
         Field::new("pass_fail_reason", DataType::Utf8, true),
