@@ -747,12 +747,6 @@ pub fn write_samplesheet_to_parquet(
             let runid_vec: Vec<String> = vec![runid.to_string(); data.len()];
             let instrument_vec: Vec<String> = vec![instrument.to_string(); data.len()];
 
-            println!("{barcode_vec:?}");
-            println!("{sample_id_vec:?}");
-            println!("{sample_type_vec:?}");
-            println!("{runid_vec:?}");
-            println!("{instrument_vec:?}");
-
             // Convert the vectors into Arrow columns
             let barcode_array: ArrayRef = Arc::new(StringArray::from(barcode_vec));
             let sample_id_array: ArrayRef = Arc::new(StringArray::from(sample_id_vec));
