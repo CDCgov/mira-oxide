@@ -8,7 +8,7 @@ use crate::utils::data_processing::{
 };
 use std::collections::HashSet;
 
-use super::data_ingest::{AllelesData, CoverageData, IndelsData, ReadsData};
+use super::data_ingest::{AlleleDataCollection, CoverageData, IndelsData, ReadsData};
 
 //////////////// Function to collection and write out all CSV files ///////////////
 /////////////// Structs ///////////////
@@ -217,7 +217,7 @@ pub fn write_out_all_json_files<S: ::std::hash::BuildHasher>(
     coverage_data: &[CoverageData],
     read_data: &[ReadsData],
     vtype_data: &[ProcessedRecord],
-    allele_data: &[AllelesData],
+    allele_data: &AlleleDataCollection,
     indel_data: &[IndelsData],
     dais_vars_data: &[DaisVarsData],
     neg_control_list: &[String],
@@ -340,7 +340,7 @@ pub fn write_out_all_json_files<S: ::std::hash::BuildHasher>(
 
     write_structs_to_split_json_file(
         &format!("{}/alleles.json", output_path.display()),
-        allele_data,
+        &allele_data.filtered_alleles,
         &allele_columns,
         &allele_struct_values,
     )?;

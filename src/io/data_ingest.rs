@@ -127,6 +127,13 @@ pub struct AllelesData {
     pub instrument: Option<String>,
 }
 
+/// Struct to hold filtered and unfiltered allele data
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AlleleDataCollection {
+    pub filtered_alleles: Vec<AllelesData>,
+    pub all_alleles: Vec<AllelesData>,
+}
+
 /// Indel struct
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct IndelsData {
@@ -439,19 +446,20 @@ pub fn reads_data_collection(
     }
     Ok(reads_data)
 }
-
-/// Collecting allele data created by IRMA and and save to vector of `AllelesData`
+/// Collecting allele data created by IRMA and save to two vectors of `AllelesData`
+/// One vector contains filtered alleles (frequency >= 0.05), and the other contains all alleles.
 pub fn allele_data_collection(
     irma_path: &Path,
     platform: &str,
     runid: &str,
-) -> Result<Vec<AllelesData>, Box<dyn std::error::Error>> {
+) -> Result<AlleleDataCollection, Box<dyn std::error::Error>> {
     let pattern = format!(
         "{}/*/IRMA/*/tables/*variants.txt",
         irma_path.to_string_lossy()
     );
 
-    let mut alleles_data: Vec<AllelesData> = Vec::new();
+    let mut filtered_alleles: Vec<AllelesData> = Vec::new();
+    let mut all_alleles: Vec<AllelesData> = Vec::new();
 
     // Iterate over all files matching the pattern and get the sample name from file
     for entry in glob(&pattern).expect("Failed to read glob pattern") {
@@ -463,18 +471,33 @@ pub fn allele_data_collection(
 
                 // Read the data from the file and include the sample name
                 let mut records: Vec<AllelesData> = process_txt_with_sample(reader, true, &sample)?;
-                records.retain(|record| record.minority_frequency >= 0.05);
+
                 // Add platform and runid to each record
                 for record in &mut records {
                     record.instrument = Some(platform.to_string());
                     record.run_id = Some(runid.to_string());
+
+                    // Round minority_frequency to 3 decimal places
+                    record.minority_frequency =
+                        (record.minority_frequency * 1000.0).round() / 1000.0;
                 }
-                alleles_data.append(&mut records);
+
+                // Separate records into filtered and unfiltered vectors
+                for record in records {
+                    if record.minority_frequency >= 0.05 {
+                        filtered_alleles.push(record.clone());
+                    }
+                    all_alleles.push(record);
+                }
             }
             Err(e) => println!("Error reading file: {e}"),
         }
     }
-    Ok(alleles_data)
+
+    Ok(AlleleDataCollection {
+        filtered_alleles,
+        all_alleles,
+    })
 }
 
 /// Collect indel data and save to vector of `IndelsData`

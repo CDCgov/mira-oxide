@@ -3,9 +3,9 @@ use serde::Serialize;
 use serde_json::Value;
 use std::{error::Error, path::Path};
 
-use crate::utils::data_processing::{AASequences, DaisVarsData, IRMASummary, NTSequences};
+use crate::utils::data_processing::{AASequences, IRMASummary, NTSequences};
 
-use super::data_ingest::{AllelesData, CoverageData, IndelsData, ReadsData, RunInfo};
+use super::data_ingest::{AlleleDataCollection, CoverageData, IndelsData, ReadsData, RunInfo};
 
 //////////////// Function to write CSV ///////////////
 pub fn write_structs_to_csv_file<T: Serialize>(
@@ -48,9 +48,8 @@ pub fn write_out_all_csv_mira_reports(
     output_path: &Path,
     coverage_data: &[CoverageData],
     read_data: &[ReadsData],
-    allele_data: &[AllelesData],
+    allele_data: &AlleleDataCollection,
     indel_data: &[IndelsData],
-    dais_vars_data: &[DaisVarsData],
     irma_summary: &[IRMASummary],
     nt_seq_vec: &[NTSequences],
     aa_seq_vec: &[AASequences],
@@ -167,8 +166,8 @@ pub fn write_out_all_csv_mira_reports(
     };
 
     write_structs_to_csv_file(
-        &format!("{}/{runid}_alleles.csv", output_path.display()),
-        allele_data,
+        &format!("{}/{runid}_all_alleles.csv", output_path.display()),
+        &allele_data.all_alleles,
         &allele_columns,
         &allele_struct_values,
     )?;
@@ -207,22 +206,56 @@ pub fn write_out_all_csv_mira_reports(
         &indels_struct_values,
     )?;
 
-    // write out the {runid}_aavars.csv
-    let aavars_columns = vec![
-        "sample_id",
-        "reference_id",
-        "protein",
-        "aa_variant_count",
-        "aa_variants",
-        "runid",
+    let minor_variant_columns = vec![
+        "sample",
+        "reference",
+        "sample_upstream_position",
+        "depth",
+        "consensus_allele",
+        "minority_allele",
+        "consensus_count",
+        "minority_count",
+        "minority_frequency",
+        "run_id",
         "instrument",
     ];
 
+    //Write out variants.csv - filtered by snv > 0.05
+    let minor_variant_struct_values = if virus == "sc2-spike" {
+        vec![
+            "Sample",
+            "Reference_Name",
+            "HMM_Position",
+            "Total",
+            "Consensus_Allele",
+            "Minority_Allele",
+            "Consensus_Count",
+            "Minority_Count",
+            "Minority_Frequency",
+            "Run_ID",
+            "Instrument",
+        ]
+    } else {
+        vec![
+            "Sample",
+            "Reference_Name",
+            "Position",
+            "Total",
+            "Consensus_Allele",
+            "Minority_Allele",
+            "Consensus_Count",
+            "Minority_Count",
+            "Minority_Frequency",
+            "Run_ID",
+            "Instrument",
+        ]
+    };
+
     write_structs_to_csv_file(
-        &format!("{}/{runid}_variants.csv", output_path.display()),
-        dais_vars_data,
-        &aavars_columns,
-        &aavars_columns,
+        &format!("{}/{runid}_minor_variants.csv", output_path.display()),
+        &allele_data.filtered_alleles,
+        &minor_variant_columns,
+        &minor_variant_struct_values,
     )?;
 
     // write out the summary.json and the {runid}_summary.csv

@@ -1,7 +1,5 @@
 use crate::io::data_ingest::ReadsData;
-use crate::utils::data_processing::{
-    AASequences, DaisVarsData, IRMASummary, NTSequences, extract_field,
-};
+use crate::utils::data_processing::{AASequences, IRMASummary, NTSequences, extract_field};
 use arrow::array::Float64Array;
 use arrow::{
     array::{ArrayRef, Float32Array, Int32Array, StringArray},
@@ -378,37 +376,52 @@ pub fn write_indels_to_parquet(
     Ok(())
 }
 
-/// Write the dais variant data to parquet file.
-pub fn write_dais_vars_to_parquet(
-    dais_vars_data: &[DaisVarsData],
+/// Write the dais variant data to parquet file. TODO FIX
+pub fn write_minor_vars_to_parquet(
+    filtered_alleles_data: &[AllelesData],
     output_file: &str,
 ) -> Result<(), Box<dyn Error>> {
     // Convert values in struct to vector of values
     let sample_ids_vec: Vec<Option<String>> =
-        extract_field(dais_vars_data, |item| item.sample_id.clone());
-    let reference_id_vec = extract_field(dais_vars_data, |item| item.reference_id.clone());
-    let protein_vec = extract_field(dais_vars_data, |item| item.protein.clone());
-    let aa_variant_count_vec = extract_field(dais_vars_data, |item| item.aa_variant_count);
-    let aa_variants_vec = extract_field(dais_vars_data, |item| item.aa_variants.clone());
-    let runid_vec = extract_field(dais_vars_data, |item| item.runid.clone());
-    let instrument_vec = extract_field(dais_vars_data, |item| item.instrument.clone());
+        extract_field(filtered_alleles_data, |item| item.sample_id.clone());
+    let reference_vec = extract_field(filtered_alleles_data, |item| item.reference.clone());
+    let sample_position_vec = extract_field(filtered_alleles_data, |item| item.sample_position);
+    let coverage_vec = extract_field(filtered_alleles_data, |item| item.coverage);
+    let consensus_allele_vec =
+        extract_field(filtered_alleles_data, |item| item.consensus_allele.clone());
+    let minority_allele_vec =
+        extract_field(filtered_alleles_data, |item| item.minority_allele.clone());
+    let consensus_count_vec = extract_field(filtered_alleles_data, |item| item.consensus_count);
+    let minority_count_vec = extract_field(filtered_alleles_data, |item| item.minority_count);
+    let minority_frequency_vec =
+        extract_field(filtered_alleles_data, |item| item.minority_frequency);
+    let runid_vec = extract_field(filtered_alleles_data, |item| item.run_id.clone());
+    let instrument_vec = extract_field(filtered_alleles_data, |item| item.instrument.clone());
 
     // Convert the vectors into Arrow columns
     let sample_array: ArrayRef = Arc::new(StringArray::from(sample_ids_vec));
-    let reference_id_array: ArrayRef = Arc::new(StringArray::from(reference_id_vec));
-    let protein_array: ArrayRef = Arc::new(StringArray::from(protein_vec));
-    let aa_variant_count_array: ArrayRef = Arc::new(Int32Array::from(aa_variant_count_vec));
-    let aa_variants_array: ArrayRef = Arc::new(StringArray::from(aa_variants_vec));
+    let reference_array: ArrayRef = Arc::new(StringArray::from(reference_vec));
+    let sample_position_array: ArrayRef = Arc::new(Int32Array::from(sample_position_vec));
+    let coverage_array: ArrayRef = Arc::new(Int32Array::from(coverage_vec));
+    let consensus_allele_array: ArrayRef = Arc::new(StringArray::from(consensus_allele_vec));
+    let minority_allele_array: ArrayRef = Arc::new(StringArray::from(minority_allele_vec));
+    let consensus_count_array: ArrayRef = Arc::new(Int32Array::from(consensus_count_vec));
+    let minority_count_array: ArrayRef = Arc::new(Int32Array::from(minority_count_vec));
+    let minority_frequency_array: ArrayRef = Arc::new(Float64Array::from(minority_frequency_vec));
     let runid_array: ArrayRef = Arc::new(StringArray::from(runid_vec));
     let instrument_array: ArrayRef = Arc::new(StringArray::from(instrument_vec));
 
     // Define the schema for the Arrow IPC file
     let fields = vec![
         Field::new("sample_id", DataType::Utf8, true),
-        Field::new("reference_id", DataType::Utf8, true),
-        Field::new("protein", DataType::Utf8, true),
-        Field::new("aa_variant_count", DataType::Int32, true),
-        Field::new("aa_variants", DataType::Utf8, true),
+        Field::new("reference", DataType::Utf8, true),
+        Field::new("sample_position", DataType::Int32, true),
+        Field::new("coverage", DataType::Int32, true),
+        Field::new("consensus_allele", DataType::Utf8, true),
+        Field::new("minority_allele", DataType::Utf8, true),
+        Field::new("consensus_count", DataType::Int32, true),
+        Field::new("minority_count", DataType::Int32, true),
+        Field::new("minority_frequency", DataType::Float64, true),
         Field::new("runid", DataType::Utf8, true),
         Field::new("machine", DataType::Utf8, true),
     ];
@@ -419,10 +432,14 @@ pub fn write_dais_vars_to_parquet(
         schema.clone(),
         vec![
             sample_array,
-            reference_id_array,
-            protein_array,
-            aa_variant_count_array,
-            aa_variants_array,
+            reference_array,
+            sample_position_array,
+            coverage_array,
+            consensus_allele_array,
+            minority_allele_array,
+            consensus_count_array,
+            minority_count_array,
+            minority_frequency_array,
             runid_array,
             instrument_array,
         ],
@@ -438,7 +455,6 @@ pub fn write_dais_vars_to_parquet(
 
     Ok(())
 }
-
 /// Write the irma summary data to parquet file.
 pub fn write_irma_summary_to_parquet(
     irma_summary_data: &[IRMASummary],
@@ -481,10 +497,6 @@ pub fn write_irma_summary_to_parquet(
     let median_coverage_array: ArrayRef = Arc::new(Int32Array::from(median_coverage_vec));
     let count_minor_snv_array: ArrayRef = Arc::new(Int32Array::from(count_minor_snv_vec));
     let count_minor_indel_array: ArrayRef = Arc::new(Int32Array::from(count_minor_indel_vec));
-    let spike_percent_coverage_array: ArrayRef =
-        Arc::new(Float64Array::from(spike_percent_coverage_vec));
-    let spike_median_coverage_array: ArrayRef =
-        Arc::new(Int32Array::from(spike_median_coverage_vec));
     let pass_fail_reason_array: ArrayRef = Arc::new(StringArray::from(pass_fail_reason_vec));
     let subtype_array: ArrayRef = Arc::new(StringArray::from(subtype_vec));
     let mira_module_array: ArrayRef = Arc::new(StringArray::from(mira_module_vec));
@@ -504,19 +516,9 @@ pub fn write_irma_summary_to_parquet(
         Field::new("pass_fail_reason", DataType::Utf8, true),
         Field::new("mira_module", DataType::Utf8, true),
         Field::new("runid", DataType::Utf8, true),
-        Field::new("machine", DataType::Utf8, true),
+        Field::new("instrument", DataType::Utf8, true),
         Field::new("subtype", DataType::Utf8, true),
     ];
-
-    if virus == "sc2-wgs" {
-        fields.push(Field::new(
-            "spike_percent_coverage",
-            DataType::Float64,
-            true,
-        ));
-        fields.push(Field::new("spike_median_coverage", DataType::Float64, true));
-    }
-    let schema = Arc::new(Schema::new(fields));
 
     let mut arrays = vec![
         sample_array,
@@ -536,10 +538,18 @@ pub fn write_irma_summary_to_parquet(
     ];
 
     if virus == "sc2-wgs" {
-        arrays.push(spike_percent_coverage_array);
-        arrays.push(spike_median_coverage_array);
+        fields.push(Field::new(
+            "spike_percent_coverage",
+            DataType::Float64,
+            true,
+        ));
+        fields.push(Field::new("spike_median_coverage", DataType::Int32, true));
+
+        arrays.push(Arc::new(Float64Array::from(spike_percent_coverage_vec)));
+        arrays.push(Arc::new(Int32Array::from(spike_median_coverage_vec)));
     }
 
+    let schema = Arc::new(Schema::new(fields));
     let record_batch = RecordBatch::try_new(schema.clone(), arrays)?;
 
     let file = File::create(output_file)?;

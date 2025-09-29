@@ -20,7 +20,7 @@ use crate::{
         write_json_files::{negative_qc_statement, write_out_all_json_files},
         write_parquet_files::{
             write_aa_seq_to_parquet, write_alleles_to_parquet, write_coverage_to_parquet,
-            write_dais_vars_to_parquet, write_indels_to_parquet, write_irma_summary_to_parquet,
+            write_indels_to_parquet, write_irma_summary_to_parquet, write_minor_vars_to_parquet,
             write_nt_seq_to_parquet, write_reads_to_parquet, write_run_info_to_parquet,
         },
     },
@@ -142,7 +142,6 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     let read_data = reads_data_collection(&args.irma_path, &args.platform, &args.runid)?;
     let vtype_data = create_vtype_data(&read_data);
     let allele_data = allele_data_collection(&args.irma_path, &args.platform, &args.runid)?;
-    println!("{allele_data:?}");
     let indel_data = indels_data_collection(&args.irma_path, &args.platform, &args.runid)?;
     let run_info = run_info_collection(&args.irma_path, &args.platform, &args.runid)?;
     let seq_data = amended_consensus_data_collection(&args.irma_path, &args.virus)?;
@@ -225,7 +224,7 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
         &sample_list,
         &melted_reads_vec,
         &calculated_cov_vec,
-        &allele_data,
+        &allele_data.filtered_alleles,
         &indel_data,
         &subtype_data,
         &analysis_metadata,
@@ -312,7 +311,6 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
         &read_data,
         &allele_data,
         &indel_data,
-        &dais_vars_data,
         &irma_summary,
         &nt_seq_vec,
         &aa_seq_vec,
@@ -355,9 +353,9 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
             &format!("{}/{}_reads.parq", &args.output_path.display(), args.runid),
         )?;
         write_alleles_to_parquet(
-            &allele_data,
+            &allele_data.all_alleles,
             &format!(
-                "{}/{}_alleles.parq",
+                "{}/{}_all_alleles.parq",
                 &args.output_path.display(),
                 args.runid
             ),
@@ -366,10 +364,10 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
             &indel_data,
             &format!("{}/{}_indels.parq", &args.output_path.display(), args.runid),
         )?;
-        write_dais_vars_to_parquet(
-            &dais_vars_data,
+        write_minor_vars_to_parquet(
+            &allele_data.filtered_alleles,
             &format!(
-                "{}/{}_variants.parq",
+                "{}/{}_minor_variants.parq",
                 &args.output_path.display(),
                 args.runid
             ),
