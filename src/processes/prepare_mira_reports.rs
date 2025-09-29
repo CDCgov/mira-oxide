@@ -142,6 +142,7 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     let read_data = reads_data_collection(&args.irma_path, &args.platform, &args.runid)?;
     let vtype_data = create_vtype_data(&read_data);
     let allele_data = allele_data_collection(&args.irma_path, &args.platform, &args.runid)?;
+    println!("{allele_data:?}");
     let indel_data = indels_data_collection(&args.irma_path, &args.platform, &args.runid)?;
     let run_info = run_info_collection(&args.irma_path, &args.platform, &args.runid)?;
     let seq_data = amended_consensus_data_collection(&args.irma_path, &args.virus)?;

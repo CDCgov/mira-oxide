@@ -294,29 +294,50 @@ pub fn write_out_all_json_files<S: ::std::hash::BuildHasher>(
         &vtype_columns,
     )?;
 
-    // Writing out allele \
-    let allele_struct_values = vec![
-        "Sample",
-        "Upstream_Position",
-        "Reference_Name",
-        "Context",
-        "Length",
-        "Insert",
-        "Count",
-        "Total",
-        "Frequency",
-    ];
+    // Writing out allele
     let allele_columns = vec![
         "sample",
-        "sample_upstream_position",
         "reference",
-        "context",
-        "length",
-        "insert",
-        "count",
-        "upstream_base_coverage",
-        "frequency",
+        "sample_upstream_position",
+        "depth",
+        "consensus_allele",
+        "minority_allele",
+        "consensus_count",
+        "minority_count",
+        "minority_frequency",
+        "run_id",
+        "instrument",
     ];
+    let allele_struct_values = if virus == "sc2-spike" {
+        vec![
+            "Sample",
+            "Reference_Name",
+            "HMM_Position",
+            "Total",
+            "Consensus_Allele",
+            "Minority_Allele",
+            "Consensus_Count",
+            "Minority_Count",
+            "Minority_Frequency",
+            "Run_ID",
+            "Instrument",
+        ]
+    } else {
+        vec![
+            "Sample",
+            "Reference_Name",
+            "Position",
+            "Total",
+            "Consensus_Allele",
+            "Minority_Allele",
+            "Consensus_Count",
+            "Minority_Count",
+            "Minority_Frequency",
+            "Run_ID",
+            "Instrument",
+        ]
+    };
+
     write_structs_to_split_json_file(
         &format!("{}/alleles.json", output_path.display()),
         allele_data,
