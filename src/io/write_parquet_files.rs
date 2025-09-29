@@ -1,4 +1,5 @@
 use crate::io::data_ingest::ReadsData;
+use crate::processes::prepare_mira_reports::Samplesheet;
 use crate::utils::data_processing::{AASequences, IRMASummary, NTSequences, extract_field};
 use arrow::array::Float64Array;
 use arrow::{
@@ -723,6 +724,121 @@ pub fn write_run_info_to_parquet(
     writer.close()?;
 
     println!("PARQUET written to {output_file}");
+
+    Ok(())
+}
+
+/// Write the samplesheet data to a Parquet file
+pub fn write_samplesheet_to_parquet(
+    samplesheet: Samplesheet,
+    output_file: &str,
+    runid: &str,
+    instrument: &str,
+) -> Result<(), Box<dyn Error>> {
+    match samplesheet {
+        Samplesheet::Illumina(data) => {
+            // Extract fields from SamplesheetI
+            let barcode_vec: Vec<Option<String>> = vec![None; data.len()];
+            let sample_id_vec: Vec<String> = extract_field(&data, |item| item.sample_id.clone());
+            let sample_type_vec: Vec<Option<String>> =
+                extract_field(&data, |item| item.sample_type.clone());
+
+            // Add runid and instrument fields
+            let runid_vec: Vec<String> = vec![runid.to_string(); data.len()];
+            let instrument_vec: Vec<String> = vec![instrument.to_string(); data.len()];
+
+            println!("{barcode_vec:?}");
+            println!("{sample_id_vec:?}");
+            println!("{sample_type_vec:?}");
+            println!("{runid_vec:?}");
+            println!("{instrument_vec:?}");
+
+            // Convert the vectors into Arrow columns
+            let barcode_array: ArrayRef = Arc::new(StringArray::from(barcode_vec));
+            let sample_id_array: ArrayRef = Arc::new(StringArray::from(sample_id_vec));
+            let sample_type_array: ArrayRef = Arc::new(StringArray::from(sample_type_vec));
+            let runid_array: ArrayRef = Arc::new(StringArray::from(runid_vec));
+            let instrument_array: ArrayRef = Arc::new(StringArray::from(instrument_vec));
+
+            // Define the schema for the Arrow IPC file
+            let fields = vec![
+                Field::new("Barcode #", DataType::Utf8, true),
+                Field::new("Sample ID", DataType::Utf8, false),
+                Field::new("Sample Type", DataType::Utf8, true),
+                Field::new("Run ID", DataType::Utf8, false),
+                Field::new("Instrument", DataType::Utf8, false),
+            ];
+            let schema = Arc::new(Schema::new(fields));
+
+            // Create a RecordBatch
+            let record_batch = RecordBatch::try_new(
+                schema.clone(),
+                vec![
+                    barcode_array,
+                    sample_id_array,
+                    sample_type_array,
+                    runid_array,
+                    instrument_array,
+                ],
+            )?;
+
+            // Write the RecordBatch to a Parquet file
+            let file = File::create(output_file)?;
+            let mut writer = ArrowWriter::try_new(file, schema.clone(), None)?;
+            writer.write(&record_batch)?;
+            writer.close()?;
+
+            println!("PARQUET written to {output_file}");
+        }
+        Samplesheet::ONT(data) => {
+            // Extract fields from SamplesheetO
+            let barcode_vec: Vec<String> = extract_field(&data, |item| item.barcode.clone());
+            let sample_id_vec: Vec<String> = extract_field(&data, |item| item.sample_id.clone());
+            let sample_type_vec: Vec<Option<String>> =
+                extract_field(&data, |item| item.sample_type.clone());
+
+            // Add runid and instrument fields
+            let runid_vec: Vec<String> = vec![runid.to_string(); data.len()];
+            let instrument_vec: Vec<String> = vec![instrument.to_string(); data.len()];
+
+            // Convert the vectors into Arrow columns
+            let barcode_array: ArrayRef = Arc::new(StringArray::from(barcode_vec));
+            let sample_id_array: ArrayRef = Arc::new(StringArray::from(sample_id_vec));
+            let sample_type_array: ArrayRef = Arc::new(StringArray::from(sample_type_vec));
+            let runid_array: ArrayRef = Arc::new(StringArray::from(runid_vec));
+            let instrument_array: ArrayRef = Arc::new(StringArray::from(instrument_vec));
+
+            // Define the schema for the Arrow IPC file
+            let fields = vec![
+                Field::new("Barcode #", DataType::Utf8, false),
+                Field::new("Sample ID", DataType::Utf8, false),
+                Field::new("Sample Type", DataType::Utf8, true),
+                Field::new("Run ID", DataType::Utf8, false),
+                Field::new("Instrument", DataType::Utf8, false),
+            ];
+            let schema = Arc::new(Schema::new(fields));
+
+            // Create a RecordBatch
+            let record_batch = RecordBatch::try_new(
+                schema.clone(),
+                vec![
+                    barcode_array,
+                    sample_id_array,
+                    sample_type_array,
+                    runid_array,
+                    instrument_array,
+                ],
+            )?;
+
+            // Write the RecordBatch to a Parquet file
+            let file = File::create(output_file)?;
+            let mut writer = ArrowWriter::try_new(file, schema.clone(), None)?;
+            writer.write(&record_batch)?;
+            writer.close()?;
+
+            println!("PARQUET written to {output_file}");
+        }
+    }
 
     Ok(())
 }

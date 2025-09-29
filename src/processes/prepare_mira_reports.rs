@@ -1,4 +1,5 @@
 #![allow(dead_code, unused_imports)]
+use crate::io::write_parquet_files::write_samplesheet_to_parquet;
 use crate::utils::data_processing::{
     DaisVarsData, ProcessedCoverage, Subtype, collect_analysis_metadata, collect_negatives,
     collect_sample_id, compute_cvv_dais_variants, compute_dais_variants, create_aa_seq_vec,
@@ -103,7 +104,7 @@ pub struct SamplesheetO {
     pub sample_type: Option<String>,
 }
 
-enum Samplesheet {
+pub enum Samplesheet {
     Illumina(Vec<SamplesheetI>),
     ONT(Vec<SamplesheetO>),
 }
@@ -404,6 +405,16 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
                 &args.output_path.display(),
                 args.runid
             ),
+        )?;
+        write_samplesheet_to_parquet(
+            samplesheet,
+            &format!(
+                "{}/{}_samplesheet.parq",
+                &args.output_path.display(),
+                args.runid
+            ),
+            &args.runid,
+            &args.platform,
         )?;
     }
 
