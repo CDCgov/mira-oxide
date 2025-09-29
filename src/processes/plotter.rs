@@ -17,7 +17,7 @@ use std::{
 };
 
 // Add this function to generate consistent colors for segment names
-fn get_segment_color(segment_name: &str) -> &'static str {
+pub fn get_segment_color(segment_name: &str) -> &'static str {
     // This ensures the same segment always gets the same color across all plots
     // Check if segment_name contains any of our known segment identifiers
     if segment_name.contains("PB2") {
@@ -110,7 +110,7 @@ pub struct PlotterArgs {
     output: Option<PathBuf>,
 }
 
-fn generate_plot_coverage(input_directory: &Path) -> Result<Plot, Box<dyn Error>> {
+pub fn generate_plot_coverage(input_directory: &Path) -> Result<Plot, Box<dyn Error>> {
     // Create a Plotly plot
     let mut plot = Plot::new();
 
@@ -199,7 +199,7 @@ fn generate_plot_coverage(input_directory: &Path) -> Result<Plot, Box<dyn Error>
 }
 
 #[allow(clippy::type_complexity)]
-fn generate_plot_coverage_seg(input_directory: &Path) -> Result<Plot, Box<dyn Error>> {
+pub fn generate_plot_coverage_seg(input_directory: &Path) -> Result<Plot, Box<dyn Error>> {
     // Init a Plotly plot
     let mut plot = Plot::new();
 
@@ -477,7 +477,7 @@ fn generate_plot_coverage_seg(input_directory: &Path) -> Result<Plot, Box<dyn Er
 
 // TO DO: fix colors for Sankey diagram, abstract parts of this
 #[allow(clippy::too_many_lines)]
-fn generate_sankey_plot(input_directory: &Path) -> Result<Plot, Box<dyn Error>> {
+pub fn generate_sankey_plot(input_directory: &Path) -> Result<Plot, Box<dyn Error>> {
     // Path to READ_COUNTS.txt
     let read_counts_path = input_directory.join("tables").join("READ_COUNTS.txt");
 
@@ -775,7 +775,7 @@ fn generate_sankey_plot(input_directory: &Path) -> Result<Plot, Box<dyn Error>> 
 }
 
 // Helper function to add node and maintain the node map
-fn add_node(
+pub fn add_node(
     name: &str,
     labels: &mut Vec<String>,
     node_map: &mut HashMap<String, usize>,
