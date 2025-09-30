@@ -7,6 +7,7 @@ use crate::utils::data_processing::{
     divide_nt_into_pass_fail_vec, extract_field, extract_subtype_flu, extract_subtype_sc2,
     melt_reads_data, process_position_coverage_data, process_wgs_coverage_data, return_seg_data,
 };
+use crate::utils::plotting::create_coverage_plot;
 use crate::{
     io::{
         data_ingest::{
@@ -417,6 +418,15 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
             &args.platform,
         )?;
     }
+
+    //////////////////////////////// Create JSONS for Dashboard ////////////////////////////////
+
+    let _ = create_coverage_plot(
+        &coverage_data,
+        segments,
+        &segcolor,
+        &format!("{}/", &args.output_path.display()),
+    );
 
     Ok(())
 }

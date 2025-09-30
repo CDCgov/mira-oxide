@@ -126,7 +126,7 @@ pub fn write_ref_data_json<S: ::std::hash::BuildHasher>(
     ref_lens: &HashMap<String, usize, S>,
     segments: &[String],
     segset: &[String],
-    segcolor: &HashMap<String, &str>,
+    segcolor: &HashMap<String, String>,
 ) -> Result<(), Box<dyn Error>> {
     let json_data = json!({
         "ref_lens": ref_lens,
@@ -226,7 +226,7 @@ pub fn write_out_all_json_files<S: ::std::hash::BuildHasher>(
     ref_lengths: &HashMap<String, usize, S>,
     segments: &[String],
     segset: &[String],
-    segcolor: &HashMap<String, &str>,
+    segcolor: &HashMap<String, String>,
     virus: &str,
 ) -> Result<(), Box<dyn Error>> {
     // Writing out Coverage data

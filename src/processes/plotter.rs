@@ -17,6 +17,7 @@ use std::{
 };
 
 // Add this function to generate consistent colors for segment names
+#[must_use]
 pub fn get_segment_color(segment_name: &str) -> &'static str {
     // This ensures the same segment always gets the same color across all plots
     // Check if segment_name contains any of our known segment identifiers
@@ -775,6 +776,7 @@ pub fn generate_sankey_plot(input_directory: &Path) -> Result<Plot, Box<dyn Erro
 }
 
 // Helper function to add node and maintain the node map
+#[allow(clippy::implicit_hasher)]
 pub fn add_node(
     name: &str,
     labels: &mut Vec<String>,

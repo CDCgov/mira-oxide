@@ -298,7 +298,7 @@ pub fn create_vtype_data(reads_data: &Vec<ReadsData>) -> Vec<ProcessedRecord> {
 #[must_use]
 pub fn return_seg_data(
     reference_names: Vec<String>,
-) -> (Vec<String>, Vec<String>, HashMap<String, &'static str>) {
+) -> (Vec<String>, Vec<String>, HashMap<String, String>) {
     let mut segments: Vec<String> = reference_names.into_iter().collect();
     segments.sort();
     segments.dedup();
@@ -324,10 +324,10 @@ pub fn return_seg_data(
         .into_iter()
         .collect();
 
-    let mut segcolor: HashMap<String, &str> = HashMap::new();
+    let mut segcolor: HashMap<String, String> = HashMap::new();
     for (i, seg) in segset.iter().enumerate() {
         if i < color_palette.len() {
-            segcolor.insert(seg.clone(), color_palette[i]);
+            segcolor.insert(seg.clone(), color_palette[i].to_owned());
         }
     }
 
