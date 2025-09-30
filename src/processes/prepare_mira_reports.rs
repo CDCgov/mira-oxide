@@ -1,4 +1,5 @@
 #![allow(dead_code, unused_imports)]
+use crate::io::coverage_json_per_sample::create_coverage_plot;
 use crate::io::write_parquet_files::write_samplesheet_to_parquet;
 use crate::utils::data_processing::{
     DaisVarsData, ProcessedCoverage, Subtype, collect_analysis_metadata, collect_negatives,
@@ -7,7 +8,6 @@ use crate::utils::data_processing::{
     divide_nt_into_pass_fail_vec, extract_field, extract_subtype_flu, extract_subtype_sc2,
     melt_reads_data, process_position_coverage_data, process_wgs_coverage_data, return_seg_data,
 };
-use crate::utils::plotting::create_coverage_plot;
 use crate::{
     io::{
         data_ingest::{

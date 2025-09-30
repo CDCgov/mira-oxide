@@ -79,6 +79,34 @@ pub fn create_sample_coverage_fig<S: ::std::hash::BuildHasher>(
             ("M2-2".to_string(), (8160, 8432)),
             ("L".to_string(), (8499, 14996)),
         ]
+    } else if segments.contains(&"RSV_AD".to_string()) {
+        vec![
+            ("NS1".to_string(), (99, 518)),
+            ("NS2".to_string(), (628, 1002)),
+            ("N".to_string(), (1140, 2315)),
+            ("P".to_string(), (2347, 3072)),
+            ("M".to_string(), (3255, 4025)),
+            ("SH".to_string(), (4295, 4489)),
+            ("G".to_string(), (4681, 5646)),
+            ("F".to_string(), (5726, 7450)),
+            ("M2-1".to_string(), (7669, 8253)),
+            ("M2-2".to_string(), (8228, 8494)),
+            ("L".to_string(), (8561, 15058)),
+        ]
+    } else if segments.contains(&"RSV_BD".to_string()) {
+        vec![
+            ("NS1".to_string(), (100, 519)),
+            ("NS2".to_string(), (627, 1001)),
+            ("N".to_string(), (1140, 2315)),
+            ("P".to_string(), (2348, 3073)),
+            ("M".to_string(), (3263, 4033)),
+            ("SH".to_string(), (4302, 4499)),
+            ("G".to_string(), (4689, 5621)),
+            ("F".to_string(), (5719, 7443)),
+            ("M2-1".to_string(), (7670, 8257)),
+            ("M2-2".to_string(), (8223, 8495)),
+            ("L".to_string(), (8561, 15061)),
+        ]
     } else {
         vec![]
     };
