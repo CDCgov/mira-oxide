@@ -37,46 +37,90 @@ pub fn create_sample_coverage_fig<S: ::std::hash::BuildHasher>(
 
     // ORF positions for different segments
     let orf_positions = if segments.contains(&"SARS-CoV-2".to_string()) {
-        Some(vec![
-            ("orf1ab", (266, 21556)),
-            ("S", (21563, 25385)),
-            ("ORF3a", (25393, 26221)),
-            ("E", (26245, 26473)),
-            ("M", (26523, 27192)),
-            ("ORF6", (27202, 27388)),
-            ("ORF7a", (27394, 27759)),
-            ("ORF7b", (27756, 27887)),
-            ("ORF8", (27894, 28260)),
-            ("N", (28274, 29534)),
-            ("ORF10", (29558, 29675)),
-            ("ORF9b", (28284, 28577)),
-        ])
+        vec![
+            ("orf1ab".to_string(), (266, 21556)),
+            ("S".to_string(), (21563, 25385)),
+            ("ORF3a".to_string(), (25393, 26221)),
+            ("E".to_string(), (26245, 26473)),
+            ("M".to_string(), (26523, 27192)),
+            ("ORF6".to_string(), (27202, 27388)),
+            ("ORF7a".to_string(), (27394, 27759)),
+            ("ORF7b".to_string(), (27756, 27887)),
+            ("ORF8".to_string(), (27894, 28260)),
+            ("N".to_string(), (28274, 29534)),
+            ("ORF10".to_string(), (29558, 29675)),
+            ("ORF9b".to_string(), (28284, 28577)),
+        ]
+    } else if segments.contains(&"RSV_B".to_string()) {
+        vec![
+            ("NS1".to_string(), (99, 518)),
+            ("NS2".to_string(), (626, 1000)),
+            ("N".to_string(), (1140, 2315)),
+            ("P".to_string(), (2348, 3073)),
+            ("M".to_string(), (3263, 4033)),
+            ("SH".to_string(), (4303, 4500)),
+            ("G".to_string(), (4690, 5589)),
+            ("F".to_string(), (5666, 7390)),
+            ("M2-1".to_string(), (7618, 8205)),
+            ("M2-2".to_string(), (8171, 8443)),
+            ("L".to_string(), (8509, 15009)),
+        ]
+    } else if segments.contains(&"RSV_A".to_string()) {
+        vec![
+            ("NS1".to_string(), (99, 518)),
+            ("NS2".to_string(), (628, 1002)),
+            ("N".to_string(), (1141, 2316)),
+            ("P".to_string(), (2347, 3072)),
+            ("M".to_string(), (3262, 4032)),
+            ("SH".to_string(), (4304, 4498)),
+            ("G".to_string(), (4689, 5585)),
+            ("F".to_string(), (5662, 7386)),
+            ("M2-1".to_string(), (7607, 8191)),
+            ("M2-2".to_string(), (8160, 8432)),
+            ("L".to_string(), (8499, 14996)),
+        ]
     } else {
-        None
+        vec![]
     };
 
+    // Predefined list of colors for ORFs
+    let orf_colors = [
+        "rgba(255, 0, 0, 0.5)",     // Red
+        "rgba(0, 255, 0, 0.5)",     // Green
+        "rgba(0, 0, 255, 0.5)",     // Blue
+        "rgba(255, 255, 0, 0.5)",   // Yellow
+        "rgba(255, 0, 255, 0.5)",   // Magenta
+        "rgba(0, 255, 255, 0.5)",   // Cyan
+        "rgba(128, 0, 128, 0.5)",   // Purple
+        "rgba(128, 128, 0, 0.5)",   // Olive
+        "rgba(0, 128, 128, 0.5)",   // Teal
+        "rgba(128, 128, 128, 0.5)", // Gray
+        "rgba(255, 128, 0, 0.5)",   // Orange
+        "rgba(0, 128, 255, 0.5)",   // Light Blue
+    ];
+
     // Add ORF boxes to the plot
-    if let Some(orf_positions) = orf_positions {
-        let oy = f64::from(max_coverage_depth) / 10.0;
-        let _ya = if cov_linear_y {
-            0.0 - (f64::from(max_coverage_depth) / 20.0)
-        } else {
-            0.9
-        };
+    let oy = f64::from(max_coverage_depth) / 10.0;
+    let _ya = if cov_linear_y {
+        0.0 - (f64::from(max_coverage_depth) / 20.0)
+    } else {
+        0.9
+    };
 
-        for (orf, (start, end)) in orf_positions {
-            let x = vec![start, end, end, start, start];
-            let y = vec![oy, oy, 0.0, 0.0, oy];
-            let color = "rgba(0, 128, 0, 0.5)";
+    for (i, (orf, (start, end))) in orf_positions.iter().enumerate() {
+        let x = vec![*start, *end, *end, *start, *start];
+        let y = vec![oy, oy, 0.0, 0.0, oy];
+        let color = orf_colors
+            .get(i % orf_colors.len())
+            .unwrap_or(&"rgba(0, 128, 0, 0.5)");
 
-            let trace = Scatter::new(x, y)
-                .mode(Mode::Lines)
-                .fill(Fill::ToSelf)
-                .line(Line::new().color(color))
-                .name(orf);
+        let trace = Scatter::new(x.clone(), y.clone()) // Clone the data to ensure ownership
+            .mode(Mode::Lines)
+            .fill(Fill::ToSelf)
+            .line(Line::new().color((*color).to_string()))
+            .name(orf.clone()); // Clone the ORF name to ensure ownership
 
-            plot.add_trace(trace);
-        }
+        plot.add_trace(trace);
     }
 
     // Add coverage data for each segment
@@ -98,7 +142,7 @@ pub fn create_sample_coverage_fig<S: ::std::hash::BuildHasher>(
             let trace = Scatter::new(x, y)
                 .mode(Mode::Lines)
                 .line(Line::new().color(color.clone()))
-                .name(segment);
+                .name(segment.clone());
             plot.add_trace(trace);
         }
     }
