@@ -58,13 +58,13 @@ pub fn nf_status_process(args: NFStatusArgs) -> Result<(), Box<dyn std::error::E
 
     let file = File::open(samplesheet_path).expect("Could not open samplesheet");
     let reader = BufReader::new(file);
-    let mut sample_ids = Vec::new();
+    let mut sample_ids = Vec::with_capacity(100); // Pre-allocate capacity
     let mut header_found = false;
     let mut sample_id_idx = None;
     for line in reader.lines() {
         let line = line.expect("Error reading line");
-        let fields: Vec<&str> = line.split(',').collect();
         if !header_found {
+            let fields: Vec<&str> = line.split(',').collect();
             for (idx, col) in fields.iter().enumerate() {
                 if col.trim() == "Sample ID" {
                     sample_id_idx = Some(idx);
@@ -75,26 +75,37 @@ pub fn nf_status_process(args: NFStatusArgs) -> Result<(), Box<dyn std::error::E
             continue;
         }
         if let Some(idx) = sample_id_idx {
+            let fields: Vec<&str> = line.split(',').collect();
             if let Some(id) = fields.get(idx) {
-                sample_ids.push(id.trim().to_string());
+                let trimmed = id.trim();
+                if !trimmed.is_empty() {
+                    sample_ids.push(trimmed.to_string());
+                }
             }
         }
     }
-    // Parse nextflow.log if provided
+    // Parse nextflow.log if provided - SINGLE PASS OPTIMIZATION
     use regex::Regex;
     use std::collections::HashMap;
-    let mut status_map: HashMap<(String, String), String> = HashMap::new();
+    // Pre-allocate capacity for HashMaps to reduce rehashing
+    let mut status_map: HashMap<(String, String), String> = HashMap::with_capacity(1000);
     // Track which processes are global (no sample in completion line)
-    let mut global_completed: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut global_completed: std::collections::HashSet<String> =
+        std::collections::HashSet::with_capacity(20);
     // Track process start times for elapsed time calculation
-    let mut process_start_times: HashMap<(String, String), String> = HashMap::new();
+    let mut process_start_times: HashMap<(String, String), String> = HashMap::with_capacity(1000);
     // Track process end times for runtime calculation
-    let mut process_end_times: HashMap<(String, String), String> = HashMap::new();
+    let mut process_end_times: HashMap<(String, String), String> = HashMap::with_capacity(1000);
     // Track runtime duration in human-readable format
-    let mut process_runtimes: HashMap<(String, String), String> = HashMap::new();
-    let mut started_processes: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut process_runtimes: HashMap<(String, String), String> = HashMap::with_capacity(1000);
+    let mut started_processes: std::collections::HashSet<String> =
+        std::collections::HashSet::with_capacity(50);
+    let mut process_order: Vec<String> = Vec::with_capacity(50);
+    let mut seen_processes = std::collections::HashSet::with_capacity(50);
+
     if let Ok(file) = File::open(nextflow_log_path) {
         let reader = BufReader::new(file);
+        // Compile all regexes once outside the loop
         let re_submit = Regex::new(r"Submitted process > ([^ ]+) \(([^)]+)\)").unwrap();
         let re_complete = Regex::new(
             r"(\w{3}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}) .*Task completed > TaskHandler\[.*name: ([^ ]+)(?: \(([^)]+)\))?; status: ([A-Z]+);",
@@ -104,41 +115,57 @@ pub fn nf_status_process(args: NFStatusArgs) -> Result<(), Box<dyn std::error::E
             r"(\w{3}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}) .*Submitted process > ([^ ]+) \(([^)]+)\)",
         )
         .unwrap();
-        let mut log_lines: Vec<String> = Vec::new();
+        let re_starting = Regex::new(r"Starting process > ([^\s]+)").unwrap();
+
         for line in reader.lines() {
             if let Ok(line) = line {
-                log_lines.push(line.clone());
+                // Check for starting process - extract process order
+                if let Some(caps) = re_starting.captures(&line) {
+                    let proc = caps[1].split(':').last().unwrap_or("");
+                    if proc != "PASSFAILED" && seen_processes.insert(proc.to_string()) {
+                        process_order.push(proc.to_string());
+                        started_processes.insert(proc.to_string());
+                    }
+                }
+
+                // Check for submitted process
                 if let Some(caps) = re_submit.captures(&line) {
-                    let process = caps[1].split(':').last().unwrap_or("").to_string();
-                    let sample = caps[2].to_string();
-                    let key = (sample.clone(), process.clone());
+                    let process = caps[1].split(':').last().unwrap_or("");
+                    let sample = &caps[2];
+                    let key = (sample.to_string(), process.to_string());
+
                     // Try to extract timestamp for this submission
                     if let Some(time_caps) = re_start_time.captures(&line) {
                         let timestamp = time_caps[1].to_string();
                         process_start_times.insert(key.clone(), timestamp);
                     }
-                    status_map.entry(key).or_insert("running".to_string());
+                    status_map
+                        .entry(key)
+                        .or_insert_with(|| "running".to_string());
                 }
+
+                // Check for completed process
                 if let Some(caps) = re_complete.captures(&line) {
-                    let end_time_str = caps[1].to_string();
-                    let process = caps[2].split(':').last().unwrap_or("").to_string();
+                    let end_time_str = &caps[1];
+                    let process = caps[2].split(':').last().unwrap_or("");
                     let sample_opt = caps.get(3).map(|m| m.as_str());
                     let status = match &caps[4] {
                         s if s == "COMPLETED" => "completed",
                         s if s == "FAILED" || s == "ERROR" => "error",
                         _ => "",
                     };
+
                     if !status.is_empty() {
                         if let Some(sample) = sample_opt {
                             if !sample.is_empty() && sample != "1" {
-                                let key = (sample.to_string(), process.clone());
+                                let key = (sample.to_string(), process.to_string());
                                 status_map.insert(key.clone(), status.to_string());
-                                process_end_times.insert(key.clone(), end_time_str.clone());
+                                process_end_times.insert(key.clone(), end_time_str.to_string());
 
                                 // Calculate runtime if we have start time
                                 if let Some(start_str) = process_start_times.get(&key) {
                                     if let (Some(start), Some(end)) =
-                                        (parse_log_time(start_str), parse_log_time(&end_time_str))
+                                        (parse_log_time(start_str), parse_log_time(end_time_str))
                                     {
                                         let duration = end - start;
                                         let hours = duration.num_hours();
@@ -152,40 +179,12 @@ pub fn nf_status_process(args: NFStatusArgs) -> Result<(), Box<dyn std::error::E
                                 }
                             } else {
                                 // sample == "1" or empty: global process
-                                global_completed.insert(process.clone());
+                                global_completed.insert(process.to_string());
                             }
                         } else {
                             // No sample: global process
-                            global_completed.insert(process.clone());
+                            global_completed.insert(process.to_string());
                         }
-                    }
-                }
-                // Track started processes for staged logic
-                if let Some(caps) = Regex::new(r"Starting process > ([^\s]+)")
-                    .unwrap()
-                    .captures(&line)
-                {
-                    let proc = caps[1].split(':').last().unwrap_or("").to_string();
-                    started_processes.insert(proc);
-                }
-            }
-        }
-    }
-    // If log is provided, extract process order from log ("Starting process > ...")
-    let mut process_order: Vec<String> = Vec::new();
-    if let Ok(file) = File::open(nextflow_log_path) {
-        let reader = BufReader::new(file);
-        let re_start = regex::Regex::new(r"Starting process > ([^\s]+)").unwrap();
-        let mut seen = std::collections::HashSet::new();
-        for line in reader.lines() {
-            if let Ok(line) = line {
-                if let Some(caps) = re_start.captures(&line) {
-                    let proc = caps[1].split(':').last().unwrap_or("").to_string();
-                    if proc == "PASSFAILED" {
-                        continue;
-                    }
-                    if seen.insert(proc.clone()) {
-                        process_order.push(proc);
                     }
                 }
             }
@@ -229,12 +228,13 @@ pub fn nf_status_process(args: NFStatusArgs) -> Result<(), Box<dyn std::error::E
         hover: Option<String>,
     }
 
-    let mut table_rows: Vec<Vec<CellData>> = Vec::new();
+    let mut table_rows: Vec<Vec<CellData>> = Vec::with_capacity(sample_ids.len());
     for sample in &sample_ids {
-        let mut row = vec![CellData {
+        let mut row = Vec::with_capacity(table_header.len());
+        row.push(CellData {
             display: sample.clone(),
             hover: None,
-        }];
+        });
         // Use reordered process columns for row
         let process_cols = &table_header[1..];
         for proc in process_cols {
@@ -323,7 +323,9 @@ pub fn nf_status_process(args: NFStatusArgs) -> Result<(), Box<dyn std::error::E
 
     // Output as raw HTML table
     if generate_table {
-        let mut html = String::new();
+        // Pre-allocate capacity for HTML string to reduce allocations
+        let estimated_size = 2000 + (table_rows.len() * table_header.len() * 50);
+        let mut html = String::with_capacity(estimated_size);
         html.push_str(r#"<!doctype html>
         <html lang="en")
         <head>
@@ -435,29 +437,68 @@ pub fn nf_status_process(args: NFStatusArgs) -> Result<(), Box<dyn std::error::E
             "N/A".to_string()
         };
 
-        // Calculate statistics for each process
-        let mut progress_stats: Vec<(String, usize, usize, usize, usize)> = Vec::new();
+        // Calculate statistics for each process with sample lists
+        let mut progress_stats: Vec<(
+            String,
+            usize,
+            usize,
+            usize,
+            usize,
+            Vec<String>,
+            Vec<String>,
+            Vec<String>,
+            Vec<String>,
+        )> = Vec::new();
         for i in 1..table_header.len() {
             let process_name = &table_header[i];
             let mut completed = 0;
             let mut running = 0;
             let mut error = 0;
             let mut staged = 0;
+            let mut completed_samples = Vec::new();
+            let mut running_samples = Vec::new();
+            let mut error_samples = Vec::new();
+            let mut staged_samples = Vec::new();
 
-            for row in &table_rows {
+            for (idx, row) in table_rows.iter().enumerate() {
+                let sample_name = &sample_ids[idx];
                 if let Some(cell) = row.get(i) {
                     match cell.display.as_str() {
-                        "✅" => completed += 1,
-                        "⁉️" => error += 1,
-                        "🛄" => staged += 1,
-                        _ => running += 1, // Anything else is running (HH:MM:SS format)
+                        "✅" => {
+                            completed += 1;
+                            completed_samples.push(sample_name.clone());
+                        }
+                        "⁉️" => {
+                            error += 1;
+                            error_samples.push(sample_name.clone());
+                        }
+                        "🛄" => {
+                            staged += 1;
+                            staged_samples.push(sample_name.clone());
+                        }
+                        _ => {
+                            running += 1;
+                            running_samples.push(sample_name.clone());
+                        }
                     }
                 }
             }
-            progress_stats.push((process_name.clone(), completed, running, error, staged));
+            progress_stats.push((
+                process_name.clone(),
+                completed,
+                running,
+                error,
+                staged,
+                completed_samples,
+                running_samples,
+                error_samples,
+                staged_samples,
+            ));
         }
 
-        let mut progress_html = String::new();
+        // Pre-allocate capacity for progress HTML to reduce allocations
+        let estimated_html_size = 10000 + (progress_stats.len() * 2000);
+        let mut progress_html = String::with_capacity(estimated_html_size);
         progress_html.push_str(r#"<!doctype html>
 <html lang="en">
 <head>
@@ -508,6 +549,22 @@ pub fn nf_status_process(args: NFStatusArgs) -> Result<(), Box<dyn std::error::E
         justify-content: space-between;
         align-items: center;
         margin-bottom: 16px;
+        cursor: pointer;
+        user-select: none;
+    }
+    .process-header-left {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+    .collapse-icon {
+        font-size: 20px;
+        color: #0057B7;
+        transition: transform 0.3s ease;
+        display: inline-block;
+    }
+    .collapse-icon.collapsed {
+        transform: rotate(-90deg);
     }
     .process-name {
         font-size: 18px;
@@ -517,6 +574,15 @@ pub fn nf_status_process(args: NFStatusArgs) -> Result<(), Box<dyn std::error::E
     .process-stats {
         font-size: 14px;
         color: #0057B7;
+    }
+    .process-details {
+        transition: max-height 0.3s ease, opacity 0.3s ease;
+        overflow: visible;
+    }
+    .process-details.collapsed {
+        max-height: 0 !important;
+        opacity: 0;
+        overflow: hidden;
     }
     .progress-container {
         width: 100%;
@@ -574,12 +640,66 @@ pub fn nf_status_process(args: NFStatusArgs) -> Result<(), Box<dyn std::error::E
         grid-template-columns: repeat(4, 1fr);
         gap: 12px;
         margin-top: 12px;
+        overflow: visible;
     }
     .stat-box {
         padding: 8px 12px;
         border-radius: 8px;
         text-align: center;
         font-size: 13px;
+        cursor: help;
+        transition: transform 0.1s;
+        position: relative;
+        overflow: visible;
+    }
+    .stat-box:hover {
+        transform: scale(1.05);
+        z-index: 10000;
+    }
+    .stat-box:hover .tooltip {
+        visibility: visible;
+        opacity: 1;
+    }
+    .tooltip {
+        visibility: hidden;
+        opacity: 0;
+        position: absolute;
+        z-index: 10001;
+        bottom: 125%;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #032659;
+        color: white;
+        padding: 12px;
+        border-radius: 8px;
+        font-size: 12px;
+        white-space: pre-line;
+        text-align: left;
+        max-height: 300px;
+        overflow-y: auto;
+        min-width: 150px;
+        max-width: 300px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        transition: opacity 0.2s, visibility 0.2s;
+        user-select: text;
+        cursor: text;
+        pointer-events: auto;
+    }
+    .tooltip::after {
+        content: "";
+        position: absolute;
+        top: 100%;
+        left: 50%;
+        margin-left: -8px;
+        border-width: 8px;
+        border-style: solid;
+        border-color: #032659 transparent transparent transparent;
+    }
+    .tooltip-header {
+        font-weight: 600;
+        margin-bottom: 8px;
+        border-bottom: 1px solid rgba(255,255,255,0.3);
+        padding-bottom: 4px;
     }
     .stat-box-completed {
         background: #D5F7F9;
@@ -625,6 +745,34 @@ pub fn nf_status_process(args: NFStatusArgs) -> Result<(), Box<dyn std::error::E
         opacity: 0.9;
     }
 </style>
+<script>
+function toggleProcess(element) {
+    const card = element.closest('.process-card');
+    const details = card.querySelector('.process-details');
+    const icon = card.querySelector('.collapse-icon');
+    
+    details.classList.toggle('collapsed');
+    icon.classList.toggle('collapsed');
+}
+
+// Initialize cards: collapse if 100% completed, expand otherwise
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.process-card').forEach(function(card) {
+        const details = card.querySelector('.process-details');
+        const icon = card.querySelector('.collapse-icon');
+        const statsText = card.querySelector('.process-stats').textContent;
+        
+        // Set max-height for proper animation
+        details.style.maxHeight = details.scrollHeight + 'px';
+        
+        // Check if process is 100% completed (look for "100.0%" or similar)
+        if (statsText.includes('100.0%')) {
+            details.classList.add('collapsed');
+            icon.classList.add('collapsed');
+        }
+    });
+});
+</script>
 </head>
 <body>
 <div class="container">
@@ -662,7 +810,18 @@ pub fn nf_status_process(args: NFStatusArgs) -> Result<(), Box<dyn std::error::E
         );
 
         // Add progress bars for each process
-        for (process_name, completed, running, error, staged) in &progress_stats {
+        for (
+            process_name,
+            completed,
+            running,
+            error,
+            staged,
+            completed_samples,
+            running_samples,
+            error_samples,
+            staged_samples,
+        ) in &progress_stats
+        {
             let total = completed + running + error + staged;
             if total == 0 {
                 continue;
@@ -676,10 +835,14 @@ pub fn nf_status_process(args: NFStatusArgs) -> Result<(), Box<dyn std::error::E
             progress_html.push_str(&format!(
                 r#"
     <div class="process-card">
-        <div class="process-header">
-            <div class="process-name">{}</div>
+        <div class="process-header" onclick="toggleProcess(this)">
+            <div class="process-header-left">
+                <span class="collapse-icon">▼</span>
+                <div class="process-name">{}</div>
+            </div>
             <div class="process-stats">{}/{} completed ({:.1}%)</div>
         </div>
+        <div class="process-details">
         <div class="progress-container">
 "#,
                 process_name, completed, total, completed_pct
@@ -710,42 +873,100 @@ pub fn nf_status_process(args: NFStatusArgs) -> Result<(), Box<dyn std::error::E
                 ));
             }
 
+            // Create sample list tooltips HTML
+            let completed_tooltip_html = if completed_samples.is_empty() {
+                String::new()
+            } else {
+                format!(
+                    r#"<div class="tooltip"><div class="tooltip-header">Completed ({})</div>{}</div>"#,
+                    completed,
+                    completed_samples.join("\n")
+                )
+            };
+
+            let running_tooltip_html = if running_samples.is_empty() {
+                String::new()
+            } else {
+                format!(
+                    r#"<div class="tooltip"><div class="tooltip-header">Running ({})</div>{}</div>"#,
+                    running,
+                    running_samples.join("\n")
+                )
+            };
+
+            let error_tooltip_html = if error_samples.is_empty() {
+                String::new()
+            } else {
+                format!(
+                    r#"<div class="tooltip"><div class="tooltip-header">Failed ({})</div>{}</div>"#,
+                    error,
+                    error_samples.join("\n")
+                )
+            };
+
+            let staged_tooltip_html = if staged_samples.is_empty() {
+                String::new()
+            } else {
+                format!(
+                    r#"<div class="tooltip"><div class="tooltip-header">Staged ({})</div>{}</div>"#,
+                    staged,
+                    staged_samples.join("\n")
+                )
+            };
+
             progress_html.push_str(
                 r#"
         </div>
-        <div class="stats-grid">
+        <div class="stats-grid">"#,
+            );
+
+            // Completed box
+            progress_html.push_str(&format!(
+                r#"
             <div class="stat-box stat-box-completed">
-                <span class="stat-number">"#,
-            );
-            progress_html.push_str(&format!("{}", completed));
-            progress_html.push_str(
-                r#"</span>
+                <span class="stat-number">{}</span>
                 Completed
-            </div>
+                {}
+            </div>"#,
+                completed, completed_tooltip_html
+            ));
+
+            // Running box
+            progress_html.push_str(&format!(
+                r#"
             <div class="stat-box stat-box-running">
-                <span class="stat-number">"#,
-            );
-            progress_html.push_str(&format!("{}", running));
-            progress_html.push_str(
-                r#"</span>
+                <span class="stat-number">{}</span>
                 Running
-            </div>
+                {}
+            </div>"#,
+                running, running_tooltip_html
+            ));
+
+            // Error box
+            progress_html.push_str(&format!(
+                r#"
             <div class="stat-box stat-box-error">
-                <span class="stat-number">"#,
-            );
-            progress_html.push_str(&format!("{}", error));
-            progress_html.push_str(
-                r#"</span>
+                <span class="stat-number">{}</span>
                 Failed
-            </div>
+                {}
+            </div>"#,
+                error, error_tooltip_html
+            ));
+
+            // Staged box
+            progress_html.push_str(&format!(
+                r#"
             <div class="stat-box stat-box-staged">
-                <span class="stat-number">"#,
-            );
-            progress_html.push_str(&format!("{}", staged));
-            progress_html.push_str(
-                r#"</span>
+                <span class="stat-number">{}</span>
                 Staged
-            </div>
+                {}
+            </div>"#,
+                staged, staged_tooltip_html
+            ));
+
+            progress_html.push_str(
+                r#"
+        </div>
         </div>
     </div>
 "#,
@@ -757,19 +978,19 @@ pub fn nf_status_process(args: NFStatusArgs) -> Result<(), Box<dyn std::error::E
     <div class="legend">
         <div class="legend-item">
             <div class="legend-color progress-completed"></div>
-            <span>Completed ✅</span>
+            <span>Completed</span>
         </div>
         <div class="legend-item">
             <div class="legend-color progress-running"></div>
-            <span>Running ⏱️</span>
+            <span>Running</span>
         </div>
         <div class="legend-item">
             <div class="legend-color progress-error"></div>
-            <span>Failed ⁉️</span>
+            <span>Failed</span>
         </div>
         <div class="legend-item">
             <div class="legend-color progress-staged"></div>
-            <span>Staged 🛄</span>
+            <span>Staged</span>
         </div>
     </div>
 </div>
