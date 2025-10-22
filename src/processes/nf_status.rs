@@ -18,43 +18,23 @@ pub struct NFStatusArgs {
     #[arg(
         short = 'o',
         long = "output",
-        help = "Output HTML file path (default: ./nf_status_table.html)"
+        help = "Output HTML file path (default: ./nf_status_progress.html)"
     )]
     output: Option<String>,
 
-    /// Generate the detailed status table HTML
-    #[arg(long = "table", help = "Generate the detailed status table HTML")]
-    table: bool,
-
-    /// Generate the progress dashboard HTML
-    #[arg(long = "progress", help = "Generate the progress dashboard HTML")]
-    progress: bool,
-
-    /// Output table HTML to stdout instead of writing to file
-    #[arg(
-        long = "inline-table",
-        help = "Output table HTML to stdout instead of writing to file"
-    )]
-    inline_table: bool,
-
     /// Output progress HTML to stdout instead of writing to file
     #[arg(
-        long = "inline-progress",
+        long = "inline",
         help = "Output progress HTML to stdout instead of writing to file"
     )]
-    inline_progress: bool,
+    inline: bool,
 }
 
 pub fn nf_status_process(args: NFStatusArgs) -> Result<(), Box<dyn std::error::Error>> {
     let samplesheet_path = &args.samplesheet;
     let nextflow_log_path = &args.nextflow_log;
-    let html_output_path = args.output.as_deref().unwrap_or("nf_status_table.html");
-
-    // Determine which outputs to generate
-    let generate_table = args.table;
-    let generate_progress = args.progress;
-    let inline_table = args.inline_table;
-    let inline_progress = args.inline_progress;
+    let html_output_path = args.output.as_deref().unwrap_or("nf_status_progress.html");
+    let inline = args.inline;
 
     let file = File::open(samplesheet_path).expect("Could not open samplesheet");
     let reader = BufReader::new(file);
@@ -301,205 +281,108 @@ pub fn nf_status_process(args: NFStatusArgs) -> Result<(), Box<dyn std::error::E
         table_rows.push(row);
     }
 
-    // Calculate summary row: count completed samples per process
+    // Calculate total samples
     let total_samples = sample_ids.len();
-    let mut summary_row = vec![CellData {
-        display: "Summary".to_string(),
-        hover: None,
-    }];
-    for i in 1..table_header.len() {
-        let completed_count = table_rows
-            .iter()
-            .filter(|row| row.get(i).map(|cell| cell.display == "✅").unwrap_or(false))
-            .count();
-        summary_row.push(CellData {
-            display: format!("{}/{}", completed_count, total_samples),
-            hover: Some(format!(
-                "{} of {} samples completed",
-                completed_count, total_samples
-            )),
-        });
-    }
-
-    // Output as raw HTML table
-    if generate_table {
-        // Pre-allocate capacity for HTML string to reduce allocations
-        let estimated_size = 2000 + (table_rows.len() * table_header.len() * 50);
-        let mut html = String::with_capacity(estimated_size);
-        html.push_str(r#"<!doctype html>
-        <html lang="en")
-        <head>
-        <meta charset="utf-8" />
-        <title>nf_status_table</title>
-        <style>
-            html, body { height: 100%; margin: 0; padding: 0; box-sizing: border-box; }
-            body { min-height: 100vh; width: 100vw; overflow-x: auto; overflow-y: auto; }
-            body, table, th, td { font-family: 'Segoe UI', 'Arial', 'Liberation Sans', 'DejaVu Sans', 'sans-serif'; }
-            table { border-collapse: collapse; width: 90vw; height-max: 80vw; table-layout: auto; }
-            th, td { border: 1px solid #B8D4ED; padding: 4px; text-align: center; }
-            th {
-                writing-mode: vertical-rl;
-                white-space: nowrap;
-                vertical-align: bottom;
-                text-align: left;
-                height: 160px;
-                font-size: 12px;
-                padding: 0 2px;
-                background: #ECF5FF;
-            }
-            tr:nth-child(even) { background: #F4FCFC; }
-            tr.summary { background: #DBE8F7; font-weight: bold; }
-            tr.summary td:first-child { text-align: left; padding-left: 8px; }
-            td[title] { cursor: help; }
-        </style>
-        </head>
-        <body>
-        "#);
-        html.push_str("<table>\n<thead>\n<tr>\n");
-        for col in &table_header {
-            html.push_str(&format!("<th>{}</th>", col));
-        }
-        html.push_str("</tr>\n</thead>\n<tbody>\n");
-
-        // Add summary row first
-        html.push_str("<tr class=\"summary\">");
-        for cell in &summary_row {
-            if let Some(hover) = &cell.hover {
-                html.push_str(&format!("<td title=\"{}\">{}</td>", hover, cell.display));
-            } else {
-                html.push_str(&format!("<td>{}</td>", cell.display));
-            }
-        }
-        html.push_str("</tr>\n");
-
-        // Then add all sample rows
-        for row in &table_rows {
-            html.push_str("<tr>");
-            for cell in row {
-                if let Some(hover) = &cell.hover {
-                    html.push_str(&format!("<td title=\"{}\">{}</td>", hover, cell.display));
-                } else {
-                    html.push_str(&format!("<td>{}</td>", cell.display));
-                }
-            }
-            html.push_str("</tr>\n");
-        }
-        html.push_str("</tbody>\n</table>\n</body>\n</html>\n");
-
-        if inline_table {
-            print!("{}", html);
-        } else {
-            // Ensure output path ends with .html
-            let html_output_path = if html_output_path.ends_with(".html") {
-                html_output_path.to_string()
-            } else {
-                format!("{}.html", html_output_path)
-            };
-            std::fs::write(&html_output_path, html).expect("Failed to write HTML table");
-            println!("Raw HTML table written to {}", html_output_path);
-        }
-    }
 
     // Generate progress visualization HTML
-    if generate_progress {
-        let progress_output_path = if html_output_path.ends_with(".html") {
-            html_output_path.replace(".html", "_progress.html")
-        } else {
-            format!("{}_progress.html", html_output_path)
-        };
+    let progress_output_path = if html_output_path.ends_with(".html") {
+        html_output_path.to_string()
+    } else {
+        format!("{}.html", html_output_path)
+    };
 
-        // Calculate total workflow runtime
-        let mut workflow_start: Option<chrono::NaiveDateTime> = None;
-        let mut workflow_end: Option<chrono::NaiveDateTime> = None;
+    // Calculate total workflow runtime
+    let mut workflow_start: Option<chrono::NaiveDateTime> = None;
+    let mut workflow_end: Option<chrono::NaiveDateTime> = None;
 
-        // Find earliest start time
-        for time_str in process_start_times.values() {
-            if let Some(time) = parse_log_time(time_str) {
-                workflow_start = Some(workflow_start.map_or(time, |existing| existing.min(time)));
-            }
+    // Find earliest start time
+    for time_str in process_start_times.values() {
+        if let Some(time) = parse_log_time(time_str) {
+            workflow_start = Some(workflow_start.map_or(time, |existing| existing.min(time)));
         }
+    }
 
-        // Find latest end time
-        for time_str in process_end_times.values() {
-            if let Some(time) = parse_log_time(time_str) {
-                workflow_end = Some(workflow_end.map_or(time, |existing| existing.max(time)));
-            }
+    // Find latest end time
+    for time_str in process_end_times.values() {
+        if let Some(time) = parse_log_time(time_str) {
+            workflow_end = Some(workflow_end.map_or(time, |existing| existing.max(time)));
         }
+    }
 
-        // Calculate total runtime string
-        let total_runtime_str = if let (Some(start), Some(end)) = (workflow_start, workflow_end) {
-            let duration = end - start;
-            let hours = duration.num_hours();
-            let mins = duration.num_minutes() % 60;
-            let secs = duration.num_seconds() % 60;
-            format!("{:02}:{:02}:{:02}", hours, mins, secs)
-        } else {
-            "N/A".to_string()
-        };
+    // Calculate total runtime string
+    let total_runtime_str = if let (Some(start), Some(end)) = (workflow_start, workflow_end) {
+        let duration = end - start;
+        let hours = duration.num_hours();
+        let mins = duration.num_minutes() % 60;
+        let secs = duration.num_seconds() % 60;
+        format!("{:02}:{:02}:{:02}", hours, mins, secs)
+    } else {
+        "N/A".to_string()
+    };
 
-        // Calculate statistics for each process with sample lists
-        let mut progress_stats: Vec<(
-            String,
-            usize,
-            usize,
-            usize,
-            usize,
-            Vec<String>,
-            Vec<String>,
-            Vec<String>,
-            Vec<String>,
-        )> = Vec::new();
-        for i in 1..table_header.len() {
-            let process_name = &table_header[i];
-            let mut completed = 0;
-            let mut running = 0;
-            let mut error = 0;
-            let mut staged = 0;
-            let mut completed_samples = Vec::new();
-            let mut running_samples = Vec::new();
-            let mut error_samples = Vec::new();
-            let mut staged_samples = Vec::new();
+    // Calculate statistics for each process with sample lists
+    let mut progress_stats: Vec<(
+        String,
+        usize,
+        usize,
+        usize,
+        usize,
+        Vec<String>,
+        Vec<String>,
+        Vec<String>,
+        Vec<String>,
+    )> = Vec::new();
+    for i in 1..table_header.len() {
+        let process_name = &table_header[i];
+        let mut completed = 0;
+        let mut running = 0;
+        let mut error = 0;
+        let mut staged = 0;
+        let mut completed_samples = Vec::new();
+        let mut running_samples = Vec::new();
+        let mut error_samples = Vec::new();
+        let mut staged_samples = Vec::new();
 
-            for (idx, row) in table_rows.iter().enumerate() {
-                let sample_name = &sample_ids[idx];
-                if let Some(cell) = row.get(i) {
-                    match cell.display.as_str() {
-                        "✅" => {
-                            completed += 1;
-                            completed_samples.push(sample_name.clone());
-                        }
-                        "⁉️" => {
-                            error += 1;
-                            error_samples.push(sample_name.clone());
-                        }
-                        "🛄" => {
-                            staged += 1;
-                            staged_samples.push(sample_name.clone());
-                        }
-                        _ => {
-                            running += 1;
-                            running_samples.push(sample_name.clone());
-                        }
+        for (idx, row) in table_rows.iter().enumerate() {
+            let sample_name = &sample_ids[idx];
+            if let Some(cell) = row.get(i) {
+                match cell.display.as_str() {
+                    "✅" => {
+                        completed += 1;
+                        completed_samples.push(sample_name.clone());
+                    }
+                    "⁉️" => {
+                        error += 1;
+                        error_samples.push(sample_name.clone());
+                    }
+                    "🛄" => {
+                        staged += 1;
+                        staged_samples.push(sample_name.clone());
+                    }
+                    _ => {
+                        running += 1;
+                        running_samples.push(sample_name.clone());
                     }
                 }
             }
-            progress_stats.push((
-                process_name.clone(),
-                completed,
-                running,
-                error,
-                staged,
-                completed_samples,
-                running_samples,
-                error_samples,
-                staged_samples,
-            ));
         }
+        progress_stats.push((
+            process_name.clone(),
+            completed,
+            running,
+            error,
+            staged,
+            completed_samples,
+            running_samples,
+            error_samples,
+            staged_samples,
+        ));
+    }
 
-        // Pre-allocate capacity for progress HTML to reduce allocations
-        let estimated_html_size = 10000 + (progress_stats.len() * 2000);
-        let mut progress_html = String::with_capacity(estimated_html_size);
-        progress_html.push_str(r#"<!doctype html>
+    // Pre-allocate capacity for progress HTML to reduce allocations
+    let estimated_html_size = 10000 + (progress_stats.len() * 2000);
+    let mut progress_html = String::with_capacity(estimated_html_size);
+    progress_html.push_str(r#"<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8" />
@@ -723,26 +606,63 @@ pub fn nf_status_process(args: NFStatusArgs) -> Result<(), Box<dyn std::error::E
         display: block;
     }
     .overall-stats {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        gap: 20px;
+        background: white;
+        border-radius: 16px;
+        padding: 30px;
         margin-bottom: 40px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        border: 2px solid #D5F7F9;
     }
-    .overall-card {
-        background: linear-gradient(135deg, #47264F 0%, #722161 100%);
-        color: white;
-        padding: 24px;
-        border-radius: 12px;
+    .stats-header {
+        font-size: 24px;
+        font-weight: 700;
+        color: #032659;
+        margin: 0 0 20px 0;
+        padding-bottom: 15px;
+        border-bottom: 3px solid #0057B7;
+    }
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 20px;
+    }
+    .stat-item {
         text-align: center;
+        padding: 15px;
+        background: linear-gradient(135deg, #F4FCFC 0%, #ECF5FF 100%);
+        border-radius: 10px;
+        border-left: 4px solid #0057B7;
+        transition: transform 0.2s, box-shadow 0.2s;
     }
-    .overall-number {
+    .stat-item:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 6px 12px rgba(0,87,183,0.2);
+    }
+    .stat-item.highlight-completed {
+        border-left-color: #0081A1;
+        background: linear-gradient(135deg, #D5F7F9 0%, #ECF5FF 100%);
+    }
+    .stat-item.highlight-progress {
+        border-left-color: #CC1B22;
+        background: linear-gradient(135deg, #FCDEDB 0%, #FFE8E5 100%);
+    }
+    .stat-item.highlight-staged {
+        border-left-color: #8F4A8F;
+        background: linear-gradient(135deg, #E8D6EB 0%, #F5EEFF 100%);
+    }
+    .stat-value {
         font-size: 36px;
         font-weight: 700;
+        color: #032659;
         margin-bottom: 8px;
+        line-height: 1;
     }
-    .overall-label {
-        font-size: 14px;
-        opacity: 0.9;
+    .stat-label {
+        font-size: 13px;
+        color: #0057B7;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
     }
 </style>
 <script>
@@ -778,62 +698,86 @@ document.addEventListener('DOMContentLoaded', function() {
 <div class="container">
     <h1>MIRA Progress</h1>
     
-    <div class="overall-stats">
-        <div class="overall-card">
-            <div class="overall-number">"#);
+    <div class="overall-stats">"#);
 
-        progress_html.push_str(&format!("{}", total_samples));
-        progress_html.push_str(
-            r#"</div>
-            <div class="overall-label">Total Samples</div>
-        </div>
-        <div class="overall-card">
-            <div class="overall-number">"#,
-        );
+    // Calculate sample-level statistics
+    let mut samples_completed = 0;
+    let mut samples_in_progress = 0;
 
-        progress_html.push_str(&format!("{}", table_header.len() - 1));
-        progress_html.push_str(
-            r#"</div>
-            <div class="overall-label">Pipeline Processes</div>
-        </div>
-        <div class="overall-card">
-            <div class="overall-number">"#,
-        );
+    for row in table_rows.iter() {
+        let mut all_completed = true;
 
-        progress_html.push_str(&format!("{}", total_runtime_str));
-        progress_html.push_str(
-            r#"</div>
-            <div class="overall-label">Total Runtime</div>
+        // Skip the first column (sample name) and check all process columns
+        for cell in row.iter().skip(1) {
+            match cell.display.as_str() {
+                "✅" => {
+                    // Completed process
+                }
+                _ => {
+                    // Any non-completed status (running, error, or staged)
+                    all_completed = false;
+                }
+            }
+        }
+
+        if all_completed {
+            samples_completed += 1;
+        } else {
+            samples_in_progress += 1;
+        }
+    }
+
+    progress_html.push_str(&format!(
+        r#"
+        <h2 class="stats-header">Pipeline Overview</h2>
+        <div class="stats-grid">
+            <div class="stat-item">
+                <div class="stat-value">{}</div>
+                <div class="stat-label">Total Samples</div>
+            </div>
+            <div class="stat-item highlight-completed">
+                <div class="stat-value">{}</div>
+                <div class="stat-label">Samples Completed</div>
+            </div>
+            <div class="stat-item highlight-progress">
+                <div class="stat-value">{}</div>
+                <div class="stat-label">Samples In Progress</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value">{}</div>
+                <div class="stat-label">Total Runtime</div>
+            </div>
         </div>
     </div>
 "#,
-        );
+        total_samples, samples_completed, samples_in_progress, total_runtime_str
+    ));
 
-        // Add progress bars for each process
-        for (
-            process_name,
-            completed,
-            running,
-            error,
-            staged,
-            completed_samples,
-            running_samples,
-            error_samples,
-            staged_samples,
-        ) in &progress_stats
-        {
-            let total = completed + running + error + staged;
-            if total == 0 {
-                continue;
-            }
+    // Add progress bars for each process
+    for (
+        process_name,
+        completed,
+        running,
+        error,
+        staged,
+        completed_samples,
+        running_samples,
+        error_samples,
+        staged_samples,
+    ) in &progress_stats
+    {
+        let total = completed + running + error + staged;
+        if total == 0 {
+            continue;
+        }
 
-            let completed_pct = (*completed as f64 / total as f64) * 100.0;
-            let running_pct = (*running as f64 / total as f64) * 100.0;
-            let error_pct = (*error as f64 / total as f64) * 100.0;
-            let staged_pct = (*staged as f64 / total as f64) * 100.0;
+        let completed_pct = (*completed as f64 / total as f64) * 100.0;
+        let running_pct = (*running as f64 / total as f64) * 100.0;
+        let error_pct = (*error as f64 / total as f64) * 100.0;
+        let staged_pct = (*staged as f64 / total as f64) * 100.0;
 
-            progress_html.push_str(&format!(
-                r#"
+        progress_html.push_str(&format!(
+            r#"
     <div class="process-card">
         <div class="process-header" onclick="toggleProcess(this)">
             <div class="process-header-left">
@@ -845,136 +789,136 @@ document.addEventListener('DOMContentLoaded', function() {
         <div class="process-details">
         <div class="progress-container">
 "#,
-                process_name, completed, total, completed_pct
-            ));
+            process_name, completed, total, completed_pct
+        ));
 
-            if *completed > 0 {
-                progress_html.push_str(&format!(
+        if *completed > 0 {
+            progress_html.push_str(&format!(
                     r#"<div class="progress-segment progress-completed" style="width: {:.1}%;" title="Completed: {}"></div>"#,
                     completed_pct, completed
                 ));
-            }
-            if *running > 0 {
-                progress_html.push_str(&format!(
+        }
+        if *running > 0 {
+            progress_html.push_str(&format!(
                     r#"<div class="progress-segment progress-running" style="width: {:.1}%;" title="Running: {}"></div>"#,
                     running_pct, running
                 ));
-            }
-            if *error > 0 {
-                progress_html.push_str(&format!(
+        }
+        if *error > 0 {
+            progress_html.push_str(&format!(
                     r#"<div class="progress-segment progress-error" style="width: {:.1}%;" title="Failed: {}"></div>"#,
                     error_pct, error
                 ));
-            }
-            if *staged > 0 {
-                progress_html.push_str(&format!(
+        }
+        if *staged > 0 {
+            progress_html.push_str(&format!(
                     r#"<div class="progress-segment progress-staged" style="width: {:.1}%;" title="Staged: {}"></div>"#,
                     staged_pct, staged
                 ));
-            }
+        }
 
-            // Create sample list tooltips HTML
-            let completed_tooltip_html = if completed_samples.is_empty() {
-                String::new()
-            } else {
-                format!(
-                    r#"<div class="tooltip"><div class="tooltip-header">Completed ({})</div>{}</div>"#,
-                    completed,
-                    completed_samples.join("\n")
-                )
-            };
+        // Create sample list tooltips HTML
+        let completed_tooltip_html = if completed_samples.is_empty() {
+            String::new()
+        } else {
+            format!(
+                r#"<div class="tooltip"><div class="tooltip-header">Completed ({})</div>{}</div>"#,
+                completed,
+                completed_samples.join("\n")
+            )
+        };
 
-            let running_tooltip_html = if running_samples.is_empty() {
-                String::new()
-            } else {
-                format!(
-                    r#"<div class="tooltip"><div class="tooltip-header">Running ({})</div>{}</div>"#,
-                    running,
-                    running_samples.join("\n")
-                )
-            };
+        let running_tooltip_html = if running_samples.is_empty() {
+            String::new()
+        } else {
+            format!(
+                r#"<div class="tooltip"><div class="tooltip-header">Running ({})</div>{}</div>"#,
+                running,
+                running_samples.join("\n")
+            )
+        };
 
-            let error_tooltip_html = if error_samples.is_empty() {
-                String::new()
-            } else {
-                format!(
-                    r#"<div class="tooltip"><div class="tooltip-header">Failed ({})</div>{}</div>"#,
-                    error,
-                    error_samples.join("\n")
-                )
-            };
+        let error_tooltip_html = if error_samples.is_empty() {
+            String::new()
+        } else {
+            format!(
+                r#"<div class="tooltip"><div class="tooltip-header">Failed ({})</div>{}</div>"#,
+                error,
+                error_samples.join("\n")
+            )
+        };
 
-            let staged_tooltip_html = if staged_samples.is_empty() {
-                String::new()
-            } else {
-                format!(
-                    r#"<div class="tooltip"><div class="tooltip-header">Staged ({})</div>{}</div>"#,
-                    staged,
-                    staged_samples.join("\n")
-                )
-            };
+        let staged_tooltip_html = if staged_samples.is_empty() {
+            String::new()
+        } else {
+            format!(
+                r#"<div class="tooltip"><div class="tooltip-header">Staged ({})</div>{}</div>"#,
+                staged,
+                staged_samples.join("\n")
+            )
+        };
 
-            progress_html.push_str(
-                r#"
+        progress_html.push_str(
+            r#"
         </div>
         <div class="stats-grid">"#,
-            );
+        );
 
-            // Completed box
-            progress_html.push_str(&format!(
-                r#"
+        // Completed box
+        progress_html.push_str(&format!(
+            r#"
             <div class="stat-box stat-box-completed">
                 <span class="stat-number">{}</span>
                 Completed
                 {}
             </div>"#,
-                completed, completed_tooltip_html
-            ));
+            completed, completed_tooltip_html
+        ));
 
-            // Running box
-            progress_html.push_str(&format!(
-                r#"
+        // Running box
+        progress_html.push_str(&format!(
+            r#"
             <div class="stat-box stat-box-running">
                 <span class="stat-number">{}</span>
                 Running
                 {}
             </div>"#,
-                running, running_tooltip_html
-            ));
+            running, running_tooltip_html
+        ));
 
-            // Error box
-            progress_html.push_str(&format!(
-                r#"
+        // Error box
+        progress_html.push_str(&format!(
+            r#"
             <div class="stat-box stat-box-error">
                 <span class="stat-number">{}</span>
                 Failed
                 {}
             </div>"#,
-                error, error_tooltip_html
-            ));
+            error, error_tooltip_html
+        ));
 
-            // Staged box
-            progress_html.push_str(&format!(
-                r#"
+        // Staged box
+        progress_html.push_str(&format!(
+            r#"
             <div class="stat-box stat-box-staged">
                 <span class="stat-number">{}</span>
                 Staged
                 {}
             </div>"#,
-                staged, staged_tooltip_html
-            ));
+            staged, staged_tooltip_html
+        ));
 
-            progress_html.push_str(
-                r#"
+        progress_html.push_str(
+            r#"
         </div>
         </div>
     </div>
 "#,
-            );
-        }
+        );
+    }
 
-        progress_html.push_str(
-            r#"
+    progress_html.push_str(
+        r#"
     <div class="legend">
         <div class="legend-item">
             <div class="legend-color progress-completed"></div>
@@ -997,15 +941,14 @@ document.addEventListener('DOMContentLoaded', function() {
 </body>
 </html>
 "#,
-        );
+    );
 
-        if inline_progress {
-            print!("{}", progress_html);
-        } else {
-            std::fs::write(&progress_output_path, progress_html)
-                .expect("Failed to write progress HTML");
-            println!("Progress dashboard written to {}", progress_output_path);
-        }
+    if inline {
+        print!("{}", progress_html);
+    } else {
+        std::fs::write(&progress_output_path, progress_html)
+            .expect("Failed to write progress HTML");
+        println!("Progress dashboard written to {}", progress_output_path);
     }
 
     // Print rows for each sample
