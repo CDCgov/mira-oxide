@@ -1,7 +1,7 @@
 #![allow(unreachable_patterns)]
 use crate::processes::{
     all_sample_hd::*, all_sample_nt_diffs::*, find_chemistry::*, nf_status::*, plotter::*,
-    positions_of_interest::*, variants_of_interest::*,
+    positions_of_interest::*, static_report::*, variants_of_interest::*,
 };
 use clap::{Parser, Subcommand};
 use zoe::prelude::OrFail;
@@ -30,6 +30,8 @@ enum Commands {
     Plotter(PlotterArgs),
     /// NF Status
     NFStatus(NFStatusArgs),
+    /// Static Report
+    StaticReport(StaticReportArgs),
 }
 
 fn main() {
@@ -53,6 +55,9 @@ fn main() {
         }
         Commands::NFStatus(cmd_args) => {
             nf_status_process(cmd_args).unwrap_or_else(|_| panic!("{module}::NFStatus"))
+        }
+        Commands::StaticReport(cmd_args) => {
+            static_report_process(cmd_args).unwrap_or_else(|_| panic!("{module}::StaticReport"))
         }
         _ => {
             eprintln!("mira-oxide: unrecognized command {:?}", args.command);

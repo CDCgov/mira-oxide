@@ -4,4 +4,5 @@ pub mod find_chemistry;
 pub mod nf_status;
 pub mod plotter;
 pub mod positions_of_interest;
+pub mod static_report;
 pub mod variants_of_interest;
