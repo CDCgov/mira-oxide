@@ -499,25 +499,6 @@ pub fn nf_status_process(args: NFStatusArgs) -> Result<(), Box<dyn std::error::E
     .progress-staged {
         background: linear-gradient(90deg, #8F4A8F, #B278B2);
     }
-    .legend {
-        display: flex;
-        gap: 24px;
-        margin-top: 30px;
-        padding-top: 20px;
-        border-top: 2px solid #D5F7F9;
-        flex-wrap: wrap;
-    }
-    .legend-item {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        font-size: 14px;
-    }
-    .legend-color {
-        width: 20px;
-        height: 20px;
-        border-radius: 4px;
-    }
     .stats-grid {
         display: grid;
         grid-template-columns: repeat(4, 1fr);
@@ -643,8 +624,12 @@ pub fn nf_status_process(args: NFStatusArgs) -> Result<(), Box<dyn std::error::E
         background: linear-gradient(135deg, #D5F7F9 0%, #ECF5FF 100%);
     }
     .stat-item.highlight-progress {
-        border-left-color: #CC1B22;
-        background: linear-gradient(135deg, #FCDEDB 0%, #FFE8E5 100%);
+        border-left-color: #0057B7;
+        background: linear-gradient(135deg, #DBE8F7 0%, #ECF5FF 100%);
+    }
+    .stat-item.highlight-error {
+        border-left-color: #660F14;
+        background: linear-gradient(135deg, #FCDEDB 0%, #FFD5D0 100%);
     }
     .stat-item.highlight-staged {
         border-left-color: #8F4A8F;
@@ -703,9 +688,11 @@ document.addEventListener('DOMContentLoaded', function() {
     // Calculate sample-level statistics
     let mut samples_completed = 0;
     let mut samples_in_progress = 0;
+    let mut samples_failed = 0;
 
     for row in table_rows.iter() {
         let mut all_completed = true;
+        let mut has_error = false;
 
         // Skip the first column (sample name) and check all process columns
         for cell in row.iter().skip(1) {
@@ -713,8 +700,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 "✅" => {
                     // Completed process
                 }
+                "⁉️" => {
+                    // Failed process
+                    all_completed = false;
+                    has_error = true;
+                }
                 _ => {
-                    // Any non-completed status (running, error, or staged)
+                    // Any other non-completed status (running or staged)
                     all_completed = false;
                 }
             }
@@ -722,6 +714,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if all_completed {
             samples_completed += 1;
+        } else if has_error {
+            samples_failed += 1;
         } else {
             samples_in_progress += 1;
         }
@@ -743,6 +737,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div class="stat-value">{}</div>
                 <div class="stat-label">Samples In Progress</div>
             </div>
+            <div class="stat-item highlight-error">
+                <div class="stat-value">{}</div>
+                <div class="stat-label">Samples Failed</div>
+            </div>
             <div class="stat-item">
                 <div class="stat-value">{}</div>
                 <div class="stat-label">Total Runtime</div>
@@ -750,7 +748,7 @@ document.addEventListener('DOMContentLoaded', function() {
         </div>
     </div>
 "#,
-        total_samples, samples_completed, samples_in_progress, total_runtime_str
+        total_samples, samples_completed, samples_in_progress, samples_failed, total_runtime_str
     ));
 
     // Add progress bars for each process
@@ -919,24 +917,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     progress_html.push_str(
         r#"
-    <div class="legend">
-        <div class="legend-item">
-            <div class="legend-color progress-completed"></div>
-            <span>Completed</span>
-        </div>
-        <div class="legend-item">
-            <div class="legend-color progress-running"></div>
-            <span>Running</span>
-        </div>
-        <div class="legend-item">
-            <div class="legend-color progress-error"></div>
-            <span>Failed</span>
-        </div>
-        <div class="legend-item">
-            <div class="legend-color progress-staged"></div>
-            <span>Staged</span>
-        </div>
-    </div>
 </div>
 </body>
 </html>

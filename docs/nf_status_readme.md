@@ -2,15 +2,16 @@
 
 ## Overview
 
-`nf-status` is a command-line tool that monitors and visualizes the progress of MIRA-NF (Nextflow) pipeline runs. It parses Nextflow log files and samplesheets to generate comprehensive status reports in both detailed table and visual dashboard formats.
+`nf-status` is a command-line tool that monitors and visualizes the progress of MIRA-NF (Nextflow) pipeline runs. It parses Nextflow log files and samplesheets to generate an interactive visual progress dashboard.
 
 ## Features
 
 - **Real-time Status Tracking**: Monitor process completion, running tasks, errors, and staged processes
-- **Multi-format Output**: Generate detailed HTML tables and visual progress dashboards
+- **Visual Progress Dashboard**: Interactive HTML dashboard with collapsible process cards
+- **Pipeline Overview**: High-level statistics showing total samples, completion status, and runtime
+- **Sample-level Granularity**: View detailed status for each sample across all pipeline processes
 - **Runtime Analytics**: Track individual process runtimes and total workflow duration
-- **Sample-level Granularity**: View status for each sample across all pipeline processes
-- **Interactive Visualizations**: Hover over cells to see detailed runtime information
+- **Auto-collapse Completed Processes**: Processes that are 100% completed automatically collapse for cleaner view
 - **Flexible Output Options**: Write to files or pipe to stdout
 
 ## Usage
@@ -28,44 +29,20 @@ mira-oxide nf-status -s <samplesheet.csv> -l <nextflow.log> [OPTIONS]
 
 ### Optional Arguments
 
-- `-o, --output <PATH>`: Output HTML file path (default: `./nf_status_table.html`)
-- `--table`: Generate the detailed status table HTML
-- `--progress`: Generate the progress dashboard HTML
-- `--inline-table`: Output table HTML to stdout instead of writing to file
-- `--inline-progress`: Output progress HTML to stdout instead of writing to file
+- `-o, --output <PATH>`: Output HTML file path (default: `./nf_status_progress.html`)
+- `--inline`: Output HTML to stdout instead of writing to file
 
 ## Examples
 
-### Generate Both HTML Outputs
+### Generate Progress Dashboard
 
 ```bash
 mira-oxide nf-status \
   -s samplesheet.csv \
-  -l .nextflow.log \
-  --table --progress
+  -l .nextflow.log
 ```
 
-This creates:
-- `nf_status_table.html` - Detailed status table
-- `nf_status_table_progress.html` - Visual progress dashboard
-
-### Generate Only the Table
-
-```bash
-mira-oxide nf-status \
-  -s samplesheet.csv \
-  -l .nextflow.log \
-  --table
-```
-
-### Generate Only the Progress Dashboard
-
-```bash
-mira-oxide nf-status \
-  -s samplesheet.csv \
-  -l .nextflow.log \
-  --progress
-```
+This creates `nf_status_progress.html` in the current directory.
 
 ### Custom Output Path
 
@@ -73,89 +50,76 @@ mira-oxide nf-status \
 mira-oxide nf-status \
   -s samplesheet.csv \
   -l .nextflow.log \
-  -o /path/to/output/status.html \
-  --table --progress
+  -o /path/to/output/my_dashboard.html
 ```
 
-Creates:
-- `/path/to/output/status.html`
-- `/path/to/output/status_progress.html`
+Creates `/path/to/output/my_dashboard.html`
 
 ### Pipe to Stdout
 
 ```bash
-# Pipe table to stdout
 mira-oxide nf-status \
   -s samplesheet.csv \
   -l .nextflow.log \
-  --table --inline-table > my_table.html
-
-# Pipe progress dashboard to stdout
-mira-oxide nf-status \
-  -s samplesheet.csv \
-  -l .nextflow.log \
-  --progress --inline-progress > my_dashboard.html
+  --inline > my_dashboard.html
 ```
 
-## Output Formats
+## Output Format
 
-### 1. Detailed Status Table
+### Progress Dashboard
 
-A comprehensive table showing the status of every sample across all pipeline processes.
-
-**Features:**
-- Vertical headers to maximize screen space
-- Summary row showing completion statistics per process
-- Color-coded status indicators:
-  - ✅ Completed
-  - ⏱️ Running (with elapsed time: HH:MM:SS)
-  - ⁉️ Failed
-  - 🛄 Staged (not yet started)
-- Hover tooltips showing runtime information
-- Responsive design with scrolling for large datasets
-
-**Color Scheme:**
-- Light blue backgrounds for easy reading
-- Alternating row colors for clarity
-- Highlighted summary row
-
-### 2. Progress Dashboard
-
-A high-level visual dashboard for quick status assessment.
+An interactive visual dashboard for comprehensive pipeline monitoring.
 
 **Features:**
-- Overall workflow statistics:
-  - Total number of samples
-  - Total number of pipeline processes
-  - Total workflow runtime (HH:MM:SS)
-- Per-process progress bars showing:
+
+#### Pipeline Overview Card
+A unified statistics card at the top showing:
+- **Total Samples**: Total number of samples in the pipeline
+- **Samples Completed**: Number of samples with all processes completed (✅)
+- **Samples In Progress**: Number of samples with any running or failed processes
+- **Total Runtime**: Total workflow runtime from first process start to last process completion (HH:MM:SS)
+
+The overview card uses color-coded visual indicators:
+- Teal border/highlight for completed samples
+- Red border/highlight for in-progress samples
+- Clean, unified design with hover effects
+
+#### Process Cards
+Individual collapsible cards for each pipeline process showing:
+- **Progress Bar**: Visual representation of sample status distribution
   - Completed samples (teal gradient)
   - Running samples (blue gradient)
   - Failed samples (red gradient)
   - Staged samples (purple gradient)
-- Detailed statistics grid for each process
-- Modern, card-based layout
-- Hover effects and tooltips
-- Color-coded legend
+- **Statistics Grid**: Detailed breakdown of sample counts and percentages
+- **Sample Lists**: Expandable sections showing which specific samples are in each state
+- **Auto-collapse**: Processes that are 100% completed automatically collapse for cleaner view
+
+**Interactive Features:**
+- Click process headers to expand/collapse details
+- Click "Show samples" links to view sample lists
+- Hover over elements for visual feedback
+- Smooth animations for all interactions
 
 **Color Scheme:**
-- Purple gradient background
-- Clean white card containers
+- Purple gradient background (#47264F to #722161)
+- Clean white card containers with rounded corners
 - Status-specific color coding (see [Color Palette](color-palette.md))
+- Light blue card backgrounds (#F4FCFC) with subtle borders
 
 ## Status Indicators
 
 ### Completed (✅)
-Process has successfully finished for this sample. Hover to see total runtime.
+Process has successfully finished for this sample. Shown in teal-colored progress bars and sample lists.
 
 ### Running (HH:MM:SS)
-Process is currently executing. Displays elapsed time in hours:minutes:seconds format.
+Process is currently executing. Displays elapsed time in hours:minutes:seconds format. Shown in blue-colored progress bars.
 
 ### Failed (⁉️)
-Process encountered an error and did not complete successfully. Hover to see how long it ran before failing.
+Process encountered an error and did not complete successfully. Shown in red-colored progress bars and sample lists.
 
 ### Staged (🛄)
-Process has not yet started for this sample (waiting in queue or dependency not met).
+Process has not yet started for this sample (waiting in queue or dependency not met). Shown in purple-colored progress bars.
 
 ## Input File Formats
 
@@ -227,18 +191,41 @@ Run `nf-status` periodically to track progress:
 
 ```bash
 # Run every 5 minutes
-watch -n 300 'mira-oxide nf-status -s samplesheet.csv -l .nextflow.log --table --progress'
+watch -n 300 'mira-oxide nf-status -s samplesheet.csv -l .nextflow.log'
+```
+
+Or use a simple loop:
+
+```bash
+while true; do
+  mira-oxide nf-status -s samplesheet.csv -l .nextflow.log
+  sleep 300  # Wait 5 minutes
+done
 ```
 
 ### Checking for Failures
 
-Look for the ⁉️ emoji in the table or red segments in the progress bars. Hover over failed cells to see how long the process ran before failing.
+Look for red segments in the progress bars. Click on "Show samples" in the Error section of any process card to see which specific samples failed.
+
+### Understanding the Pipeline Overview
+
+The Pipeline Overview card gives you instant insight into your pipeline's health:
+- **All samples completed?** Total Samples = Samples Completed
+- **Pipeline still running?** Samples In Progress > 0
+- **How long has it been running?** Check Total Runtime
+
+### Using Auto-collapse
+
+Processes that have completed for all samples (100% completion) automatically collapse to reduce clutter. You can:
+- Click the collapsed process header to expand and view details
+- Focus on processes that still have work in progress
+- Quickly scan for any non-collapsed processes that need attention
 
 ### Performance Considerations
 
-- Large datasets (100+ samples, 20+ processes) generate large HTML tables
-- Progress dashboard is more lightweight for quick checks
-- Consider generating only the visualization you need (`--table` or `--progress`)
+- The progress dashboard efficiently handles large datasets (100+ samples, 20+ processes)
+- Auto-collapse feature reduces visual clutter for long-running pipelines
+- Single HTML file output makes it easy to share with team members
 
 ### Troubleshooting
 
@@ -257,6 +244,11 @@ Look for the ⁉️ emoji in the table or red segments in the progress bars. Hov
 - Log file doesn't contain timestamp information
 - Timestamps couldn't be parsed (check log format)
 
+**Pipeline Overview shows 0 samples:**
+- Check that the samplesheet has data rows (not just headers)
+- Verify sample IDs are not empty
+- Ensure CSV file is properly formatted
+
 ## Integration with MIRA-NF
 
 This tool is designed to work seamlessly with the MIRA-NF pipeline:
@@ -267,31 +259,28 @@ This tool is designed to work seamlessly with the MIRA-NF pipeline:
 
 ## Output Files
 
-When generating files (not using `--inline-*` options):
+When generating files (not using `--inline` option):
 
 ### Default Naming
-- Table: `nf_status_table.html`
-- Progress: `nf_status_table_progress.html`
+- Progress Dashboard: `nf_status_progress.html`
 
 ### Custom Naming (with `-o` flag)
 If you specify `-o my_report.html`:
-- Table: `my_report.html`
-- Progress: `my_report_progress.html`
+- Progress Dashboard: `my_report.html`
 
 If you specify `-o my_report` (without .html):
-- Table: `my_report.html`
-- Progress: `my_report_progress.html`
+- Progress Dashboard: `my_report.html`
 
 ## Browser Compatibility
 
-Both HTML outputs are compatible with:
+The HTML dashboard is compatible with:
 - Chrome/Chromium (recommended)
 - Firefox
 - Safari
 - Edge
-- Mobile browsers
+- Mobile browsers (responsive design)
 
-No JavaScript required - pure HTML/CSS for maximum compatibility and performance.
+Requires JavaScript for interactive features (collapsing/expanding, sample list toggling). Falls back gracefully if JavaScript is disabled.
 
 ## Color Palette
 
