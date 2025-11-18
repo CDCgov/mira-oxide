@@ -1,5 +1,6 @@
 pub mod coverage_json_per_sample;
 pub mod data_ingest;
+pub mod reads_to_sankey_json;
 pub mod write_csv_files;
 pub mod write_fasta_files;
 pub mod write_json_files;

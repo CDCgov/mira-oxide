@@ -270,8 +270,9 @@ pub fn write_out_all_json_files<S: ::std::hash::BuildHasher>(
         "PairsAndWidows",
         "Stage",
     ];
+    //have to keep "Sample" in json for dashboard to work
     let reads_columns = vec![
-        "sample_id",
+        "Sample",
         "record",
         "reads",
         "patterns",
