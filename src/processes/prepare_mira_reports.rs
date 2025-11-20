@@ -1,5 +1,6 @@
 #![allow(dead_code, unused_imports)]
 use crate::io::coverage_json_per_sample::create_coverage_plot;
+use crate::io::coverage_to_heatmap::coverage_to_heatap;
 use crate::io::reads_to_sankey_json::reads_to_sankey_json;
 use crate::io::write_parquet_files::write_samplesheet_to_parquet;
 use crate::utils::data_processing::{
@@ -433,6 +434,12 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
         &read_data,
         &args.virus,
         &format!("{}/", &args.output_path.display()),
+    );
+
+    coverage_to_heatap(
+        &coverage_data,
+        &args.virus,
+        //&format!("{}/", &args.output_path.display()),
     );
 
     Ok(())
