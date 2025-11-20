@@ -135,6 +135,14 @@ pub struct ProcessedSequences {
     pub failed_seqs: Vec<SeqData>,
 }
 
+// Transform Cov for Heatmap Struct
+#[derive(Debug, Clone)]
+pub struct TransformedData {
+    pub sample_id: Option<String>,
+    pub ref_id: String,
+    pub coverage_depth: i32,
+}
+
 /////////////// Traits ///////////////
 /// check for sample type and if not there add ""
 pub trait HasSampleType {
@@ -1466,4 +1474,65 @@ pub fn divide_aa_into_pass_fail_vec(
     };
 
     Ok(processed_aa_seqs)
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////// Functions for Figures ////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[must_use]
+//todo: fix sc2-spike
+pub fn transform_coverage_to_heatmap(
+    coverage_data: &[CoverageData],
+    virus: &str,
+) -> Vec<TransformedData> {
+    // Filter for SC2-Spike region if virus is "sc2-spike"
+    let position_1 = 21563;
+    let position_2 = 25384;
+
+    let filtered_data: Vec<&CoverageData> = if virus.to_lowercase() == "sc2-spike" {
+        coverage_data
+            .iter()
+            .filter(|row| row.position > position_1 && row.position < position_2)
+            .collect()
+    } else {
+        coverage_data.iter().collect()
+    };
+
+    println!("{filtered_data:?}");
+
+    // Group by sample_id and reference_name, and calculate median coverage depth
+    let mut grouped_data: HashMap<(Option<String>, String), Vec<i32>> = HashMap::new();
+    for data in filtered_data {
+        let key = (data.sample_id.clone(), data.reference_name.clone());
+        grouped_data
+            .entry(key)
+            .or_default()
+            .push(data.coverage_depth);
+    }
+
+    let mut median_data: Vec<(Option<String>, String, i32)> = Vec::new();
+    for ((sample_id, reference_name), depths) in grouped_data {
+        let median_depth = calculate_median(&depths);
+        median_data.push((sample_id, reference_name, median_depth));
+    }
+
+    // Split Reference_Name into Subtype, Segment, and Group
+    let mut transformed_data: Vec<TransformedData> = Vec::new();
+    for (sample_id, reference_name, coverage_depth) in median_data {
+        let parts: Vec<&str> = reference_name.split('_').collect();
+        let segment = if parts.len() >= 2 {
+            parts[1].to_string()
+        } else {
+            reference_name.clone()
+        };
+
+        transformed_data.push(TransformedData {
+            sample_id,
+            ref_id: segment,
+            coverage_depth,
+        });
+    }
+
+    transformed_data
 }

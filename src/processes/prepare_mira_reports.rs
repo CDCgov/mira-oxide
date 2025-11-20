@@ -1,6 +1,6 @@
 #![allow(dead_code, unused_imports)]
 use crate::io::coverage_json_per_sample::create_coverage_plot;
-use crate::io::coverage_to_heatmap::coverage_to_heatap;
+use crate::io::coverage_to_heatmap::coverage_to_heatmap_json;
 use crate::io::reads_to_sankey_json::reads_to_sankey_json;
 use crate::io::write_parquet_files::write_samplesheet_to_parquet;
 use crate::utils::data_processing::{
@@ -9,6 +9,7 @@ use crate::utils::data_processing::{
     create_irma_summary_vec, create_nt_seq_vec, create_vtype_data, divide_aa_into_pass_fail_vec,
     divide_nt_into_pass_fail_vec, extract_field, extract_subtype_flu, extract_subtype_sc2,
     melt_reads_data, process_position_coverage_data, process_wgs_coverage_data, return_seg_data,
+    transform_coverage_to_heatmap,
 };
 use crate::{
     io::{
@@ -298,6 +299,10 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     let processed_nt_seq = divide_nt_into_pass_fail_vec(&nt_seq_vec, &args.platform, &args.virus)?;
     let processed_aa_seq = divide_aa_into_pass_fail_vec(&aa_seq_vec, &args.platform, &args.virus)?;
 
+    //////////////////////////////// Processing data for Dashboard Figures ////////////////////////////////
+    let transformed_cov_data = transform_coverage_to_heatmap(&coverage_data, &args.virus);
+    println!("{transformed_cov_data:?}");
+
     //////////////////////////////// Write all files ////////////////////////////////
 
     write_out_all_fasta_files(
@@ -436,10 +441,10 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
         &format!("{}/", &args.output_path.display()),
     );
 
-    coverage_to_heatap(
-        &coverage_data,
+    coverage_to_heatmap_json(
+        &transformed_cov_data,
         &args.virus,
-        //&format!("{}/", &args.output_path.display()),
+        &format!("{}/", &args.output_path.display()),
     );
 
     Ok(())
