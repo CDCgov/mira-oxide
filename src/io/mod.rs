@@ -1,5 +1,6 @@
 pub mod coverage_json_per_sample;
 pub mod coverage_to_heatmap;
+pub mod create_passfail_heatmap;
 pub mod data_ingest;
 pub mod reads_to_sankey_json;
 pub mod write_csv_files;

@@ -1,6 +1,7 @@
 #![allow(dead_code, unused_imports)]
 use crate::io::coverage_json_per_sample::create_coverage_plot;
 use crate::io::coverage_to_heatmap::coverage_to_heatmap_json;
+use crate::io::create_passfail_heatmap::create_passfail_heatmap;
 use crate::io::reads_to_sankey_json::reads_to_sankey_json;
 use crate::io::write_parquet_files::write_samplesheet_to_parquet;
 use crate::utils::data_processing::{
@@ -441,8 +442,16 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
         &format!("{}/", &args.output_path.display()),
     );
 
+    //TODO:: fix the heatmaps to handle missing data
+
     coverage_to_heatmap_json(
         &transformed_cov_data,
+        &args.virus,
+        &format!("{}/", &args.output_path.display()),
+    );
+
+    create_passfail_heatmap(
+        &irma_summary,
         &args.virus,
         &format!("{}/", &args.output_path.display()),
     );

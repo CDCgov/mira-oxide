@@ -1481,7 +1481,6 @@ pub fn divide_aa_into_pass_fail_vec(
 ///////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[must_use]
-//todo: fix sc2-spike
 pub fn transform_coverage_to_heatmap(
     coverage_data: &[CoverageData],
     virus: &str,
