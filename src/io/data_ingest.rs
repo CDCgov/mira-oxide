@@ -1,7 +1,7 @@
 use csv::ReaderBuilder;
 use either::Either;
 use glob::glob;
-use serde::{self, Deserialize, Serialize, de::DeserializeOwned};
+use serde::{self, Deserialize, Deserializer, Serialize, de::DeserializeOwned};
 use std::{
     collections::HashMap,
     error::Error,
@@ -48,6 +48,19 @@ pub struct QCConfig {
     pub ont_rsv: QCSettings,
 }
 
+//This function is needed to read in the NA in positions as 0 below
+fn string_to_int<'de, D>(deserializer: D) -> Result<i32, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s: String = Deserialize::deserialize(deserializer)?;
+    if s == "NA" {
+        Ok(0)
+    } else {
+        s.parse::<i32>().map_err(serde::de::Error::custom)
+    }
+}
+
 /// Coverage struct
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct CoverageData {
@@ -56,6 +69,7 @@ pub struct CoverageData {
     #[serde(rename = "Reference_Name")]
     pub reference_name: String,
     #[serde(rename = "Position")]
+    #[serde(deserialize_with = "string_to_int")]
     pub position: i32,
     #[serde(rename = "Coverage Depth")]
     pub coverage_depth: i32,
@@ -69,6 +83,8 @@ pub struct CoverageData {
     pub consensus_count: i32,
     #[serde(rename = "Consensus_Average_Quality")]
     pub consensus_avg_quality: f64,
+    #[serde(rename = "HMM_Position")]
+    pub hmm_position: Option<i32>,
     #[serde(rename = "Run_ID")]
     pub run_id: Option<String>,
     #[serde(rename = "Instrument")]
@@ -377,11 +393,19 @@ pub fn coverage_data_collection(
     irma_path: impl AsRef<Path>,
     platform: &str,
     runid: &str,
+    virus: &str,
 ) -> Result<Vec<CoverageData>, Box<dyn std::error::Error>> {
-    let pattern = format!(
-        "{}/*/IRMA/*/tables/*coverage.txt",
-        irma_path.as_ref().display()
-    );
+    let pattern = if virus.to_lowercase() == "sc2-spike" {
+        format!(
+            "{}/*/IRMA/*/tables/*coverage.a2m.txt",
+            irma_path.as_ref().display()
+        )
+    } else {
+        format!(
+            "{}/*/IRMA/*/tables/*coverage.txt",
+            irma_path.as_ref().display()
+        )
+    };
 
     let mut cov_data: Vec<CoverageData> = Vec::new();
 
@@ -396,6 +420,14 @@ pub fn coverage_data_collection(
                 // Read the data from the file and include the sample name
                 let mut records: Vec<CoverageData> =
                     process_txt_with_sample(reader, true, &sample)?;
+
+                // If virus is "sc2-spike", replace position with hmm_position
+                if virus == "sc2-spike" {
+                    for line in &mut records {
+                        line.position = line.hmm_position.unwrap_or(0);
+                    }
+                }
+
                 for line in &mut records {
                     line.run_id = Some(runid.to_string());
                     line.instrument = Some(platform.to_string());
@@ -405,6 +437,7 @@ pub fn coverage_data_collection(
             Err(e) => println!("Error reading file: {e}"),
         }
     }
+
     Ok(cov_data)
 }
 

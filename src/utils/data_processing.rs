@@ -1499,8 +1499,6 @@ pub fn transform_coverage_to_heatmap(
         coverage_data.iter().collect()
     };
 
-    println!("{filtered_data:?}");
-
     // Group by sample_id and reference_name, and calculate median coverage depth
     let mut grouped_data: HashMap<(Option<String>, String), Vec<i32>> = HashMap::new();
     for data in filtered_data {

@@ -143,7 +143,8 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     let qc_config: QCConfig = read_yaml(qc_yaml_path)?;
 
     // Read in IRMA data
-    let coverage_data = coverage_data_collection(&args.irma_path, &args.platform, &args.runid)?;
+    let coverage_data =
+        coverage_data_collection(&args.irma_path, &args.platform, &args.runid, &args.virus)?;
     let read_data = reads_data_collection(&args.irma_path, &args.platform, &args.runid)?;
     let vtype_data = create_vtype_data(&read_data);
     let allele_data = allele_data_collection(&args.irma_path, &args.platform, &args.runid)?;
@@ -194,11 +195,10 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     let mut calculated_cov_vec: Vec<ProcessedCoverage> = Vec::new();
     let mut calculated_position_cov_vec: Vec<ProcessedCoverage> = Vec::new();
 
-    if args.virus.to_lowercase() == "flu"
-        || args.virus.to_lowercase() == "rsv"
-        || args.virus.to_lowercase() == "sc2-spike"
-    {
+    if args.virus.to_lowercase() == "flu" || args.virus.to_lowercase() == "rsv" {
         calculated_cov_vec = process_wgs_coverage_data(&coverage_data, &ref_lengths)?;
+    } else if args.virus.to_lowercase() == "sc2-spike" {
+        calculated_cov_vec = process_position_coverage_data(&coverage_data, 21563, 25384)?;
     } else if args.virus.to_lowercase() == "sc2-wgs" {
         calculated_cov_vec = process_wgs_coverage_data(&coverage_data, &ref_lengths)?;
         calculated_position_cov_vec = process_position_coverage_data(&coverage_data, 21563, 25384)?;
@@ -301,7 +301,7 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
 
     //////////////////////////////// Processing data for Dashboard Figures ////////////////////////////////
     let transformed_cov_data = transform_coverage_to_heatmap(&coverage_data, &args.virus);
-    println!("{transformed_cov_data:?}");
+    //println!("{transformed_cov_data:?}");
 
     //////////////////////////////// Write all files ////////////////////////////////
 
