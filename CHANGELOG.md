@@ -3,8 +3,13 @@
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.0.0] - 2025-09-19
-#testing123
+## [1.1.3] - 2025-11-26
+
+- [Sam Wiley](https://github.com/samcwiley)
+
+### `Added`
+
+- [PR #50](https://github.com/CDCgov/mira-oxide/pull/50) - Added `check_mira_versions.rs` to proccesses. Made to replace checkmiraversion.py within MIRA-NF
 
 ## [1.1.2] - 2025-09-19
 
