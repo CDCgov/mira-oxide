@@ -116,6 +116,7 @@ pub enum Samplesheet {
 
 #[allow(clippy::too_many_lines)]
 pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Error>> {
+    println!("Starting data ingestion...");
     /////////////// Read in and process data from IRMA and Dais ///////////////
     // Read in samplesheet
     let samplesheet_path = create_reader(args.samplesheet)?;
@@ -171,6 +172,8 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     } else if args.virus.to_lowercase() == "sc2-wgs" || args.virus.to_lowercase() == "sc2-spike" {
         dais_ref_data = dais_ref_seq_data_collection(&args.workdir_path, "sc2")?;
     }
+
+    println!("Finished ingesting data.");
 
     //////////////////////////////// Processing ingested IRMA and Dais data ////////////////////////////////
     //Calculate AA variants for aavars.csv and dais_vars.json
@@ -443,9 +446,9 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     );
 
     //TODO:: fix the heatmaps to handle missing data
-
     coverage_to_heatmap_json(
         &transformed_cov_data,
+        &sample_list,
         &args.virus,
         &format!("{}/", &args.output_path.display()),
     );

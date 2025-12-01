@@ -66,14 +66,11 @@ fn main() {
             plotter_process(cmd_args).unwrap_or_else(|_| panic!("{module}::Plotter"));
         }
         Commands::PrepareMiraReports(cmd_args) => prepare_mira_reports_process(cmd_args)
-            .unwrap_or_else(|_| panic!("{module}::PrepareMiraReports")),
-        _ => {
-            eprintln!("mira-oxide: unrecognized command {:?}", args.command);
-            std::process::exit(1)
-        }
+            .unwrap_or_else(|e| panic!("{module}::PrepareMiraReports: {e}")),
     }
 }
 
+pub mod constants;
 pub mod io;
 pub mod processes;
 pub mod utils;

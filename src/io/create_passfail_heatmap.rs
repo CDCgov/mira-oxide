@@ -5,7 +5,7 @@ use std::fs::File;
 use std::io::Write;
 
 fn assign_number(reason: &str) -> i32 {
-    if reason == "No assembly" {
+    if reason == "No assembly" || reason == "Fail" {
         4
     } else if reason == "Pass" {
         -4

@@ -288,7 +288,12 @@ pub fn create_reader(path: PathBuf) -> io::Result<BufReader<Either<File, Stdin>>
         Ok(BufReader::new(Either::Right(io::stdin())))
     } else {
         // Otherwise, open the file at the given path
-        let file = OpenOptions::new().read(true).open(path)?;
+        let file = OpenOptions::new().read(true).open(&path).map_err(|e| {
+            io::Error::new(
+                e.kind(),
+                format!("Could not open file '{}': {}", path.display(), e),
+            )
+        })?;
         Ok(BufReader::new(Either::Left(file)))
     }
 }
