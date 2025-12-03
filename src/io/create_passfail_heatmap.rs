@@ -4,14 +4,14 @@ use std::collections::HashSet;
 use std::fs::File;
 use std::io::Write;
 
+#[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
 fn assign_number(reason: &str) -> i32 {
     if reason == "No assembly" || reason == "Fail" {
         4
     } else if reason == "Pass" {
         -4
     } else if reason.split(';').count() > 1 {
-        let count = reason.split(';').count() as i32;
-        count
+        reason.split(';').count() as i32
     } else {
         -1
     }
@@ -54,71 +54,69 @@ fn remove_brace_content(s: &str) -> String {
     }
     result.trim().to_string()
 }
-#[warn(clippy::too_many_lines)]
-pub fn create_passfail_heatmap(summaries: &[IRMASummary], virus: &str, output_path: &str) {
-    println!("Building pass_fail_heatmap as flat JSON");
 
-    let mut records = Vec::new();
-
-    for summary in summaries {
-        let sample = summary
-            .sample_id
-            .clone()
-            .unwrap_or_else(|| "Unknown".to_string());
-        let reference = normalize_reference(
-            &summary
-                .reference
+fn build_records(summaries: &[IRMASummary], virus: &str) -> Vec<(String, String, String)> {
+    summaries
+        .iter()
+        .map(|summary| {
+            let sample = summary
+                .sample_id
                 .clone()
-                .unwrap_or_else(|| "Unknown".to_string()),
-            virus,
-        );
-        let mut reason = summary
-            .pass_fail_reason
-            .clone()
-            .unwrap_or_else(|| "No assembly".to_string());
+                .unwrap_or_else(|| "Unknown".to_string());
+            let reference = normalize_reference(
+                &summary
+                    .reference
+                    .clone()
+                    .unwrap_or_else(|| "Unknown".to_string()),
+                virus,
+            );
+            let mut reason = summary
+                .pass_fail_reason
+                .clone()
+                .unwrap_or_else(|| "No assembly".to_string());
+            if reason.is_empty() {
+                reason = "No assembly".to_string();
+            }
+            reason = remove_brace_content(&reason);
+            (sample, reference, reason)
+        })
+        .collect()
+}
 
-        if reason.is_empty() {
-            reason = "No assembly".to_string();
-        }
-        reason = remove_brace_content(&reason);
-
-        records.push((sample, reference, reason));
-    }
-
-    // Remove duplicates
+fn dedup_records(records: Vec<(String, String, String)>) -> Vec<(String, String, String)> {
     let mut seen = HashSet::new();
     let mut unique_records = Vec::new();
     for (sample, reference, reason) in records {
         let key = format!("{sample}|{reference}");
-        if !seen.contains(&key) {
-            seen.insert(key.clone());
+        if seen.insert(key) {
             unique_records.push((sample, reference, reason));
         }
     }
+    unique_records
+}
 
-    // Flat arrays for x, y, z, customdata
+// Build the heatmap given the data
+fn build_heatmap_arrays(
+    unique_records: &[(String, String, String)],
+) -> (Vec<String>, Vec<String>, Vec<i32>, Vec<String>) {
     let mut x = Vec::new();
     let mut y = Vec::new();
     let mut z = Vec::new();
     let mut customdata = Vec::new();
 
-    for (sample, reference, reason) in &unique_records {
+    for (sample, reference, reason) in unique_records {
         x.push(sample.clone());
         y.push(reference.clone());
         z.push(assign_number(reason));
         customdata.push(reason.clone());
     }
+    (x, y, z, customdata)
+}
 
-    // Custom colorscale
-    let colorscale = vec![
-        (0.0, "rgb(160,200,255)"),
-        (0.25, "rgb(255,255,255)"),
-        (0.5, "rgb(230,210,0)"),
-        (0.75, "rgb(230,0,0)"),
-        (1.0, "rgb(0,0,0)"),
-    ];
-
-    // The full Plotly template from your example (copy-paste as is)
+// The function to reate the plotly json
+// Full plotly template
+#[allow(clippy::too_many_lines)]
+fn plotly_template(colorscale: &Vec<(f64, &str)>) -> serde_json::Value {
     let plotly_template = json!({
         "data": {
             "histogram2dcontour": [{
@@ -282,7 +280,24 @@ pub fn create_passfail_heatmap(summaries: &[IRMASummary], virus: &str, output_pa
         }
     });
 
-    // Build the heatmap trace
+    plotly_template
+}
+
+pub fn create_passfail_heatmap(summaries: &[IRMASummary], virus: &str, output_path: &str) {
+    println!("Building pass_fail_heatmap as flat JSON");
+
+    let colorscale = vec![
+        (0.0, "rgb(160,200,255)"),
+        (0.25, "rgb(255,255,255)"),
+        (0.5, "rgb(230,210,0)"),
+        (0.75, "rgb(230,0,0)"),
+        (1.0, "rgb(0,0,0)"),
+    ];
+
+    let records = build_records(summaries, virus);
+    let unique_records = dedup_records(records);
+    let (x, y, z, customdata) = build_heatmap_arrays(&unique_records);
+
     let heatmap = json!({
         "type": "heatmap",
         "x": x,
@@ -297,21 +312,18 @@ pub fn create_passfail_heatmap(summaries: &[IRMASummary], virus: &str, output_pa
         "showscale": false
     });
 
-    // Build the layout
     let layout = json!({
-        "template": plotly_template,
+        "template": plotly_template(&colorscale),
         "xaxis": {"side": "top"},
         "paper_bgcolor": "white",
         "plot_bgcolor": "white"
     });
 
-    // Combine into final plot JSON
     let plot_json = json!({
         "data": [heatmap],
         "layout": layout
     });
 
-    // Save JSON to file
     let file_path = format!("{output_path}/pass_fail_heatmap.json");
     let mut file = File::create(&file_path).expect("Unable to create file");
     file.write_all(plot_json.to_string().as_bytes())

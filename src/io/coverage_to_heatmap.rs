@@ -4,7 +4,7 @@ use serde_json::json;
 
 pub fn coverage_to_heatmap_json(
     coverage_data: &[TransformedData],
-    sample_list: &Vec<String>,
+    sample_list: &[String],
     virus: &str,
     output_file: &str,
 ) {
@@ -70,9 +70,10 @@ fn complete_data_for_samples(
 
     for sample in sample_list {
         for reference in references {
-            if let Some(data) = filtered_data.iter().find(|d| {
-                d.sample_id.as_ref().map_or(false, |id| id == sample) && d.ref_id == *reference
-            }) {
+            if let Some(data) = filtered_data
+                .iter()
+                .find(|d| (d.sample_id.as_ref() == Some(sample)) && d.ref_id == *reference)
+            {
                 completed_data.push(data.clone());
             } else if let Some(_data) = filtered_data
                 .iter()

@@ -1,4 +1,3 @@
-#![warn(clippy::pedantic)]
 #![allow(
     unreachable_patterns,
     clippy::missing_panics_doc,
@@ -65,7 +64,7 @@ fn main() {
         Commands::Plotter(cmd_args) => {
             plotter_process(cmd_args).unwrap_or_else(|_| panic!("{module}::Plotter"));
         }
-        Commands::PrepareMiraReports(cmd_args) => prepare_mira_reports_process(cmd_args)
+        Commands::PrepareMiraReports(cmd_args) => prepare_mira_reports_process(&cmd_args)
             .unwrap_or_else(|e| panic!("{module}::PrepareMiraReports: {e}")),
     }
 }

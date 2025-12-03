@@ -115,11 +115,11 @@ pub enum Samplesheet {
 }
 
 #[allow(clippy::too_many_lines)]
-pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Error>> {
+pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Error>> {
     println!("Starting data ingestion...");
     /////////////// Read in and process data from IRMA and Dais ///////////////
     // Read in samplesheet
-    let samplesheet_path = create_reader(args.samplesheet)?;
+    let samplesheet_path = create_reader(&args.samplesheet)?;
     let samplesheet = if &args.platform == "illumina" {
         let illumina_samplesheet: Vec<SamplesheetI> = read_csv(samplesheet_path, true)?;
         Samplesheet::Illumina(illumina_samplesheet)
@@ -141,7 +141,7 @@ pub fn prepare_mira_reports_process(args: ReportsArgs) -> Result<(), Box<dyn Err
     };
 
     // Read in qc yaml
-    let qc_yaml_path = create_reader(args.qc_yaml)?;
+    let qc_yaml_path = create_reader(&args.qc_yaml)?;
     let qc_config: QCConfig = read_yaml(qc_yaml_path)?;
 
     // Read in IRMA data
