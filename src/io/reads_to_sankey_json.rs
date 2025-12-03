@@ -6,7 +6,11 @@ fn dash_reads_to_sankey(data: &[ReadsData], virus: &str) -> Value {
     // Filter out rows where "Stage" is None or "Stage" is 0
     let filtered_data: Vec<_> = data
         .iter()
-        .filter(|row| row.stage.as_ref().is_some_and(|stage| stage != "0"))
+        .filter(|row| {
+            row.stage
+                .as_ref()
+                .is_some_and(|stage| stage != "0" && stage != "5")
+        })
         .cloned()
         .collect();
 
