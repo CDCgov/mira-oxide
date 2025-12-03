@@ -56,6 +56,8 @@ fn remove_brace_content(s: &str) -> String {
     result.trim().to_string()
 }
 
+// Function for grabbing sample_id and pass/fail reason from summaries
+// Also checking that there is a record for each sample/reference combination
 fn build_records(
     summaries: &[IRMASummary],
     heatmap_refs: &[String],
@@ -106,18 +108,6 @@ fn build_records(
     }
     println!("{records:?}");
     records
-}
-
-fn dedup_records(records: Vec<(String, String, String)>) -> Vec<(String, String, String)> {
-    let mut seen = HashSet::new();
-    let mut unique_records = Vec::new();
-    for (sample, reference, reason) in records {
-        let key = format!("{sample}|{reference}");
-        if seen.insert(key) {
-            unique_records.push((sample, reference, reason));
-        }
-    }
-    unique_records
 }
 
 // Build the heatmap given the data
@@ -326,8 +316,7 @@ pub fn create_passfail_heatmap(
 
     let references = get_references_for_virus(virus);
     let records = build_records(summaries, &references, sample_list, virus);
-    let unique_records = dedup_records(records);
-    let (x, y, z, customdata) = build_heatmap_arrays(&unique_records);
+    let (x, y, z, customdata) = build_heatmap_arrays(&records);
 
     let heatmap = json!({
         "type": "heatmap",
