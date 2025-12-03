@@ -3,17 +3,16 @@ use plotly::{
     common::{Fill, Line, Mode, Title},
     layout::{Axis, AxisType, Layout, Shape, ShapeLine, ShapeType},
 };
-use std::{collections::HashMap, error::Error};
+use std::error::Error;
 
 use crate::io::data_ingest::CoverageData;
 
 #[allow(clippy::too_many_lines, clippy::double_must_use)]
 #[must_use]
-pub fn create_sample_coverage_fig<S: ::std::hash::BuildHasher>(
+pub fn create_sample_coverage_fig(
     sample: &str,
     data: &[CoverageData],
     segments: &[String],
-    segcolor: &HashMap<String, String, S>,
     cov_linear_y: bool,
 ) -> Result<Plot, Box<dyn Error>> {
     let mut plot = Plot::new();
@@ -228,7 +227,6 @@ pub fn create_sample_coverage_fig<S: ::std::hash::BuildHasher>(
 pub fn create_coverage_plot(
     data: &[CoverageData],
     segments: Vec<String>,
-    segcolor: &HashMap<String, String>,
     output_file: &str,
 ) -> Result<(), Box<dyn Error>> {
     let samples: Vec<String> = data
@@ -241,7 +239,7 @@ pub fn create_coverage_plot(
     println!("Building coverage plots for {} samples", samples.len());
 
     for sample in samples {
-        let coverage_fig = create_sample_coverage_fig(&sample, data, &segments, segcolor, true)?;
+        let coverage_fig = create_sample_coverage_fig(&sample, data, &segments, true)?;
         let file_name = format!("{output_file}/coveragefig_{sample}_linear.json");
         let json_output = serde_json::to_string_pretty(&coverage_fig)?;
         std::fs::write(&file_name, json_output)?;

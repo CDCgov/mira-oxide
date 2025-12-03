@@ -119,31 +119,6 @@ pub fn write_irma_summary_to_pass_fail_json_file(
     Ok(())
 }
 
-#[allow(clippy::implicit_hasher)]
-/// make `ref_data.json` - has unique set up
-pub fn write_ref_data_json<S: ::std::hash::BuildHasher>(
-    file_path: &str,
-    ref_lens: &HashMap<String, usize, S>,
-    segments: &[String],
-    segset: &[String],
-    segcolor: &HashMap<String, String>,
-) -> Result<(), Box<dyn Error>> {
-    let json_data = json!({
-        "ref_lens": ref_lens,
-        "segments": segments,
-        "segset": segset,
-        "segcolor": segcolor,
-    });
-
-    // Write JSON to a file
-    let mut file = File::create(file_path)?;
-    file.write_all(serde_json::to_string_pretty(&json_data)?.as_bytes())?;
-
-    println!("Data written to ref_data.json");
-
-    Ok(())
-}
-
 pub fn negative_qc_statement(
     output_file: &str,
     reads_data: &[ReadsData],
@@ -212,7 +187,7 @@ pub fn negative_qc_statement(
     clippy::too_many_lines,
     clippy::implicit_hasher
 )]
-pub fn write_out_all_json_files<S: ::std::hash::BuildHasher>(
+pub fn write_out_all_json_files(
     output_path: &Path,
     coverage_data: &[CoverageData],
     read_data: &[ReadsData],
@@ -223,10 +198,6 @@ pub fn write_out_all_json_files<S: ::std::hash::BuildHasher>(
     neg_control_list: &[String],
     irma_summary: &[IRMASummary],
     nt_seq_vec: &[NTSequences],
-    ref_lengths: &HashMap<String, usize, S>,
-    segments: &[String],
-    segset: &[String],
-    segcolor: &HashMap<String, String>,
     virus: &str,
 ) -> Result<(), Box<dyn Error>> {
     // Writing out Coverage data
@@ -374,15 +345,6 @@ pub fn write_out_all_json_files<S: ::std::hash::BuildHasher>(
         indel_data,
         &indels_columns,
         &indels_struct_values,
-    )?;
-
-    // Write out ref_data.json
-    write_ref_data_json(
-        &format!("{}/ref_data.json", output_path.display()),
-        ref_lengths,
-        segments,
-        segset,
-        segcolor,
     )?;
 
     // write out the dais_vars.json

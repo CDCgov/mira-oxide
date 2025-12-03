@@ -161,7 +161,8 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
             return Err(e);
         }
     };
-    let (segments, segset, segcolor) = return_seg_data(extract_field(&coverage_data, |item| {
+    // Keeping function for segment data extraction, though segset abd segcolor not currently used
+    let (segments, _segset, _segcolor) = return_seg_data(extract_field(&coverage_data, |item| {
         item.reference_name.clone()
     }));
 
@@ -344,10 +345,6 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
         &neg_control_list,
         &irma_summary,
         &nt_seq_vec,
-        &ref_lengths,
-        &segments,
-        &segset,
-        &segcolor,
         &args.virus,
     )?;
 
@@ -436,7 +433,6 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
     let _ = create_coverage_plot(
         &coverage_data,
         segments,
-        &segcolor,
         &format!("{}/", &args.output_path.display()),
     );
 
