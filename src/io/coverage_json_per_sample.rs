@@ -111,8 +111,9 @@ pub fn create_sample_coverage_fig<S: ::std::hash::BuildHasher>(
         vec![]
     };
 
-    // Predefined list of colors for ORFs
-    let orf_colors = [
+    // Predefined list of colors for ORFs and different flu segments
+    let color_palette = [
+        "rgba(0, 128, 255, 0.5)",   // Light Blue
         "rgba(255, 0, 0, 0.5)",     // Red
         "rgba(0, 255, 0, 0.5)",     // Green
         "rgba(0, 0, 255, 0.5)",     // Blue
@@ -124,7 +125,6 @@ pub fn create_sample_coverage_fig<S: ::std::hash::BuildHasher>(
         "rgba(0, 128, 128, 0.5)",   // Teal
         "rgba(128, 128, 128, 0.5)", // Gray
         "rgba(255, 128, 0, 0.5)",   // Orange
-        "rgba(0, 128, 255, 0.5)",   // Light Blue
     ];
 
     // Add ORF boxes to the plot
@@ -138,8 +138,8 @@ pub fn create_sample_coverage_fig<S: ::std::hash::BuildHasher>(
     for (i, (orf, (start, end))) in orf_positions.iter().enumerate() {
         let x = vec![*start, *end, *end, *start, *start];
         let y = vec![oy, oy, 0.0, 0.0, oy];
-        let color = orf_colors
-            .get(i % orf_colors.len())
+        let color = color_palette
+            .get(i % color_palette.len())
             .unwrap_or(&"rgba(0, 128, 0, 0.5)");
 
         let trace = Scatter::new(x.clone(), y.clone()) // Clone the data to ensure ownership
@@ -152,7 +152,7 @@ pub fn create_sample_coverage_fig<S: ::std::hash::BuildHasher>(
     }
 
     // Add coverage data for each segment
-    for segment in segments {
+    for (seg_idx, segment) in segments.iter().enumerate() {
         let segment_data: Vec<&CoverageData> = sample_data
             .iter()
             .copied()
@@ -162,10 +162,8 @@ pub fn create_sample_coverage_fig<S: ::std::hash::BuildHasher>(
         if !segment_data.is_empty() {
             let x: Vec<i32> = segment_data.iter().map(|d| d.position).collect();
             let y: Vec<i32> = segment_data.iter().map(|d| d.coverage_depth).collect();
-            let color = segcolor
-                .get(segment)
-                .cloned()
-                .unwrap_or_else(|| "blue".to_string());
+
+            let color = color_palette[seg_idx % color_palette.len()].to_string();
 
             let trace = Scatter::new(x, y)
                 .mode(Mode::Lines)
