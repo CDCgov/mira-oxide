@@ -351,7 +351,7 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
     )?;
 
     // Write fields to parq if flag given
-    // Why separate you ask? parquet set up it niche
+    // Why separate you ask? parquet set up is niche
     if args.parq {
         write_coverage_to_parquet(
             &coverage_data,
@@ -445,7 +445,6 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
         &format!("{}/", &args.output_path.display()),
     );
 
-    //TODO:: fix the heatmaps to handle missing data
     coverage_to_heatmap_json(
         &transformed_cov_data,
         &sample_list,
@@ -455,6 +454,7 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
 
     create_passfail_heatmap(
         &irma_summary,
+        &sample_list,
         &args.virus,
         &format!("{}/", &args.output_path.display()),
     );

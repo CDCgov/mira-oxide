@@ -1,34 +1,6 @@
-use crate::constants::heatmap_ref::{FLU_SEGMENTS, RSV_GENOME, SC2_GENOME};
+use crate::constants::heatmap_ref::get_references_for_virus;
 use crate::utils::data_processing::TransformedData;
 use serde_json::json;
-
-pub fn coverage_to_heatmap_json(
-    coverage_data: &[TransformedData],
-    sample_list: &[String],
-    virus: &str,
-    output_file: &str,
-) {
-    let filtered_data = normalize_rsv_segments(coverage_data, virus);
-
-    let references = get_references_for_virus(virus);
-    let completed_data = complete_data_for_samples(&filtered_data, sample_list, &references);
-
-    let (x_values, y_values, z_values) = prepare_heatmap_axes(&completed_data);
-
-    let colorscale = get_colorscale();
-
-    let heatmap = build_heatmap_json(&x_values, &y_values, &z_values, &colorscale);
-    let layout = build_layout_json(&colorscale);
-
-    let plot_json = json!({
-        "data": [heatmap],
-        "layout": layout
-    });
-
-    let file_path = format!("{output_file}/heatmap.json");
-    std::fs::write(&file_path, plot_json.to_string()).expect("Failed to write heatmap JSON");
-    println!("  -> coverage heatmap json saved to {file_path}");
-}
 
 fn normalize_rsv_segments(coverage_data: &[TransformedData], virus: &str) -> Vec<TransformedData> {
     let mut filtered_data = coverage_data.to_vec();
@@ -48,17 +20,7 @@ fn normalize_rsv_segments(coverage_data: &[TransformedData], virus: &str) -> Vec
         });
         filtered_data.dedup_by(|a, b| a.sample_id == b.sample_id);
     }
-    println!("{filtered_data:?}");
     filtered_data
-}
-
-fn get_references_for_virus(virus: &str) -> Vec<String> {
-    match virus.to_lowercase().as_str() {
-        "flu" => FLU_SEGMENTS.iter().map(ToString::to_string).collect(),
-        "sc2-wgs" | "sc2-spike" => vec![SC2_GENOME.to_string()],
-        "rsv" => vec![RSV_GENOME.to_string()],
-        _ => vec![],
-    }
 }
 
 fn complete_data_for_samples(
@@ -167,4 +129,32 @@ fn build_layout_json(colorscale: &[(f64, &str)]) -> serde_json::Value {
             "side": "top"
         }
     })
+}
+
+pub fn coverage_to_heatmap_json(
+    coverage_data: &[TransformedData],
+    sample_list: &[String],
+    virus: &str,
+    output_file: &str,
+) {
+    let filtered_data = normalize_rsv_segments(coverage_data, virus);
+
+    let references = get_references_for_virus(virus);
+    let completed_data = complete_data_for_samples(&filtered_data, sample_list, &references);
+
+    let (x_values, y_values, z_values) = prepare_heatmap_axes(&completed_data);
+
+    let colorscale = get_colorscale();
+
+    let heatmap = build_heatmap_json(&x_values, &y_values, &z_values, &colorscale);
+    let layout = build_layout_json(&colorscale);
+
+    let plot_json = json!({
+        "data": [heatmap],
+        "layout": layout
+    });
+
+    let file_path = format!("{output_file}/heatmap.json");
+    std::fs::write(&file_path, plot_json.to_string()).expect("Failed to write heatmap JSON");
+    println!("  -> coverage heatmap json saved to {file_path}");
 }

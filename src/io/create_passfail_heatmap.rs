@@ -1,3 +1,4 @@
+use crate::constants::heatmap_ref::get_references_for_virus;
 use crate::utils::data_processing::IRMASummary;
 use serde_json::json;
 use std::collections::HashSet;
@@ -55,32 +56,56 @@ fn remove_brace_content(s: &str) -> String {
     result.trim().to_string()
 }
 
-fn build_records(summaries: &[IRMASummary], virus: &str) -> Vec<(String, String, String)> {
-    summaries
-        .iter()
-        .map(|summary| {
-            let sample = summary
-                .sample_id
-                .clone()
-                .unwrap_or_else(|| "Unknown".to_string());
-            let reference = normalize_reference(
-                &summary
-                    .reference
+fn build_records(
+    summaries: &[IRMASummary],
+    heatmap_refs: &[String],
+    sample_list: &[String],
+    virus: &str,
+) -> Vec<(String, String, String)> {
+    let mut records = Vec::new();
+
+    for sample in sample_list {
+        for reference in heatmap_refs {
+            // Try to find a summary for this sample/reference
+            if let Some(summary) = summaries.iter().find(|s| {
+                s.sample_id.as_ref() == Some(sample)
+                    && normalize_reference(
+                        &s.reference.clone().unwrap_or_else(|| "Unknown".to_string()),
+                        virus,
+                    ) == *reference
+            }) {
+                let sample = summary
+                    .sample_id
                     .clone()
-                    .unwrap_or_else(|| "Unknown".to_string()),
-                virus,
-            );
-            let mut reason = summary
-                .pass_fail_reason
-                .clone()
-                .unwrap_or_else(|| "No assembly".to_string());
-            if reason.is_empty() {
-                reason = "No assembly".to_string();
+                    .unwrap_or_else(|| "Unknown".to_string());
+                let reference = normalize_reference(
+                    &summary
+                        .reference
+                        .clone()
+                        .unwrap_or_else(|| "Unknown".to_string()),
+                    virus,
+                );
+                let mut reason = summary
+                    .pass_fail_reason
+                    .clone()
+                    .unwrap_or_else(|| "No assembly".to_string());
+                if reason.is_empty() {
+                    reason = "No assembly".to_string();
+                }
+                let reason = remove_brace_content(&reason);
+                records.push((sample, reference, reason));
+            } else {
+                // Not found: add default record
+                records.push((
+                    sample.clone(),
+                    reference.to_string(),
+                    "No assembly".to_string(),
+                ));
             }
-            reason = remove_brace_content(&reason);
-            (sample, reference, reason)
-        })
-        .collect()
+        }
+    }
+    println!("{records:?}");
+    records
 }
 
 fn dedup_records(records: Vec<(String, String, String)>) -> Vec<(String, String, String)> {
@@ -283,7 +308,12 @@ fn plotly_template(colorscale: &Vec<(f64, &str)>) -> serde_json::Value {
     plotly_template
 }
 
-pub fn create_passfail_heatmap(summaries: &[IRMASummary], virus: &str, output_path: &str) {
+pub fn create_passfail_heatmap(
+    summaries: &[IRMASummary],
+    sample_list: &[String],
+    virus: &str,
+    output_path: &str,
+) {
     println!("Building pass_fail_heatmap as flat JSON");
 
     let colorscale = vec![
@@ -294,7 +324,8 @@ pub fn create_passfail_heatmap(summaries: &[IRMASummary], virus: &str, output_pa
         (1.0, "rgb(0,0,0)"),
     ];
 
-    let records = build_records(summaries, virus);
+    let references = get_references_for_virus(virus);
+    let records = build_records(summaries, &references, sample_list, virus);
     let unique_records = dedup_records(records);
     let (x, y, z, customdata) = build_heatmap_arrays(&unique_records);
 
