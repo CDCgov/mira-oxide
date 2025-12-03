@@ -1,7 +1,6 @@
 use crate::constants::heatmap_ref::get_references_for_virus;
 use crate::utils::data_processing::IRMASummary;
 use serde_json::json;
-use std::collections::HashSet;
 use std::fs::File;
 use std::io::Write;
 
@@ -106,7 +105,6 @@ fn build_records(
             }
         }
     }
-    println!("{records:?}");
     records
 }
 
