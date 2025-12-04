@@ -258,12 +258,16 @@ fn indels_to_plotly_json(data: &[IndelsData]) -> String {
     .to_string()
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn generate_html_report(
     output_path: &Path,
     irma_summary: &[IRMASummary],
     dais_vars_data: &[DaisVarsData],
     minor_variants: &[AllelesData],
     indels: &[IndelsData],
+    barcode_distribution_json: serde_json::Value,
+    pass_fail_heatmap_json: serde_json::Value,
+    cov_heatmap_json: serde_json::Value,
     runid: &str,
     logo_path: Option<&Path>,
 ) -> std::io::Result<()> {
@@ -290,16 +294,29 @@ pub fn generate_html_report(
         }
     }
 
+    fn plotly_json_script(div_id: &str, plotly_json: &str) -> String {
+        format!(
+            r#"
+    <div id="{div_id}" style="width:95vw; margin:auto;"></div>
+    <script type="text/javascript">
+    (function() {{
+        var fig = {plotly_json};
+        Plotly.newPlot('{div_id}', fig.data, fig.layout, {{displayModeBar: false}});
+    }})();
+    </script>
+    "#
+        )
+    }
+
     // Read all the required files
-    let bdp_html = read_plotly_html(
-        &output_path.join("barcode_distribution.json"),
-        "barcode results",
-    );
-    let pfhm_html = read_plotly_html(
-        &output_path.join("pass_fail_heatmap.json"),
-        "automatic qc results",
-    );
-    let chm_html = read_plotly_html(&output_path.join("heatmap.json"), "coverage results");
+    let barcode_distribution_json_str = barcode_distribution_json.to_string();
+    let bdp_html = plotly_json_script("barcode_distribution_plot", &barcode_distribution_json_str);
+
+    let pass_fail_heatmap_json_str = pass_fail_heatmap_json.to_string();
+    let pfhm_html = plotly_json_script("pass_fail_heatmap_plot", &pass_fail_heatmap_json_str);
+
+    let cov_heatmap_json_str = cov_heatmap_json.to_string();
+    let chm_html = plotly_json_script("cov_heatmap_plot", &cov_heatmap_json_str);
 
     // Pull in data tables for htmls
     let irma_summary_json = irma_summary_to_plotly_json(&irma_summary);

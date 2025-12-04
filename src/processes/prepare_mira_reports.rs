@@ -443,30 +443,36 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
         &format!("{}/", &args.output_path.display()),
     );
 
-    coverage_to_heatmap_json(
+    let cov_heatmap_json = coverage_to_heatmap_json(
         &transformed_cov_data,
         &sample_list,
         &args.virus,
         &format!("{}/", &args.output_path.display()),
     );
 
-    create_passfail_heatmap(
+    let pass_fail_heatmap_json = create_passfail_heatmap(
         &irma_summary,
         &sample_list,
         &args.virus,
         &format!("{}/", &args.output_path.display()),
     );
 
-    create_barcode_distribution_figure(&read_data, &format!("{}/", &args.output_path.display()));
+    let barcode_distribution_json = create_barcode_distribution_figure(
+        &read_data,
+        &format!("{}/", &args.output_path.display()),
+    );
 
     //////////////////////////////// Create staticHTML ////////////////////////////////
 
-    generate_html_report(
+    let _ = generate_html_report(
         &args.output_path,
         &irma_summary,
         &dais_vars_data,
         &allele_data.filtered_alleles,
         &indel_data,
+        barcode_distribution_json,
+        pass_fail_heatmap_json,
+        cov_heatmap_json,
         &args.runid,
         Some(&args.workdir_path),
     );

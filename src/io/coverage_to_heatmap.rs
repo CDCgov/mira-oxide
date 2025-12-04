@@ -136,16 +136,12 @@ pub fn coverage_to_heatmap_json(
     sample_list: &[String],
     virus: &str,
     output_file: &str,
-) {
+) -> serde_json::Value {
     let filtered_data = normalize_rsv_segments(coverage_data, virus);
-
     let references = get_references_for_virus(virus);
     let completed_data = complete_data_for_samples(&filtered_data, sample_list, &references);
-
     let (x_values, y_values, z_values) = prepare_heatmap_axes(&completed_data);
-
     let colorscale = get_colorscale();
-
     let heatmap = build_heatmap_json(&x_values, &y_values, &z_values, &colorscale);
     let layout = build_layout_json(&colorscale);
 
@@ -157,4 +153,7 @@ pub fn coverage_to_heatmap_json(
     let file_path = format!("{output_file}/heatmap.json");
     std::fs::write(&file_path, plot_json.to_string()).expect("Failed to write heatmap JSON");
     println!("  -> coverage heatmap json saved to {file_path}");
+
+    // Return the JSON object
+    plot_json
 }
