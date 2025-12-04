@@ -369,7 +369,7 @@ pub fn generate_html_report(
     // Coverage links
 
     let mut coverage_links_html =
-        String::from("<h2>Individual Sample Coverage & Sankey Figures</h2><p2>");
+        String::from("<h3>Individual Sample Coverage & Sankey Figures</h3><p2>");
     for coverage_json in coverage_json_per_sample {
         let sample = &coverage_json.sample_id;
 
@@ -434,29 +434,27 @@ pub fn generate_html_report(
         <h2>Median Coverage</h2>
         {chm_html}
         <hr>
-        <h2>MIRA Summary Table</h2>
-        <a href="./{runid}_summary.csv" download>
-            <img src="data:image/png;base64,{base64_excellogo}" alt="Download excel" width="60" height="40">
-        </a>
         {irma_sum_html}
+        <a href="./{runid}_summary.csv" download style="display: inline-block; text-align: center;">MIRA Summary Download<br>
+        <img src="data:image/png;base64,{base64_excellogo}" alt="Download excel" width="60" height="40">
+        </a>
         <hr>
         {coverage_links_html}
         <hr>
-        <h2>AA Variants Table</h2>
-        <a href="./{runid}_aavars.csv" download>
-            <img src="data:image/png;base64,{base64_excellogo}" alt="Download excel" width="60" height="40">
-        </a>
         {dais_var_html}
+        <a href="./{runid}_aavars.csv" download style="display: inline-block; text-align: center;">AA Variants Table Download<br>
+        <img src="data:image/png;base64,{base64_excellogo}" alt="Download excel" width="60" height="40">
+        </a>
         <hr>
-        <h2>Minor Variants Table</h2>
-        <a href="./{runid}_all_alleles.csv" download>
-            <img src="data:image/png;base64,{base64_excellogo}" alt="Download excel" width="60" height="40">
-        </a>
-        {minorvars_table_html} 
-        <a href="./{runid}_indels.csv" download>
-            <img src="data:image/png;base64,{base64_excellogo}" alt="Download excel" width="60" height="40">
-        </a>
+        {minorvars_table_html}
+        <a href="./{runid}_all_alleles.csv" download style="display: inline-block; text-align: center;">Minor Variant Table Download<br>
+        <img src="data:image/png;base64,{base64_excellogo}" alt="Download excel" width="60" height="40">
+        </a> 
+        <hr>
         {indels_table_html}
+        <a href="./{runid}_indels.csv" download style="display: inline-block; text-align: center;">Minor Indels Table Download<br>
+        <img src="data:image/png;base64,{base64_excellogo}" alt="Download excel" width="60" height="40">
+        </a> 
         <hr>
         {fasta_links_html}
     </body>
