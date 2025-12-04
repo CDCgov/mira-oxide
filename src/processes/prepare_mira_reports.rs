@@ -2,6 +2,7 @@
 use crate::io::coverage_json_per_sample::create_coverage_plot;
 use crate::io::coverage_to_heatmap::coverage_to_heatmap_json;
 use crate::io::create_passfail_heatmap::create_passfail_heatmap;
+use crate::io::create_statichtml::generate_html_report;
 use crate::io::reads_to_piechart::create_barcode_distribution_figure;
 use crate::io::reads_to_sankey_json::reads_to_sankey_json;
 use crate::io::write_parquet_files::write_samplesheet_to_parquet;
@@ -457,6 +458,18 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
     );
 
     create_barcode_distribution_figure(&read_data, &format!("{}/", &args.output_path.display()));
+
+    //////////////////////////////// Create staticHTML ////////////////////////////////
+
+    generate_html_report(
+        &args.output_path,
+        &irma_summary,
+        &dais_vars_data,
+        &allele_data.filtered_alleles,
+        &indel_data,
+        &args.runid,
+        Some(&args.workdir_path),
+    );
 
     Ok(())
 }

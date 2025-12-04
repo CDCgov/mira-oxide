@@ -1,6 +1,7 @@
 pub mod coverage_json_per_sample;
 pub mod coverage_to_heatmap;
 pub mod create_passfail_heatmap;
+pub mod create_statichtml;
 pub mod data_ingest;
 pub mod reads_to_piechart;
 pub mod reads_to_sankey_json;
