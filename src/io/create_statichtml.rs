@@ -1,5 +1,7 @@
 #![allow(clippy::format_push_string, clippy::too_many_lines)]
+use super::coverage_json_per_sample::SampleCoverageJson;
 use super::data_ingest::{AllelesData, IndelsData};
+use super::reads_to_sankey_json::SampleSankeyJson;
 use crate::utils::data_processing::{DaisVarsData, IRMASummary};
 use glob::glob;
 use serde_json::json;
@@ -316,8 +318,8 @@ pub fn generate_html_report(
     barcode_distribution_json: &serde_json::Value,
     pass_fail_heatmap_json: &serde_json::Value,
     cov_heatmap_json: &serde_json::Value,
-    coverage_json_per_sample: &[serde_json::Value],
-    sankey_json_per_sample: &[serde_json::Value],
+    coverage_json_per_sample: &[SampleCoverageJson],
+    sankey_json_per_sample: &[SampleSankeyJson],
     runid: &str,
     logo_path: Option<&Path>,
 ) -> std::io::Result<()> {
@@ -365,23 +367,27 @@ pub fn generate_html_report(
     let indels_table_html = plotly_table_script("indels_table", &indels_json, "Minor Indels Table");
 
     // Coverage links
+
     let mut coverage_links_html =
         String::from("<h2>Individual Sample Coverage & Sankey Figures</h2><p2>");
-    for (coverage_json, sankey_json) in coverage_json_per_sample
-        .iter()
-        .zip(sankey_json_per_sample.iter())
-    {
-        // You need to know the sample name for each pair.
-        // Let's assume coverage_json["sample"] exists:
-        let sample = coverage_json["sample"].as_str().unwrap_or("unknown");
+    for coverage_json in coverage_json_per_sample {
+        let sample = &coverage_json.sample_id;
 
-        // Write the per-sample HTML file
-        write_sample_plot_html(output_path, sample, coverage_json, sankey_json)?;
+        // Find the matching sankey_json by sample_id
+        if let Some(sankey_json) = sankey_json_per_sample
+            .iter()
+            .find(|s| s.sample_id == *sample)
+        {
+            // Write the per-sample HTML file
+            write_sample_plot_html(output_path, sample, &coverage_json.json, &sankey_json.json)?;
 
-        // Add the link to the main HTML
-        let link =
-            format!(r#"<a href="./MIRA_{sample}_plots.html" target="_blank">{sample}</a><br>"#);
-        coverage_links_html.push_str(&link);
+            // Add the link to the main HTML
+            let plot_path = output_path.display().to_string();
+            let link = format!(
+                r#"<a href="{plot_path}/MIRA_{sample}_plots.html" target="_blank">{sample}</a><br>"#
+            );
+            coverage_links_html.push_str(&link);
+        }
     }
     coverage_links_html.push_str("</p2>");
 

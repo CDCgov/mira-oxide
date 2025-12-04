@@ -2,6 +2,12 @@ use crate::io::data_ingest::ReadsData;
 use serde_json::{Value, json};
 use std::collections::HashMap;
 
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct SampleSankeyJson {
+    pub sample_id: String,
+    pub json: serde_json::Value,
+}
+
 // Placeholder functions for returnStageColors and seg
 fn return_stage_colors(_data: &[ReadsData]) -> HashMap<String, String> {
     // Implement logic to return stage colors
@@ -133,7 +139,7 @@ pub fn reads_to_sankey_json(
     data: &[ReadsData],
     virus: &str,
     output_file: &str,
-) -> Vec<serde_json::Value> {
+) -> Vec<SampleSankeyJson> {
     println!("Building read sankey plot");
 
     let unique_samples: Vec<_> = data
@@ -158,7 +164,10 @@ pub fn reads_to_sankey_json(
         std::fs::write(file_path.clone(), sankeyfig.to_string()).expect("Unable to write file");
         println!("  -> read sankey plot json saved to {file_path}");
 
-        json_vec.push(sankeyfig);
+        json_vec.push(SampleSankeyJson {
+            sample_id: sample,
+            json: sankeyfig,
+        });
     }
 
     json_vec

@@ -1,3 +1,4 @@
+use crate::io::data_ingest::CoverageData;
 use plotly::{
     Plot, Scatter,
     common::{Fill, Line, Mode, Title},
@@ -5,7 +6,11 @@ use plotly::{
 };
 use std::error::Error;
 
-use crate::io::data_ingest::CoverageData;
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct SampleCoverageJson {
+    pub sample_id: String,
+    pub json: serde_json::Value,
+}
 
 #[allow(clippy::too_many_lines, clippy::double_must_use)]
 #[must_use]
@@ -228,7 +233,7 @@ pub fn create_coverage_plot(
     data: &[CoverageData],
     segments: Vec<String>,
     output_file: &str,
-) -> Result<Vec<serde_json::Value>, Box<dyn Error>> {
+) -> Result<Vec<SampleCoverageJson>, Box<dyn Error>> {
     let samples: Vec<String> = data
         .iter()
         .filter_map(|d| d.sample_id.clone())
@@ -247,7 +252,10 @@ pub fn create_coverage_plot(
         let json_output = serde_json::to_string_pretty(&json_value)?;
         std::fs::write(&file_name, json_output)?;
         println!("  -> saved {file_name}");
-        json_vec.push(json_value);
+        json_vec.push(SampleCoverageJson {
+            sample_id: sample,
+            json: json_value,
+        });
     }
 
     println!(" --> All coverage JSONs saved");
