@@ -391,16 +391,24 @@ pub fn generate_html_report(
     coverage_links_html.push_str("</p2>");
 
     // Fasta links
-    let mut fasta_links_html =
-        String::from(r#"<h2>Fasta downloads</h2><p3>(Right-click->"Save link as...")</p3><br><p>"#);
-    for entry in glob(&format!("{}/MIRA_{}*.fasta", output_path.display(), runid)).unwrap() {
-        if let Ok(f) = entry {
-            let kind = f.file_name().and_then(|n| n.to_str()).unwrap_or("");
-            let link = format!(r#"<a href="./{kind}" download>{kind}</a><br><br>"#);
+    let mut fasta_links_html = String::from(
+        r#"<h2>Fasta downloads</h2>
+        <p>(Right-click → "Save link as...")</p>
+        <div>
+    "#,
+    );
+
+    for entry in glob(&format!("{}/{}*.fasta", output_path.display(), runid))
+        .unwrap()
+        .flatten()
+    {
+        if let Some(kind) = entry.file_name().and_then(|n| n.to_str()) {
+            let link = format!(r#"<a href="./{kind}" download>{kind}</a><br>"#);
             fasta_links_html.push_str(&link);
         }
     }
-    fasta_links_html.push_str("</p2>");
+
+    fasta_links_html.push_str("</div>");
 
     // Compose HTML
     let html_string = format!(
