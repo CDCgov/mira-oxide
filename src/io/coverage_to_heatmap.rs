@@ -131,6 +131,7 @@ fn build_layout_json(colorscale: &[(f64, &str)]) -> serde_json::Value {
     })
 }
 
+#[must_use]
 pub fn coverage_to_heatmap_json(
     coverage_data: &[TransformedData],
     sample_list: &[String],

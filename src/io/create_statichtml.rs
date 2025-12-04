@@ -3,7 +3,7 @@ use super::data_ingest::{AllelesData, IndelsData};
 use crate::utils::data_processing::{DaisVarsData, IRMASummary};
 use glob::glob;
 use serde_json::json;
-use std::fs::{read, read_to_string, write};
+use std::fs::{read, write};
 use std::path::{Path, PathBuf};
 
 // Helper functions to base64 encode an image file
@@ -40,6 +40,54 @@ fn base64_img(path: &Path) -> String {
     read(path)
         .map(|bytes| base64_encode(&bytes))
         .unwrap_or_default()
+}
+
+// Helper to read plotly JSON value
+fn plotly_json_script(div_id: &str, plotly_json: &str) -> String {
+    format!(
+        r#"
+<div id="{div_id}" style="width:95vw; margin:auto;"></div>
+<script type="text/javascript">
+(function() {{
+    var fig = {plotly_json};
+    Plotly.newPlot('{div_id}', fig.data, fig.layout, {{displayModeBar: false}});
+}})();
+</script>
+"#
+    )
+}
+
+fn write_sample_plot_html(
+    output_path: &Path,
+    sample: &str,
+    coverage_json: &serde_json::Value,
+    sankey_json: &serde_json::Value,
+) -> std::io::Result<()> {
+    let html = format!(
+        r#"<!DOCTYPE html>
+<html>
+<head>
+    <title>{sample} Coverage & Sankey</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+    <h2>{sample} Coverage Plot</h2>
+    <div id="coverage_plot" style="width:90vw; height:40vh;"></div>
+    <h2>{sample} Sankey Plot</h2>
+    <div id="sankey_plot" style="width:90vw; height:40vh;"></div>
+    <script>
+        var coverage_fig = {coverage_json};
+        Plotly.newPlot('coverage_plot', coverage_fig.data, coverage_fig.layout);
+
+        var sankey_fig = {sankey_json};
+        Plotly.newPlot('sankey_plot', sankey_fig.data, sankey_fig.layout);
+    </script>
+</body>
+</html>
+"#
+    );
+    let out_path = output_path.join(format!("MIRA_{sample}_plots.html"));
+    write(out_path, html)
 }
 
 //Format plotly table
@@ -174,7 +222,7 @@ fn alleles_to_plotly_json(data: &[AllelesData]) -> String {
         columns[1].push(row.reference.to_string());
         columns[2].push(
             row.reference_position
-                .map_or("".to_string(), |v| v.to_string()),
+                .map_or(String::new(), |v| v.to_string()),
         );
         columns[3].push(row.sample_position.to_string());
         columns[4].push(row.coverage.to_string());
@@ -232,7 +280,7 @@ fn indels_to_plotly_json(data: &[IndelsData]) -> String {
                 .to_string(),
         );
         columns[4].push(row.insert.as_deref().unwrap_or("").to_string());
-        columns[5].push(row.length.map_or("".to_string(), |v| v.to_string()));
+        columns[5].push(row.length.map_or(String::new(), |v| v.to_string()));
         columns[6].push(row.context.to_string());
         columns[7].push(row.called.to_string());
         columns[8].push(row.count.to_string());
@@ -265,9 +313,11 @@ pub fn generate_html_report(
     dais_vars_data: &[DaisVarsData],
     minor_variants: &[AllelesData],
     indels: &[IndelsData],
-    barcode_distribution_json: serde_json::Value,
-    pass_fail_heatmap_json: serde_json::Value,
-    cov_heatmap_json: serde_json::Value,
+    barcode_distribution_json: &serde_json::Value,
+    pass_fail_heatmap_json: &serde_json::Value,
+    cov_heatmap_json: &serde_json::Value,
+    coverage_json_per_sample: &[serde_json::Value],
+    sankey_json_per_sample: &[serde_json::Value],
     runid: &str,
     logo_path: Option<&Path>,
 ) -> std::io::Result<()> {
@@ -286,28 +336,6 @@ pub fn generate_html_report(
     let base64_favicon = base64_img(&favicon);
     let base64_excellogo = base64_img(&excel_logo);
 
-    // Helper to read plotly JSON and wrap in <div> (or fallback)
-    fn read_plotly_html(path: &Path, svg_name: &str) -> String {
-        match read_to_string(path) {
-            Ok(json) => format!(r#"<div id="plotly-plot">{json}</div>"#),
-            Err(_) => format!("<p>No results for {}</p>", svg_name),
-        }
-    }
-
-    fn plotly_json_script(div_id: &str, plotly_json: &str) -> String {
-        format!(
-            r#"
-    <div id="{div_id}" style="width:95vw; margin:auto;"></div>
-    <script type="text/javascript">
-    (function() {{
-        var fig = {plotly_json};
-        Plotly.newPlot('{div_id}', fig.data, fig.layout, {{displayModeBar: false}});
-    }})();
-    </script>
-    "#
-        )
-    }
-
     // Read all the required files
     let barcode_distribution_json_str = barcode_distribution_json.to_string();
     let bdp_html = plotly_json_script("barcode_distribution_plot", &barcode_distribution_json_str);
@@ -319,43 +347,41 @@ pub fn generate_html_report(
     let chm_html = plotly_json_script("cov_heatmap_plot", &cov_heatmap_json_str);
 
     // Pull in data tables for htmls
-    let irma_summary_json = irma_summary_to_plotly_json(&irma_summary);
+    let irma_summary_json = irma_summary_to_plotly_json(irma_summary);
     let irma_sum_html = plotly_table_script(
         "irma_summary_table",
         &irma_summary_json,
         "MIRA Summary Table",
     );
-    let dais_vars_json = dais_vars_to_plotly_json(&dais_vars_data);
+    let dais_vars_json = dais_vars_to_plotly_json(dais_vars_data);
     let dais_var_html =
         plotly_table_script("dais_vars_table", &dais_vars_json, "AA Variants Table");
 
-    let minorvars_json = alleles_to_plotly_json(&minor_variants);
+    let minorvars_json = alleles_to_plotly_json(minor_variants);
     let minorvars_table_html =
         plotly_table_script("minor_vars_table", &minorvars_json, "Minor Variants Table");
 
-    let indels_json = indels_to_plotly_json(&indels);
+    let indels_json = indels_to_plotly_json(indels);
     let indels_table_html = plotly_table_script("indels_table", &indels_json, "Minor Indels Table");
 
     // Coverage links
-    let mut coverage_links_html = String::from("<h2>Individual Sample Coverage Figures</h2><p2>");
-    for entry in glob(&format!(
-        "{}/coveragefig*linear.json",
-        output_path.display()
-    ))
-    .unwrap()
+    let mut coverage_links_html =
+        String::from("<h2>Individual Sample Coverage & Sankey Figures</h2><p2>");
+    for (coverage_json, sankey_json) in coverage_json_per_sample
+        .iter()
+        .zip(sankey_json_per_sample.iter())
     {
-        if let Ok(cf) = entry {
-            let sample = cf
-                .file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or("")
-                .replace("coveragefig_", "")
-                .replace("_linear.json", "");
-            let link = format!(
-                r#"<a href="./MIRA_{sample}_coverage.html" target="_blank">{sample}</a><br>"#
-            );
-            coverage_links_html.push_str(&link);
-        }
+        // You need to know the sample name for each pair.
+        // Let's assume coverage_json["sample"] exists:
+        let sample = coverage_json["sample"].as_str().unwrap_or("unknown");
+
+        // Write the per-sample HTML file
+        write_sample_plot_html(output_path, sample, coverage_json, sankey_json)?;
+
+        // Add the link to the main HTML
+        let link =
+            format!(r#"<a href="./MIRA_{sample}_plots.html" target="_blank">{sample}</a><br>"#);
+        coverage_links_html.push_str(&link);
     }
     coverage_links_html.push_str("</p2>");
 
@@ -409,7 +435,7 @@ pub fn generate_html_report(
         </a>
         {irma_sum_html}
         <hr>
-        {coverage_links_html}
+        {coverage_links_html:?}
         <hr>
         <h2>AA Variants Table</h2>
         <a href="./MIRA_{runid}_aavars.csv" download>
@@ -427,7 +453,7 @@ pub fn generate_html_report(
     );
 
     // Write to file
-    let out_path = output_path.join(format!("MIRA-summary-{}.html", runid));
+    let out_path = output_path.join(format!("MIRA-summary-{runid}.html"));
     write(out_path, html_string)?;
 
     Ok(())

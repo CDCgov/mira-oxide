@@ -2,6 +2,17 @@ use crate::io::data_ingest::ReadsData;
 use serde_json::{Value, json};
 use std::collections::HashMap;
 
+// Placeholder functions for returnStageColors and seg
+fn return_stage_colors(_data: &[ReadsData]) -> HashMap<String, String> {
+    // Implement logic to return stage colors
+    HashMap::new()
+}
+
+fn seg(label: &str) -> std::string::String {
+    // Implement logic to segment the label
+    label.to_string()
+}
+
 fn dash_reads_to_sankey(data: &[ReadsData], virus: &str) -> Value {
     // Filter out rows where "Stage" is None or "Stage" is 0
     let filtered_data: Vec<_> = data
@@ -117,7 +128,12 @@ fn dash_reads_to_sankey(data: &[ReadsData], virus: &str) -> Value {
     fig
 }
 
-pub fn reads_to_sankey_json(data: &[ReadsData], virus: &str, output_file: &str) {
+#[must_use]
+pub fn reads_to_sankey_json(
+    data: &[ReadsData],
+    virus: &str,
+    output_file: &str,
+) -> Vec<serde_json::Value> {
     println!("Building read sankey plot");
 
     let unique_samples: Vec<_> = data
@@ -126,6 +142,8 @@ pub fn reads_to_sankey_json(data: &[ReadsData], virus: &str, output_file: &str) 
         .collect::<std::collections::HashSet<_>>()
         .into_iter()
         .collect();
+
+    let mut json_vec = Vec::new();
 
     for sample in unique_samples {
         let sample_data: Vec<_> = data
@@ -139,16 +157,9 @@ pub fn reads_to_sankey_json(data: &[ReadsData], virus: &str, output_file: &str) 
         let file_path = format!("{output_file}/readsfig_{sample}.json");
         std::fs::write(file_path.clone(), sankeyfig.to_string()).expect("Unable to write file");
         println!("  -> read sankey plot json saved to {file_path}");
+
+        json_vec.push(sankeyfig);
     }
-}
 
-// Placeholder functions for returnStageColors and seg
-fn return_stage_colors(_data: &[ReadsData]) -> HashMap<String, String> {
-    // Implement logic to return stage colors
-    HashMap::new()
-}
-
-fn seg(label: &str) -> std::string::String {
-    // Implement logic to segment the label
-    label.to_string()
+    json_vec
 }

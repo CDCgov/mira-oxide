@@ -1,5 +1,5 @@
 #![allow(dead_code, unused_imports)]
-use crate::io::coverage_json_per_sample::create_coverage_plot;
+use crate::io::coverage_json_per_sample::{self, create_coverage_plot};
 use crate::io::coverage_to_heatmap::coverage_to_heatmap_json;
 use crate::io::create_passfail_heatmap::create_passfail_heatmap;
 use crate::io::create_statichtml::generate_html_report;
@@ -431,13 +431,13 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
 
     //////////////////////////////// Create JSONS for Dashboard ////////////////////////////////
 
-    let _ = create_coverage_plot(
+    let coverage_json_per_sample = create_coverage_plot(
         &coverage_data,
         segments,
         &format!("{}/", &args.output_path.display()),
-    );
+    )?;
 
-    reads_to_sankey_json(
+    let sankey_json_per_sample = reads_to_sankey_json(
         &read_data,
         &args.virus,
         &format!("{}/", &args.output_path.display()),
@@ -470,9 +470,11 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
         &dais_vars_data,
         &allele_data.filtered_alleles,
         &indel_data,
-        barcode_distribution_json,
-        pass_fail_heatmap_json,
-        cov_heatmap_json,
+        &barcode_distribution_json,
+        &pass_fail_heatmap_json,
+        &cov_heatmap_json,
+        &coverage_json_per_sample,
+        &sankey_json_per_sample,
         &args.runid,
         Some(&args.workdir_path),
     );

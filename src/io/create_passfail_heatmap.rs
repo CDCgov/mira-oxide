@@ -296,7 +296,7 @@ fn plotly_template(colorscale: &Vec<(f64, &str)>) -> serde_json::Value {
     plotly_template
 }
 
-/// Creates a pass_fail_heatmap figure - writes it to a file and returns the JSON object.
+/// Creates a `pass_fail_heatmap` figure - writes it to a file and returns the JSON object.
 #[must_use]
 pub fn create_passfail_heatmap(
     summaries: &[IRMASummary],

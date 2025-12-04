@@ -228,7 +228,7 @@ pub fn create_coverage_plot(
     data: &[CoverageData],
     segments: Vec<String>,
     output_file: &str,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<Vec<serde_json::Value>, Box<dyn Error>> {
     let samples: Vec<String> = data
         .iter()
         .filter_map(|d| d.sample_id.clone())
@@ -238,14 +238,18 @@ pub fn create_coverage_plot(
 
     println!("Building coverage plots for {} samples", samples.len());
 
+    let mut json_vec = Vec::new();
+
     for sample in samples {
         let coverage_fig = create_sample_coverage_fig(&sample, data, &segments, true)?;
         let file_name = format!("{output_file}/coveragefig_{sample}_linear.json");
-        let json_output = serde_json::to_string_pretty(&coverage_fig)?;
+        let json_value = serde_json::to_value(&coverage_fig)?;
+        let json_output = serde_json::to_string_pretty(&json_value)?;
         std::fs::write(&file_name, json_output)?;
         println!("  -> saved {file_name}");
+        json_vec.push(json_value);
     }
 
     println!(" --> All coverage JSONs saved");
-    Ok(())
+    Ok(json_vec)
 }
