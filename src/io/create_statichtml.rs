@@ -88,7 +88,7 @@ fn write_sample_plot_html(
 </html>
 "#
     );
-    let out_path = output_path.join(format!("MIRA_{sample}_plots.html"));
+    let out_path = output_path.join(format!("MIRA_{sample}_coverage.html"));
     write(out_path, html)
 }
 
@@ -381,10 +381,9 @@ pub fn generate_html_report(
             // Write the per-sample HTML file
             write_sample_plot_html(output_path, sample, &coverage_json.json, &sankey_json.json)?;
 
-            // Add the link to the main HTML
-            let plot_path = output_path.display().to_string();
+            // Add the link to the main HTML (relative path)
             let link = format!(
-                r#"<a href="{plot_path}/MIRA_{sample}_plots.html" target="_blank">{sample}</a><br>"#
+                r#"<a href="MIRA_{sample}_coverage.html" target="_blank">{sample}</a><br>"#
             );
             coverage_links_html.push_str(&link);
         }
@@ -436,21 +435,28 @@ pub fn generate_html_report(
         {chm_html}
         <hr>
         <h2>MIRA Summary Table</h2>
-        <a href="./MIRA_{runid}_summary.xlsx" download>
+        <a href="./{runid}_summary.csv" download>
             <img src="data:image/png;base64,{base64_excellogo}" alt="Download excel" width="60" height="40">
         </a>
         {irma_sum_html}
         <hr>
-        {coverage_links_html:?}
+        {coverage_links_html}
         <hr>
         <h2>AA Variants Table</h2>
-        <a href="./MIRA_{runid}_aavars.csv" download>
+        <a href="./{runid}_aavars.csv" download>
             <img src="data:image/png;base64,{base64_excellogo}" alt="Download excel" width="60" height="40">
         </a>
         {dais_var_html}
         <hr>
-        <h2>Minor Table Download</h2>
-        {minorvars_table_html} {indels_table_html}
+        <h2>Minor Variants Table</h2>
+        <a href="./{runid}_all_alleles.csv" download>
+            <img src="data:image/png;base64,{base64_excellogo}" alt="Download excel" width="60" height="40">
+        </a>
+        {minorvars_table_html} 
+        <a href="./{runid}_indels.csv" download>
+            <img src="data:image/png;base64,{base64_excellogo}" alt="Download excel" width="60" height="40">
+        </a>
+        {indels_table_html}
         <hr>
         {fasta_links_html}
     </body>

@@ -468,7 +468,7 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
         &args.output_path,
         &irma_summary,
         &dais_vars_data,
-        &allele_data.filtered_alleles,
+        &allele_data.all_alleles,
         &indel_data,
         &barcode_distribution_json,
         &pass_fail_heatmap_json,
