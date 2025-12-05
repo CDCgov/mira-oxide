@@ -587,6 +587,11 @@ pub fn indels_data_collection(
 
                 // Read the data from the file and include the sample name
                 let mut records: Vec<IndelsData> = process_txt_with_sample(reader, true, &sample)?;
+                // Add platform and runid to each record
+                for record in &mut records {
+                    record.instrument = Some(platform.to_string());
+                    record.run_id = Some(runid.to_string());
+                }
                 indels_data.append(&mut records);
             }
             Err(e) => println!("Error reading file: {e}"),

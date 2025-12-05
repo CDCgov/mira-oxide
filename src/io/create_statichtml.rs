@@ -281,14 +281,9 @@ fn indels_to_plotly_json(data: &[IndelsData], virus: &str) -> String {
             "Insert",
             "Length",
             "Context",
-            "Called",
             "Count",
             "Total",
             "Frequency",
-            "Average Quality",
-            "ConfidenceNotMacErr",
-            "PairedUB",
-            "QualityUB",
             "Run ID",
             "Instrument",
         ]
@@ -300,14 +295,9 @@ fn indels_to_plotly_json(data: &[IndelsData], virus: &str) -> String {
             "Insert",
             "Length",
             "Context",
-            "Called",
             "Count",
             "Total",
             "Frequency",
-            "Average Quality",
-            "ConfidenceNotMacErr",
-            "PairedUB",
-            "QualityUB",
             "Run ID",
             "Instrument",
         ]
@@ -328,21 +318,11 @@ fn indels_to_plotly_json(data: &[IndelsData], virus: &str) -> String {
             columns[3].push(row.insert.as_deref().unwrap_or("").to_string());
             columns[4].push(row.length.map_or(String::new(), |v| v.to_string()));
             columns[5].push(row.context.to_string());
-            columns[6].push(row.called.to_string());
-            columns[7].push(row.count.to_string());
-            columns[8].push(row.total.to_string());
-            columns[9].push(format!("{:.4}", row.frequency));
-            columns[10].push(row.average_quality.as_deref().unwrap_or("").to_string());
-            columns[11].push(
-                row.confidence_not_mac_err
-                    .as_deref()
-                    .unwrap_or("")
-                    .to_string(),
-            );
-            columns[12].push(row.paired_ub.to_string());
-            columns[13].push(row.quality_ub.as_deref().unwrap_or("").to_string());
-            columns[14].push(row.run_id.as_deref().unwrap_or("").to_string());
-            columns[15].push(row.instrument.as_deref().unwrap_or("").to_string());
+            columns[6].push(row.count.to_string());
+            columns[7].push(row.total.to_string());
+            columns[8].push(format!("{:.2}", row.frequency));
+            columns[9].push(row.run_id.as_deref().unwrap_or("").to_string());
+            columns[10].push(row.instrument.as_deref().unwrap_or("").to_string());
         } else {
             columns[0].push(row.sample_id.as_deref().unwrap_or("").to_string());
             columns[1].push(row.reference_name.to_string());
@@ -355,21 +335,11 @@ fn indels_to_plotly_json(data: &[IndelsData], virus: &str) -> String {
             columns[3].push(row.insert.as_deref().unwrap_or("").to_string());
             columns[4].push(row.length.map_or(String::new(), |v| v.to_string()));
             columns[5].push(row.context.to_string());
-            columns[6].push(row.called.to_string());
-            columns[7].push(row.count.to_string());
-            columns[8].push(row.total.to_string());
-            columns[9].push(format!("{:.4}", row.frequency));
-            columns[10].push(row.average_quality.as_deref().unwrap_or("").to_string());
-            columns[11].push(
-                row.confidence_not_mac_err
-                    .as_deref()
-                    .unwrap_or("")
-                    .to_string(),
-            );
-            columns[12].push(row.paired_ub.to_string());
-            columns[13].push(row.quality_ub.as_deref().unwrap_or("").to_string());
-            columns[14].push(row.run_id.as_deref().unwrap_or("").to_string());
-            columns[15].push(row.instrument.as_deref().unwrap_or("").to_string());
+            columns[6].push(row.count.to_string());
+            columns[7].push(row.total.to_string());
+            columns[8].push(format!("{:.2}", row.frequency));
+            columns[9].push(row.run_id.as_deref().unwrap_or("").to_string());
+            columns[10].push(row.instrument.as_deref().unwrap_or("").to_string());
         };
     }
 

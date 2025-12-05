@@ -463,7 +463,6 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
     );
 
     //////////////////////////////// Create staticHTML ////////////////////////////////
-
     let _ = generate_html_report(
         &args.output_path,
         &irma_summary,
