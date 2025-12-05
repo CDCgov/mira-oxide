@@ -212,7 +212,6 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
     }
 
     //Gather subtype information
-    //todo: add rsv handling - fix sc2-spike handling
     let mut subtype_data: Vec<Subtype> = Vec::new();
     if args.virus.to_lowercase() == "flu" {
         subtype_data = extract_subtype_flu(&dais_vars_data)?;
@@ -327,6 +326,7 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
         &read_data,
         &allele_data,
         &indel_data,
+        &dais_vars_data,
         &irma_summary,
         &nt_seq_vec,
         &aa_seq_vec,
@@ -477,6 +477,7 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
         &sankey_json_per_sample,
         &args.runid,
         Some(&args.workdir_path),
+        &args.virus,
     );
 
     Ok(())

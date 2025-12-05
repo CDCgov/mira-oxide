@@ -267,19 +267,35 @@ pub fn write_out_all_json_files(
     )?;
 
     // Writing out allele
-    let allele_columns = vec![
-        "sample",
-        "reference",
-        "sample_upstream_position",
-        "depth",
-        "consensus_allele",
-        "minority_allele",
-        "consensus_count",
-        "minority_count",
-        "minority_frequency",
-        "run_id",
-        "instrument",
-    ];
+    let allele_columns = if virus == "sc2-spike" {
+        vec![
+            "sample",
+            "reference",
+            "reference_position",
+            "depth",
+            "consensus_allele",
+            "minority_allele",
+            "consensus_count",
+            "minority_count",
+            "minority_frequency",
+            "run_id",
+            "instrument",
+        ]
+    } else {
+        vec![
+            "sample",
+            "reference",
+            "sample_position",
+            "depth",
+            "consensus_allele",
+            "minority_allele",
+            "consensus_count",
+            "minority_count",
+            "minority_frequency",
+            "run_id",
+            "instrument",
+        ]
+    };
     let allele_struct_values = if virus == "sc2-spike" {
         vec![
             "Sample",
@@ -312,7 +328,7 @@ pub fn write_out_all_json_files(
 
     write_structs_to_split_json_file(
         &format!("{}/alleles.json", output_path.display()),
-        &allele_data.filtered_alleles,
+        &allele_data.all_alleles,
         &allele_columns,
         &allele_struct_values,
     )?;

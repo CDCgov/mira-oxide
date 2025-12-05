@@ -202,39 +202,67 @@ fn dais_vars_to_plotly_json(vars: &[DaisVarsData]) -> String {
     .to_string()
 }
 
-fn alleles_to_plotly_json(data: &[AllelesData]) -> String {
-    let headers = [
-        "Sample",
-        "Reference",
-        "HMM Position",
-        "Sample Position",
-        "Coverage",
-        "Consensus Allele",
-        "Minority Allele",
-        "Consensus Count",
-        "Minority Count",
-        "Minority Frequency",
-        "Run ID",
-        "Instrument",
-    ];
+fn alleles_to_plotly_json(data: &[AllelesData], virus: &str) -> String {
+    let headers = if virus == "sc2-spike" {
+        [
+            "Sample",
+            "Reference",
+            "HMM Position",
+            "Coverage",
+            "Consensus Allele",
+            "Minority Allele",
+            "Consensus Count",
+            "Minority Count",
+            "Minority Frequency",
+            "Run ID",
+            "Instrument",
+        ]
+    } else {
+        [
+            "Sample",
+            "Reference",
+            "Sample Position",
+            "Coverage",
+            "Consensus Allele",
+            "Minority Allele",
+            "Consensus Count",
+            "Minority Count",
+            "Minority Frequency",
+            "Run ID",
+            "Instrument",
+        ]
+    };
     let mut columns: Vec<Vec<String>> = vec![Vec::new(); headers.len()];
 
     for row in data {
-        columns[0].push(row.sample_id.as_deref().unwrap_or("").to_string());
-        columns[1].push(row.reference.to_string());
-        columns[2].push(
-            row.reference_position
-                .map_or(String::new(), |v| v.to_string()),
-        );
-        columns[3].push(row.sample_position.to_string());
-        columns[4].push(row.coverage.to_string());
-        columns[5].push(row.consensus_allele.to_string());
-        columns[6].push(row.minority_allele.to_string());
-        columns[7].push(row.consensus_count.to_string());
-        columns[8].push(row.minority_count.to_string());
-        columns[9].push(format!("{:.4}", row.minority_frequency));
-        columns[10].push(row.run_id.as_deref().unwrap_or("").to_string());
-        columns[11].push(row.instrument.as_deref().unwrap_or("").to_string());
+        if virus == "sc2-spike" {
+            columns[0].push(row.sample_id.as_deref().unwrap_or("").to_string());
+            columns[1].push(row.reference.to_string());
+            columns[2].push(
+                row.reference_position
+                    .map_or(String::new(), |v| v.to_string()),
+            );
+            columns[3].push(row.coverage.to_string());
+            columns[4].push(row.consensus_allele.to_string());
+            columns[5].push(row.minority_allele.to_string());
+            columns[6].push(row.consensus_count.to_string());
+            columns[7].push(row.minority_count.to_string());
+            columns[8].push(format!("{:.4}", row.minority_frequency));
+            columns[9].push(row.run_id.as_deref().unwrap_or("").to_string());
+            columns[10].push(row.instrument.as_deref().unwrap_or("").to_string());
+        } else {
+            columns[0].push(row.sample_id.as_deref().unwrap_or("").to_string());
+            columns[1].push(row.reference.to_string());
+            columns[2].push(row.sample_position.to_string());
+            columns[3].push(row.coverage.to_string());
+            columns[4].push(row.consensus_allele.to_string());
+            columns[5].push(row.minority_allele.to_string());
+            columns[6].push(row.consensus_count.to_string());
+            columns[7].push(row.minority_count.to_string());
+            columns[8].push(format!("{:.4}", row.minority_frequency));
+            columns[9].push(row.run_id.as_deref().unwrap_or("").to_string());
+            columns[10].push(row.instrument.as_deref().unwrap_or("").to_string());
+        };
     }
 
     serde_json::json!({
@@ -244,61 +272,105 @@ fn alleles_to_plotly_json(data: &[AllelesData]) -> String {
     .to_string()
 }
 
-fn indels_to_plotly_json(data: &[IndelsData]) -> String {
-    let headers = [
-        "Sample",
-        "Reference",
-        "HMM Upstream Position",
-        "Sample Upstream Position",
-        "Insert",
-        "Length",
-        "Context",
-        "Called",
-        "Count",
-        "Total",
-        "Frequency",
-        "Average Quality",
-        "ConfidenceNotMacErr",
-        "PairedUB",
-        "QualityUB",
-        "Run ID",
-        "Instrument",
-    ];
+fn indels_to_plotly_json(data: &[IndelsData], virus: &str) -> String {
+    let headers = if virus == "sc2-spike" {
+        [
+            "Sample",
+            "Reference",
+            "HMM Upstream Position",
+            "Insert",
+            "Length",
+            "Context",
+            "Called",
+            "Count",
+            "Total",
+            "Frequency",
+            "Average Quality",
+            "ConfidenceNotMacErr",
+            "PairedUB",
+            "QualityUB",
+            "Run ID",
+            "Instrument",
+        ]
+    } else {
+        [
+            "Sample",
+            "Reference",
+            "Sample Upstream Position",
+            "Insert",
+            "Length",
+            "Context",
+            "Called",
+            "Count",
+            "Total",
+            "Frequency",
+            "Average Quality",
+            "ConfidenceNotMacErr",
+            "PairedUB",
+            "QualityUB",
+            "Run ID",
+            "Instrument",
+        ]
+    };
+
     let mut columns: Vec<Vec<String>> = vec![Vec::new(); headers.len()];
 
     for row in data {
-        columns[0].push(row.sample_id.as_deref().unwrap_or("").to_string());
-        columns[1].push(row.reference_name.to_string());
-        columns[2].push(
-            row.reference_upstream_position
-                .as_deref()
-                .unwrap_or("")
-                .to_string(),
-        );
-        columns[3].push(
-            row.sample_upstream_position
-                .as_deref()
-                .unwrap_or("")
-                .to_string(),
-        );
-        columns[4].push(row.insert.as_deref().unwrap_or("").to_string());
-        columns[5].push(row.length.map_or(String::new(), |v| v.to_string()));
-        columns[6].push(row.context.to_string());
-        columns[7].push(row.called.to_string());
-        columns[8].push(row.count.to_string());
-        columns[9].push(row.total.to_string());
-        columns[10].push(format!("{:.4}", row.frequency));
-        columns[11].push(row.average_quality.as_deref().unwrap_or("").to_string());
-        columns[12].push(
-            row.confidence_not_mac_err
-                .as_deref()
-                .unwrap_or("")
-                .to_string(),
-        );
-        columns[13].push(row.paired_ub.to_string());
-        columns[14].push(row.quality_ub.as_deref().unwrap_or("").to_string());
-        columns[15].push(row.run_id.as_deref().unwrap_or("").to_string());
-        columns[16].push(row.instrument.as_deref().unwrap_or("").to_string());
+        if virus == "sc2-spike" {
+            columns[0].push(row.sample_id.as_deref().unwrap_or("").to_string());
+            columns[1].push(row.reference_name.to_string());
+            columns[2].push(
+                row.reference_upstream_position
+                    .as_deref()
+                    .unwrap_or("")
+                    .to_string(),
+            );
+            columns[3].push(row.insert.as_deref().unwrap_or("").to_string());
+            columns[4].push(row.length.map_or(String::new(), |v| v.to_string()));
+            columns[5].push(row.context.to_string());
+            columns[6].push(row.called.to_string());
+            columns[7].push(row.count.to_string());
+            columns[8].push(row.total.to_string());
+            columns[9].push(format!("{:.4}", row.frequency));
+            columns[10].push(row.average_quality.as_deref().unwrap_or("").to_string());
+            columns[11].push(
+                row.confidence_not_mac_err
+                    .as_deref()
+                    .unwrap_or("")
+                    .to_string(),
+            );
+            columns[12].push(row.paired_ub.to_string());
+            columns[13].push(row.quality_ub.as_deref().unwrap_or("").to_string());
+            columns[14].push(row.run_id.as_deref().unwrap_or("").to_string());
+            columns[15].push(row.instrument.as_deref().unwrap_or("").to_string());
+        } else {
+            columns[0].push(row.sample_id.as_deref().unwrap_or("").to_string());
+            columns[1].push(row.reference_name.to_string());
+            columns[2].push(
+                row.sample_upstream_position
+                    .as_deref()
+                    .unwrap_or("")
+                    .to_string(),
+            );
+            columns[3].push(row.insert.as_deref().unwrap_or("").to_string());
+            columns[4].push(row.length.map_or(String::new(), |v| v.to_string()));
+            columns[5].push(row.context.to_string());
+            columns[6].push(row.called.to_string());
+            columns[7].push(row.count.to_string());
+            columns[8].push(row.total.to_string());
+            columns[9].push(format!("{:.4}", row.frequency));
+            columns[10].push(row.average_quality.as_deref().unwrap_or("").to_string());
+            columns[11].push(
+                row.confidence_not_mac_err
+                    .as_deref()
+                    .unwrap_or("")
+                    .to_string(),
+            );
+            columns[12].push(row.paired_ub.to_string());
+            columns[13].push(row.quality_ub.as_deref().unwrap_or("").to_string());
+            columns[14].push(row.run_id.as_deref().unwrap_or("").to_string());
+            columns[15].push(row.instrument.as_deref().unwrap_or("").to_string());
+        };
     }
 
     serde_json::json!({
@@ -322,6 +394,7 @@ pub fn generate_html_report(
     sankey_json_per_sample: &[SampleSankeyJson],
     runid: &str,
     logo_path: Option<&Path>,
+    virus: &str,
 ) -> std::io::Result<()> {
     // Set up asset paths
     let (mira_logo, favicon, excel_logo) = if let Some(logo_path) = logo_path {
@@ -359,11 +432,11 @@ pub fn generate_html_report(
     let dais_var_html =
         plotly_table_script("dais_vars_table", &dais_vars_json, "AA Variants Table");
 
-    let minorvars_json = alleles_to_plotly_json(minor_variants);
+    let minorvars_json = alleles_to_plotly_json(minor_variants, virus);
     let minorvars_table_html =
         plotly_table_script("minor_vars_table", &minorvars_json, "Minor Variants Table");
 
-    let indels_json = indels_to_plotly_json(indels);
+    let indels_json = indels_to_plotly_json(indels, virus);
     let indels_table_html = plotly_table_script("indels_table", &indels_json, "Minor Indels Table");
 
     // Coverage links
