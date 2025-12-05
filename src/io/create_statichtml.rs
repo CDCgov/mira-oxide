@@ -411,8 +411,11 @@ pub fn generate_html_report(
 
     // Coverage links
 
-    let mut coverage_links_html =
-        String::from("<h3>Individual Sample Coverage & Sankey Figures</h3><p2>");
+    let mut coverage_links_html = String::from(
+        r#"<div class="centered-link">
+    <h3>Individual Sample Coverage & Sankey Figures</h3>
+    "#,
+    );
     for coverage_json in coverage_json_per_sample {
         let sample = &coverage_json.sample_id;
 
@@ -436,6 +439,7 @@ pub fn generate_html_report(
     // Fasta links
     let mut fasta_links_html = String::from(
         r#"<h2>Fasta downloads</h2>
+        <div class="centered-link">
         <p>(Right-click -> "Save link as...")</p>
         <div>
     "#,
@@ -456,61 +460,131 @@ pub fn generate_html_report(
     // Compose HTML
     let html_string = format!(
         r#"
-<html>
+    <html>
     <head>
         <style>
-        h1 {{text-align: center; font-family: Helvetica;}}
-        h2 {{text-align: center; font-family: Helvetica; margin-bottom: 2px;}}
-        head {{text-align: center; font-family: Helvetica; margin-top: 20px; margin-left: 100px; margin-right: 100px;}}
-        body {{text-align: center; font-family: Helvetica; margin-bottom: 20px; margin-left: 100px; margin-right: 100px;}}
-        p1 {{text-align: left; font-family: Helvetica; margin-top: 20px; margin-bottom: 20px; margin-left: 300px; margin-right: 300px;}}
-        p2 {{text-align: center; font-size: 25px; font-family: Helvetica; margin-bottom: 20px;}}
+            body {{
+                font-family: Helvetica;
+                margin-bottom: 20px;
+                margin-left: 100px;
+                margin-right: 100px;
+            }}
+            .test-info {{
+                text-align: center;
+                margin-bottom: 20px;
+            }}
+            h1, h2 {{
+                text-align: center;
+                font-family: Helvetica;
+            }}
+            .info-paragraph {{
+                text-align: left;
+                margin-top: 20px;
+                margin-bottom: 20px;
+                margin-left: 300px;
+                margin-right: 300px;
+            }}
+            .centered-paragraph {{
+                text-align: center;
+                font-size: 25px;
+                margin-bottom: 20px;
+            }}
+            table {{
+                background-color: #e6f2ff; /* Light blue */
+                border-collapse: collapse;
+                width: 100%;
+            }}
+            th, td {{
+                border: 1px solid #b3d1ff;
+                padding: 8px;
+                text-align: center;
+            }}
+            .centered-link {{
+                text-align: center;
+                margin: 20px 0;
+            }}
+            a {{
+                display: inline-block;
+            }}
         </style>
         <title>MIRA Summary</title>
         <link rel="icon" type="image/x-icon" href="data:image/png;base64,{base64_favicon}">
-        <img src="data:image/png;base64,{base64_logo}">
-        <h1>MIRA Summary Report</h1>
-        <h2>{runid}</h2>
         <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     </head>
-    <hr>
-    <hr>
     <body>
+        <div class="test-info">
+            <img src="data:image/png;base64,{base64_logo}">
+            <h1>MIRA Summary Report</h1>
+            <h2>{runid}</h2>
+        </div>
+        <hr>
+        <hr>
         <h2>Barcode Assignment</h2>
         {bdp_html}
+        <p class="info-paragraph">
+            The ideal result would be a similar number of reads assigned to each test and positive 
+            control. However, it is ok to not have similar read numbers per sample. Samples with a low 
+            proportion of reads may indicate higher Ct of starting material or less performant PCR 
+            during library preparation. What is most important for sequencing assembly is raw count of 
+            reads and their quality.
+        </p>
         <hr>
         <h2>Automatic Quality Control Decisions</h2>
         {pfhm_html}
+        <p class="info-paragraph">
+            MIRA requires a minimum median coverage of 50x, a minimum coverage of the reference 
+            length of 90%, and less than 10 minor variants >=5%. These are marked in yellow to orange 
+            according to the number of these failure types. Samples that failed to generate any assembly 
+            are marked in red. In addition, premature stop codons are flagged in yellow. CDC does not 
+            submit sequences with premature stop codons, particularly in HA, NA or SARS-CoV-2 Spike. 
+            Outside of those genes, premature stop codons near the end of the gene may be ok for 
+            submission. Hover your mouse over the figure to see individual results.
+        </p>
         <hr>
         <h2>Median Coverage</h2>
         {chm_html}
+        <p class="info-paragraph">
+            The heatmap summarizes the mean coverage per sample per reference.
+        </p>
         <hr>
         {irma_sum_html}
-        <a href="./{runid}_summary.csv" download style="display: inline-block; text-align: center;">MIRA Summary Download<br>
-        <img src="data:image/png;base64,{base64_excellogo}" alt="Download excel" width="60" height="40">
-        </a>
+        <div class="centered-link">
+            <a href="./{runid}_summary.csv" download>
+                MIRA Summary Download<br>
+                <img src="data:image/png;base64,{base64_excellogo}" alt="Download excel" width="60" height="40">
+            </a>
+        </div>
         <hr>
         {coverage_links_html}
         <hr>
         {dais_var_html}
-        <a href="./{runid}_aavars.csv" download style="display: inline-block; text-align: center;">AA Variants Table Download<br>
-        <img src="data:image/png;base64,{base64_excellogo}" alt="Download excel" width="60" height="40">
-        </a>
+        <div class="centered-link">
+            <a href="./{runid}_aavars.csv" download>
+                AA Variants Table Download<br>
+                <img src="data:image/png;base64,{base64_excellogo}" alt="Download excel" width="60" height="40">
+            </a>
+        </div>
         <hr>
         {minorvars_table_html}
-        <a href="./{runid}_all_alleles.csv" download style="display: inline-block; text-align: center;">Minor Variant Table Download<br>
-        <img src="data:image/png;base64,{base64_excellogo}" alt="Download excel" width="60" height="40">
-        </a> 
+        <div class="centered-link">
+            <a href="./{runid}_all_alleles.csv" download>
+                Minor Variant Table Download<br>
+                <img src="data:image/png;base64,{base64_excellogo}" alt="Download excel" width="60" height="40">
+            </a>
+        </div>
         <hr>
         {indels_table_html}
-        <a href="./{runid}_indels.csv" download style="display: inline-block; text-align: center;">Minor Indels Table Download<br>
-        <img src="data:image/png;base64,{base64_excellogo}" alt="Download excel" width="60" height="40">
-        </a> 
+        <div class="centered-link">
+            <a href="./{runid}_indels.csv" download>
+                Minor Indels Table Download<br>
+                <img src="data:image/png;base64,{base64_excellogo}" alt="Download excel" width="60" height="40">
+            </a>
+        </div>
         <hr>
         {fasta_links_html}
     </body>
-</html>
-"#
+    </html>
+    "#
     );
 
     // Write to file
