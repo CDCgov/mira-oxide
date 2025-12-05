@@ -96,31 +96,67 @@ fn write_sample_plot_html(
 fn plotly_table_script(div_id: &str, table_json: &str, table_title: &str) -> String {
     format!(
         r#"
-<div id="{div_id}" style="width:95vw; margin:auto;"></div>
+<style>
+#{div_id} table {{
+    border-collapse: collapse;
+    margin: auto;
+    background: #e6f2ff;
+    /* Set a max width for the whole table if you want, or remove for auto */
+    max-width: 1200px;
+    width: auto;
+}}
+#{div_id} th, #{div_id} td {{
+    border: 1px solid #b3d1ff;
+    padding: 8px;
+    text-align: center;
+    white-space: normal;
+    word-break: break-word;
+    font-family: Helvetica, Arial, sans-serif;
+    font-size: 14px;
+    user-select: text;
+    /* Set a fixed width for each cell */
+    width: 180px;      /* You can adjust this value as needed */
+    max-width: 180px;  /* Ensures cell doesn't grow wider */
+    box-sizing: border-box;
+}}
+#{div_id} th {{
+    font-weight: bold;
+    font-size: 16px;
+}}
+</style>
+<div style="overflow-x:auto; width:95vw; margin:auto; display: flex; justify-content: center;">
+  <div id="{div_id}">
+    <h3 style="text-align:center;">{table_title}</h3>
+    <table id="{div_id}_table"></table>
+  </div>
+</div>
 <script type="text/javascript">
 (function() {{
     var data = {table_json};
-    var trace = {{
-        type: 'table',
-        header: {{
-            values: data.header,
-            align: "center",
-            line: {{width: 1, color: 'black'}},
-            fill: {{color: "lightgrey"}},
-            font: {{family: "Helvetica", size: 14, color: "black"}}
-        }},
-        cells: {{
-            values: data.columns,
-            align: "center",
-            line: {{color: "black", width: 1}},
-            font: {{family: "Helvetica", size: 12, color: ["black"]}}
+    var table = document.getElementById('{div_id}_table');
+    // Create header
+    var thead = document.createElement('thead');
+    var headerRow = document.createElement('tr');
+    data.header.forEach(function(h) {{
+        var th = document.createElement('th');
+        th.innerHTML = h;
+        headerRow.appendChild(th);
+    }});
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+    // Create body
+    var tbody = document.createElement('tbody');
+    var numRows = data.columns[0].length;
+    for (var i = 0; i < numRows; i++) {{
+        var tr = document.createElement('tr');
+        for (var j = 0; j < data.columns.length; j++) {{
+            var td = document.createElement('td');
+            td.innerHTML = data.columns[j][i];
+            tr.appendChild(td);
         }}
-    }};
-    Plotly.newPlot('{div_id}', [trace], {{
-        title: '{table_title}',
-        margin: {{t: 40, l: 10, r: 10, b: 10}},
-        autosize: true
-    }}, {{displayModeBar: false}});
+        tbody.appendChild(tr);
+    }}
+    table.appendChild(tbody);
 }})();
 </script>
 "#
