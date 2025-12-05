@@ -466,7 +466,7 @@ pub fn generate_html_report(
     // Fasta links
     let mut fasta_links_html = String::from(
         r#"<h2>Fasta downloads</h2>
-        <p>(Right-click → "Save link as...")</p>
+        <p>(Right-click -> "Save link as...")</p>
         <div>
     "#,
     );
