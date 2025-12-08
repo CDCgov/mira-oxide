@@ -1,5 +1,5 @@
 #![allow(dead_code, unused_imports)]
-use crate::io::coverage_json_per_sample::{self, create_coverage_plot};
+use crate::io::coverage_json_per_sample::create_coverage_plot;
 use crate::io::coverage_to_heatmap::coverage_to_heatmap_json;
 use crate::io::create_passfail_heatmap::create_passfail_heatmap;
 use crate::io::create_statichtml::generate_html_report;

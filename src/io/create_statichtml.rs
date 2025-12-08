@@ -97,11 +97,20 @@ fn plotly_table_script(div_id: &str, table_json: &str, table_title: &str) -> Str
     format!(
         r#"
 <style>
+#{div_id} .scroll-table-window {{
+    max-height: 500px;   /* Adjust this value as needed */
+    overflow-y: auto;
+    overflow-x: auto;
+    width: 100%;
+    margin: auto;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    background: #e6f2ff;
+}}
 #{div_id} table {{
     border-collapse: collapse;
     margin: auto;
     background: #e6f2ff;
-    /* Set a max width for the whole table if you want, or remove for auto */
     max-width: 1200px;
     width: auto;
 }}
@@ -114,9 +123,8 @@ fn plotly_table_script(div_id: &str, table_json: &str, table_title: &str) -> Str
     font-family: Helvetica, Arial, sans-serif;
     font-size: 14px;
     user-select: text;
-    /* Set a fixed width for each cell */
-    width: 180px;      /* You can adjust this value as needed */
-    max-width: 180px;  /* Ensures cell doesn't grow wider */
+    width: 180px;
+    max-width: 180px;
     box-sizing: border-box;
 }}
 #{div_id} th {{
@@ -127,7 +135,9 @@ fn plotly_table_script(div_id: &str, table_json: &str, table_title: &str) -> Str
 <div style="overflow-x:auto; width:95vw; margin:auto; display: flex; justify-content: center;">
   <div id="{div_id}">
     <h3 style="text-align:center;">{table_title}</h3>
-    <table id="{div_id}_table"></table>
+    <div class="scroll-table-window">
+      <table id="{div_id}_table"></table>
+    </div>
   </div>
 </div>
 <script type="text/javascript">
@@ -493,7 +503,7 @@ pub fn generate_html_report(
 
     fasta_links_html.push_str("</div>");
 
-    // Compose HTML
+    // Compose HTML - main html for whole page
     let html_string = format!(
         r#"
     <html>

@@ -47,25 +47,25 @@ fn dash_reads_to_sankey(data: &[ReadsData], virus: &str) -> Value {
             '1' => {
                 x_pos.push(0.05);
                 y_pos.push(0.1);
-                color.push("#357EC7".to_string());
+                color.push("#87B5E3".to_string());
             }
             '2' => {
                 x_pos.push(0.2);
                 y_pos.push(0.1);
-                color.push("#357EC7".to_string());
+                color.push("#3382CF".to_string());
             }
             '3' => {
                 x_pos.push(0.35);
                 y_pos.push(0.1);
-                color.push("#357EC7".to_string());
+                color.push("#0057B7".to_string());
             }
             _ => {
                 x_pos.push(0.95);
                 y_pos.push(0.01);
 
-                let fallback_color = "#357EC7".to_string();
+                let fallback_color = "#032659".to_string();
                 let seg_key = seg(label);
-                let seg_color = reccolor.get(&seg_key).unwrap_or(&fallback_color); // Use a reference to `fallback_color`
+                let seg_color = reccolor.get(&seg_key).unwrap_or(&fallback_color);
                 color.push(seg_color.clone());
             }
         }
@@ -125,7 +125,7 @@ fn dash_reads_to_sankey(data: &[ReadsData], virus: &str) -> Value {
                 "source": source,
                 "target": target,
                 "value": value,
-                "color": color[1..].to_vec(),
+                "color": "#DBE8F7".to_string(),
                 "hovertemplate": "<extra></extra>"
             }
         }]
