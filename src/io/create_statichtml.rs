@@ -48,7 +48,14 @@ fn base64_img(path: &Path) -> String {
 fn plotly_json_script(div_id: &str, plotly_json: &str) -> String {
     format!(
         r#"
-<div id="{div_id}" style="width:95vw; margin:auto;"></div>
+<div style="display:flex; justify-content:center; width:100%;">
+    <div id="{div_id}" style="
+        width:85vw;
+        max-width:1200px;
+        margin:0 auto;
+    "></div>
+</div>
+
 <script type="text/javascript">
 (function() {{
     var fig = {plotly_json};
@@ -92,28 +99,37 @@ fn write_sample_plot_html(
     write(out_path, html)
 }
 
-//Format plotly table
+// Format plotly table
 fn plotly_table_script(div_id: &str, table_json: &str, table_title: &str) -> String {
     format!(
         r#"
 <style>
+/* Center the entire table block */
+#{div_id}-container {{
+    width: 95vw;
+    max-width: 1200px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}}
+
 #{div_id} .scroll-table-window {{
-    max-height: 500px;   /* Adjust this value as needed */
+    max-height: 500px;
     overflow-y: auto;
     overflow-x: auto;
-    width: 100%;
-    margin: auto;
+    margin: 0 auto;
     border-radius: 8px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.05);
     background: #e6f2ff;
 }}
+
 #{div_id} table {{
     border-collapse: collapse;
-    margin: auto;
+    margin: 0 auto;
     background: #e6f2ff;
-    max-width: 1200px;
-    width: auto;
 }}
+
 #{div_id} th, #{div_id} td {{
     border: 1px solid #b3d1ff;
     padding: 8px;
@@ -125,14 +141,17 @@ fn plotly_table_script(div_id: &str, table_json: &str, table_title: &str) -> Str
     user-select: text;
     width: 180px;
     max-width: 180px;
-    box-sizing: border-box;
 }}
+
 #{div_id} th {{
     font-weight: bold;
     font-size: 16px;
+    text-align: center;
 }}
 </style>
-<div style="overflow-x:auto; width:95vw; margin:auto; display: flex; justify-content: center;">
+
+<!-- Center wrapper -->
+<div id="{div_id}-container">
   <div id="{div_id}">
     <h3 style="text-align:center;">{table_title}</h3>
     <div class="scroll-table-window">
@@ -140,10 +159,12 @@ fn plotly_table_script(div_id: &str, table_json: &str, table_title: &str) -> Str
     </div>
   </div>
 </div>
+
 <script type="text/javascript">
 (function() {{
     var data = {table_json};
     var table = document.getElementById('{div_id}_table');
+
     // Create header
     var thead = document.createElement('thead');
     var headerRow = document.createElement('tr');
@@ -154,6 +175,7 @@ fn plotly_table_script(div_id: &str, table_json: &str, table_title: &str) -> Str
     }});
     thead.appendChild(headerRow);
     table.appendChild(thead);
+
     // Create body
     var tbody = document.createElement('tbody');
     var numRows = data.columns[0].length;
