@@ -4,7 +4,7 @@ use plotly::{
     common::{Fill, Line, Mode, Title},
     layout::{Axis, AxisType, Layout, Shape, ShapeLine, ShapeType},
 };
-use std::error::Error;
+use std::{collections::HashMap, error::Error};
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct SampleCoverageJson {
@@ -19,6 +19,7 @@ pub fn create_sample_coverage_fig(
     data: &[CoverageData],
     segments: &[String],
     cov_linear_y: bool,
+    virus: &str,
 ) -> Result<Plot, Box<dyn Error>> {
     let mut plot = Plot::new();
 
@@ -116,19 +117,31 @@ pub fn create_sample_coverage_fig(
     };
 
     // Predefined list of colors for ORFs and different flu segments
-    let color_palette = [
-        "rgba(0, 128, 255, 0.5)",   // Light Blue
-        "rgba(255, 0, 0, 0.5)",     // Red
-        "rgba(0, 255, 0, 0.5)",     // Green
-        "rgba(0, 0, 255, 0.5)",     // Blue
-        "rgba(255, 255, 0, 0.5)",   // Yellow
-        "rgba(255, 0, 255, 0.5)",   // Magenta
-        "rgba(0, 255, 255, 0.5)",   // Cyan
-        "rgba(128, 0, 128, 0.5)",   // Purple
-        "rgba(128, 128, 0, 0.5)",   // Olive
-        "rgba(0, 128, 128, 0.5)",   // Teal
-        "rgba(128, 128, 128, 0.5)", // Gray
-        "rgba(255, 128, 0, 0.5)",   // Orange
+    let orf_color_palette = [
+        "#5796D9", // Light Blue
+        "#CC1B22", // Red
+        "#125261", // Dark Teal
+        "#0057B7", // Blue
+        "#FABF61", // Yellow
+        "#722161", // Magenta
+        "#00B1CE", // Light Teal
+        "#B278B2", // Purple
+        "#DB5E2E", // Light Orange
+        "#D1ADD4", // Light Purple
+        "#B8D4ED", // White Blue
+        "#FB7E38", // Orange
+    ];
+
+    // Pattern-based color map for flu
+    let flu_pattern_colors: Vec<(&str, &str)> = vec![
+        ("HA", "#5796D9"),  // Light Blue
+        ("NA", "#7DDEEC"),  // Teal
+        ("MP", "#B278B2"),  // Purple
+        ("NP", "#FABF61"),  // Yellow
+        ("NS", "#FF9C63"),  // Orange
+        ("PA", "#F0695E"),  // Light Red
+        ("PB1", "#0081A1"), // Dark Teal
+        ("PB2", "#8F4A8F"), // Dark Purplr
     ];
 
     // Add ORF boxes to the plot
@@ -139,11 +152,12 @@ pub fn create_sample_coverage_fig(
         0.9
     };
 
+    // Add ORF box info to plot
     for (i, (orf, (start, end))) in orf_positions.iter().enumerate() {
         let x = vec![*start, *end, *end, *start, *start];
         let y = vec![oy, oy, 0.0, 0.0, oy];
-        let color = color_palette
-            .get(i % color_palette.len())
+        let color = orf_color_palette
+            .get(i % orf_color_palette.len())
             .unwrap_or(&"rgba(0, 128, 0, 0.5)");
 
         let trace = Scatter::new(x.clone(), y.clone()) // Clone the data to ensure ownership
@@ -167,12 +181,21 @@ pub fn create_sample_coverage_fig(
             let x: Vec<i32> = segment_data.iter().map(|d| d.position).collect();
             let y: Vec<i32> = segment_data.iter().map(|d| d.coverage_depth).collect();
 
-            let color = color_palette[seg_idx % color_palette.len()].to_string();
+            // Determine color by virus
+            let color = if virus == "flu" {
+                flu_pattern_colors
+                    .iter()
+                    .find(|(pattern, _)| segment.contains(pattern))
+                    .map_or("#000000".to_string(), |(_, color)| (*color).to_string())
+            } else {
+                orf_color_palette[seg_idx % orf_color_palette.len()].to_string()
+            };
 
             let trace = Scatter::new(x, y)
                 .mode(Mode::Lines)
-                .line(Line::new().color(color.clone()))
+                .line(Line::new().color(color))
                 .name(segment.clone());
+
             plot.add_trace(trace);
         }
     }
@@ -232,6 +255,7 @@ pub fn create_sample_coverage_fig(
 pub fn create_coverage_plot(
     data: &[CoverageData],
     segments: Vec<String>,
+    virus: &str,
     output_file: &str,
 ) -> Result<Vec<SampleCoverageJson>, Box<dyn Error>> {
     let samples: Vec<String> = data
@@ -246,7 +270,7 @@ pub fn create_coverage_plot(
     let mut json_vec = Vec::new();
 
     for sample in samples {
-        let coverage_fig = create_sample_coverage_fig(&sample, data, &segments, true)?;
+        let coverage_fig = create_sample_coverage_fig(&sample, data, &segments, true, virus)?;
         let file_name = format!("{output_file}/coveragefig_{sample}_linear.json");
         let json_value = serde_json::to_value(&coverage_fig)?;
         let json_output = serde_json::to_string_pretty(&json_value)?;

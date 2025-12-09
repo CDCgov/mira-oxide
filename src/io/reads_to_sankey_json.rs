@@ -101,11 +101,7 @@ fn dash_reads_to_sankey(data: &[ReadsData], virus: &str) -> Value {
     }
 
     // Determine arrangement
-    let arrangement = if virus.contains("sc2") || virus.contains("rsv") {
-        "freeform"
-    } else {
-        "snap"
-    };
+    let arrangement = "snap";
 
     // Create Sankey diagram JSON
     let fig = json!({

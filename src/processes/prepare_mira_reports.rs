@@ -434,6 +434,7 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
     let coverage_json_per_sample = create_coverage_plot(
         &coverage_data,
         segments,
+        &args.virus,
         &format!("{}/", &args.output_path.display()),
     )?;
 

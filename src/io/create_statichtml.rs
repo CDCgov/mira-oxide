@@ -308,7 +308,7 @@ fn alleles_to_plotly_json(data: &[AllelesData], virus: &str) -> String {
             columns[8].push(format!("{:.4}", row.minority_frequency));
             columns[9].push(row.run_id.as_deref().unwrap_or("").to_string());
             columns[10].push(row.instrument.as_deref().unwrap_or("").to_string());
-        };
+        }
     }
 
     serde_json::json!({
@@ -386,7 +386,7 @@ fn indels_to_plotly_json(data: &[IndelsData], virus: &str) -> String {
             columns[8].push(format!("{:.2}", row.frequency));
             columns[9].push(row.run_id.as_deref().unwrap_or("").to_string());
             columns[10].push(row.instrument.as_deref().unwrap_or("").to_string());
-        };
+        }
     }
 
     serde_json::json!({
