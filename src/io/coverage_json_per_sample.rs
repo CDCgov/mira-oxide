@@ -4,7 +4,7 @@ use plotly::{
     common::{Fill, Line, Mode, Title},
     layout::{Axis, AxisType, Layout, Shape, ShapeLine, ShapeType},
 };
-use std::{collections::HashMap, error::Error};
+use std::error::Error;
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct SampleCoverageJson {
