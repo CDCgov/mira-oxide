@@ -2,6 +2,7 @@
 use crate::io::coverage_json_per_sample::create_coverage_plot;
 use crate::io::coverage_to_heatmap::coverage_to_heatmap_json;
 use crate::io::create_passfail_heatmap::create_passfail_heatmap;
+use crate::io::create_statichtml::generate_html_report;
 use crate::io::reads_to_piechart::create_barcode_distribution_figure;
 use crate::io::reads_to_sankey_json::reads_to_sankey_json;
 use crate::io::write_parquet_files::write_samplesheet_to_parquet;
@@ -211,7 +212,6 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
     }
 
     //Gather subtype information
-    //todo: add rsv handling - fix sc2-spike handling
     let mut subtype_data: Vec<Subtype> = Vec::new();
     if args.virus.to_lowercase() == "flu" {
         subtype_data = extract_subtype_flu(&dais_vars_data)?;
@@ -326,6 +326,7 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
         &read_data,
         &allele_data,
         &indel_data,
+        &dais_vars_data,
         &irma_summary,
         &nt_seq_vec,
         &aa_seq_vec,
@@ -430,33 +431,54 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
 
     //////////////////////////////// Create JSONS for Dashboard ////////////////////////////////
 
-    let _ = create_coverage_plot(
+    let coverage_json_per_sample = create_coverage_plot(
         &coverage_data,
         segments,
+        &args.virus,
         &format!("{}/", &args.output_path.display()),
-    );
+    )?;
 
-    reads_to_sankey_json(
+    let sankey_json_per_sample = reads_to_sankey_json(
         &read_data,
         &args.virus,
         &format!("{}/", &args.output_path.display()),
     );
 
-    coverage_to_heatmap_json(
+    let cov_heatmap_json = coverage_to_heatmap_json(
         &transformed_cov_data,
         &sample_list,
         &args.virus,
         &format!("{}/", &args.output_path.display()),
     );
 
-    create_passfail_heatmap(
+    let pass_fail_heatmap_json = create_passfail_heatmap(
         &irma_summary,
         &sample_list,
         &args.virus,
         &format!("{}/", &args.output_path.display()),
     );
 
-    create_barcode_distribution_figure(&read_data, &format!("{}/", &args.output_path.display()));
+    let barcode_distribution_json = create_barcode_distribution_figure(
+        &read_data,
+        &format!("{}/", &args.output_path.display()),
+    );
+
+    //////////////////////////////// Create staticHTML ////////////////////////////////
+    let _ = generate_html_report(
+        &args.output_path,
+        &irma_summary,
+        &dais_vars_data,
+        &allele_data.all_alleles,
+        &indel_data,
+        &barcode_distribution_json,
+        &pass_fail_heatmap_json,
+        &cov_heatmap_json,
+        &coverage_json_per_sample,
+        &sankey_json_per_sample,
+        &args.runid,
+        Some(&args.workdir_path),
+        &args.virus,
+    );
 
     Ok(())
 }

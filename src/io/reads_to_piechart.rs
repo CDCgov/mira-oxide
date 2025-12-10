@@ -1,7 +1,12 @@
 use super::data_ingest::ReadsData;
 use serde_json::json;
 
-pub fn create_barcode_distribution_figure(summaries: &[ReadsData], output_path: &str) {
+/// Creates a barcode distribution figure - writes it to a file and returns the JSON object.
+#[must_use]
+pub fn create_barcode_distribution_figure(
+    summaries: &[ReadsData],
+    output_path: &str,
+) -> serde_json::Value {
     println!("Building barcode distribution pie figure");
 
     // Prepare vectors for samples and reads
@@ -43,4 +48,7 @@ pub fn create_barcode_distribution_figure(summaries: &[ReadsData], output_path: 
         .expect("Failed to write barcode distribution JSON");
 
     println!("  -> barcode distribution pie figure saved to {file_path}");
+
+    // Return the JSON object
+    plot_json
 }
