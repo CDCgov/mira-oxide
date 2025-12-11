@@ -73,23 +73,30 @@ fn write_sample_plot_html(
     sankey_json: &serde_json::Value,
 ) -> std::io::Result<()> {
     let html = format!(
-        r#"<!DOCTYPE html>
+        r#"
 <html>
 <head>
-    <title>{sample} Coverage & Sankey</title>
+    <style>
+        body {{
+            font-family: Helvetica;
+            margin-bottom: 20px;
+            margin-left: 100px;
+            margin-right: 100px;
+        }}
+    </style>
+    <title>Coverage & Sankey</title>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 </head>
 <body>
-    <h2>{sample} Coverage Plot</h2>
-    <div id="coverage_plot" style="width:90vw; height:40vh;"></div>
-    <h2>{sample} Sankey Plot</h2>
-    <div id="sankey_plot" style="width:90vw; height:40vh;"></div>
-    <script>
-        var coverage_fig = {coverage_json};
-        Plotly.newPlot('coverage_plot', coverage_fig.data, coverage_fig.layout);
+    <h2>Sankey Plot - {sample}</h2>
+    <div id="sankey_plot" class="plot-container"></div>
 
-        var sankey_fig = {sankey_json};
-        Plotly.newPlot('sankey_plot', sankey_fig.data, sankey_fig.layout);
+    <h2>Coverage Plot - {sample}</h2>
+    <div id="coverage_plot" class="plot-container"></div>
+
+    <script>
+        Plotly.newPlot('sankey_plot', {sankey_json}.data, {sankey_json}.layout);
+        Plotly.newPlot('coverage_plot', {coverage_json}.data, {coverage_json}.layout);
     </script>
 </body>
 </html>
