@@ -237,7 +237,6 @@ fn plotly_template(colorscale: &Vec<(f64, &str)>) -> serde_json::Value {
         },
         "layout": {
             "autotypenumbers": "strict",
-            "colorway": ["#636efa","#EF553B","#00cc96","#ab63fa","#FFA15A","#19d3f3","#FF6692","#B6E880","#FF97FF","#FECB52"],
             "font": {"color": "#2a3f5f"},
             "hovermode": "closest",
             "hoverlabel": {"align": "left"},
@@ -258,9 +257,6 @@ fn plotly_template(colorscale: &Vec<(f64, &str)>) -> serde_json::Value {
             "colorscale": {
                 "sequential": colorscale,
                 "sequentialminus": colorscale,
-                "diverging": [
-                    [0,"#8e0152"],[0.1,"#c51b7d"],[0.2,"#de77ae"],[0.3,"#f1b6da"],[0.4,"#fde0ef"],[0.5,"#f7f7f7"],[0.6,"#e6f5d0"],[0.7,"#b8e186"],[0.8,"#7fbc41"],[0.9,"#4d9221"],[1,"#276419"]
-                ]
             },
             "xaxis": {
                 "gridcolor": "white",
@@ -307,10 +303,10 @@ pub fn create_passfail_heatmap(
     println!("Building pass_fail_heatmap as flat JSON");
 
     let colorscale = vec![
-        (0.0, "rgb(160,200,255)"),
-        (0.25, "rgb(255,255,255)"),
-        (0.5, "rgb(230,210,0)"),
-        (0.75, "rgb(230,0,0)"),
+        (0.0, "rgb(184, 212, 237)"),
+        (0.25, "rgb(252, 235, 201)"),
+        (0.5, "rgb(251, 126, 56)"),
+        (0.75, "rgb(204, 27, 34)"),
         (1.0, "rgb(0,0,0)"),
     ];
 

@@ -20,7 +20,28 @@ pub fn create_barcode_distribution_figure(
         }
     }
 
-    // Build the JSON structure
+    // Color palette
+    let colors = vec![
+        "#0057B7", "#0081A1", "#722161", "#DE8A05", "#FB7E38", "#CC1B22", "#032659", "#125261",
+        "#47264F", "#975722", "#944521", "#660F14", "#3382CF", "#00B1CE", "#8F4A8F", "#FFB24D",
+        "#DB5E2E", "#961C1C",
+    ]
+    .into_iter()
+    .map(std::string::ToString::to_string)
+    .collect::<Vec<String>>();
+
+    assert!(!colors.is_empty(), "Color list cannot be empty.");
+
+    // Cycle colors to match number of samples
+    let cycled_colors: Vec<String> = samples
+        .iter()
+        .enumerate()
+        .map(|(i, _)| colors[i % colors.len()].clone())
+        .collect();
+
+    let marker_json = json!({ "colors": cycled_colors });
+
+    // Build pie chart JSON
     let pie_data = json!({
         "domain": { "x": [0.0, 1.0], "y": [0.0, 1.0] },
         "hovertemplate": "Sample=%{label}<br>Reads=%{value}<extra></extra>",
@@ -31,15 +52,13 @@ pub fn create_barcode_distribution_figure(
         "values": reads,
         "type": "pie",
         "textinfo": "percent+label",
-        "textposition": "inside"
+        "textposition": "inside",
+        "marker": marker_json,
     });
 
-    // Minimal layout
     let plot_json = json!({
         "data": [pie_data],
-        "layout": {
-            "margin": { "t": 60 }
-        }
+        "layout": { "margin": { "t": 60 } }
     });
 
     // Save to file
@@ -49,6 +68,5 @@ pub fn create_barcode_distribution_figure(
 
     println!("  -> barcode distribution pie figure saved to {file_path}");
 
-    // Return the JSON object
     plot_json
 }
