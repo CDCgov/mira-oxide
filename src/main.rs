@@ -5,9 +5,14 @@
     clippy::upper_case_acronyms
 )]
 use crate::processes::{
-
-    all_sample_hd::*, all_sample_nt_diffs::*, check_mira_version::*, find_chemistry::*, plotter::*,
-    positions_of_interest::*, variants_of_interest::*, prepare_mira_reports::*,
+    all_sample_hd::{HammingArgs, all_sample_hd_process},
+    all_sample_nt_diffs::{NTDiffsArgs, all_sample_nt_diffs_process},
+    check_mira_version::{MiraVersionArgs, check_mira_version},
+    find_chemistry::{FindChemArgs, find_chemistry_process},
+    plotter::{PlotterArgs, plotter_process},
+    positions_of_interest::{PositionsArgs, positions_of_interest_process},
+    prepare_mira_reports::{ReportsArgs, prepare_mira_reports_process},
+    variants_of_interest::{VariantsArgs, variants_of_interest_process},
 };
 use clap::{Parser, Subcommand};
 use zoe::prelude::OrFail;
@@ -49,9 +54,10 @@ fn main() {
             variants_of_interest_process(cmd_args)
                 .unwrap_or_else(|_| panic!("{module}::VariantsOfInterest"));
         }
-        Commands::PositionsOfInterest(cmd_args) => positions_of_interest_process(cmd_args)
-            .unwrap_or_else(|_| panic!("{module}::PositionsOfInterest")),
-
+        Commands::PositionsOfInterest(cmd_args) => {
+            positions_of_interest_process(cmd_args)
+                .unwrap_or_else(|_| panic!("{module}::PositionsOfInterest"));
+        }
         Commands::FindChemistry(cmd_args) => {
             find_chemistry_process(&cmd_args).unwrap_or_die(&format!("{module}::FindChemistry"));
         }
@@ -60,17 +66,15 @@ fn main() {
         }
         Commands::NTDiffs(cmd_args) => all_sample_nt_diffs_process(&cmd_args),
         Commands::Plotter(cmd_args) => {
-            plotter_process(cmd_args).unwrap_or_else(|_| panic!("{module}::Plotter"))
+            plotter_process(cmd_args).unwrap_or_else(|_| panic!("{module}::Plotter"));
         }
         Commands::CheckMiraVersion(cmd_args) => {
-            check_mira_version(cmd_args).unwrap_or_die(&format!("{module}::CheckMiraVersion"))
+            check_mira_version(&cmd_args).unwrap_or_die(&format!("{module}::CheckMiraVersion"));
         }
-        _ => {
-            eprintln!("mira-oxide: unrecognized command {:?}", args.command);
-            std::process::exit(1)
+        Commands::PrepareMiraReports(cmd_args) => {
+            prepare_mira_reports_process(&cmd_args)
+                .unwrap_or_else(|e| panic!("{module}::PrepareMiraReports: {e}"));
         }
-        Commands::PrepareMiraReports(cmd_args) => prepare_mira_reports_process(&cmd_args)
-            .unwrap_or_else(|e| panic!("{module}::PrepareMiraReports: {e}")),
     }
 }
 
