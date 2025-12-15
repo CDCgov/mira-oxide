@@ -7,7 +7,7 @@ pub fn create_barcode_distribution_figure(
     summaries: &[ReadsData],
     output_path: &str,
 ) -> serde_json::Value {
-    println!("Building barcode distribution pie figure");
+    println!("Building barcode distribution pie figure as JSON");
 
     // Prepare vectors for samples and reads
     let mut samples = Vec::new();

@@ -300,7 +300,7 @@ pub fn create_passfail_heatmap(
     virus: &str,
     output_path: &str,
 ) -> serde_json::Value {
-    println!("Building pass_fail_heatmap as flat JSON");
+    println!("Building pass_fail_heatmap as JSON");
 
     let colorscale = vec![
         (0.0, "rgb(184, 212, 237)"),

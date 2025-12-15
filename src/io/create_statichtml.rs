@@ -441,6 +441,8 @@ pub fn generate_html_report(
     logo_path: Option<&Path>,
     virus: &str,
 ) -> std::io::Result<()> {
+    println!("Building static HTML file");
+
     // Set up asset paths
     let (mira_logo, favicon, excel_logo) = if let Some(logo_path) = logo_path {
         (
@@ -664,7 +666,9 @@ pub fn generate_html_report(
 
     // Write to file
     let out_path = output_path.join(format!("MIRA-summary-{runid}.html"));
-    write(out_path, html_string)?;
+    write(&out_path, html_string)?;
+
+    println!("  -> static HTML saved to {:?}", out_path.display());
 
     Ok(())
 }

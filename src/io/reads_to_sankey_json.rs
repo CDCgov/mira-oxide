@@ -171,7 +171,7 @@ pub fn reads_to_sankey_json(
     virus: &str,
     output_file: &str,
 ) -> Vec<SampleSankeyJson> {
-    println!("Building read sankey plot");
+    println!("Building read sankey plots as JSON");
 
     let unique_samples: Vec<_> = data
         .iter()

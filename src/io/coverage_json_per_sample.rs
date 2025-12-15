@@ -265,7 +265,10 @@ pub fn create_coverage_plot(
         .into_iter()
         .collect();
 
-    println!("Building coverage plots for {} samples", samples.len());
+    println!(
+        "Building coverage plots for {} samples as JSONs",
+        samples.len()
+    );
 
     let mut json_vec = Vec::new();
 

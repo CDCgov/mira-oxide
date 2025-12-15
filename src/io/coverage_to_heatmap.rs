@@ -139,6 +139,7 @@ pub fn coverage_to_heatmap_json(
     virus: &str,
     output_file: &str,
 ) -> serde_json::Value {
+    println!("Building coverage heatmap as JSON");
     let filtered_data = normalize_rsv_segments(coverage_data, virus);
     let references = get_references_for_virus(virus);
     let completed_data = complete_data_for_samples(&filtered_data, sample_list, &references);
