@@ -17,7 +17,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### `Fixed`
 - [PR #53](https://github.com/CDCgov/mira-oxide/pull/53) - Fix github trigger to run upon tagging. Not merging from dev.
 
-
 ## [1.1.3] - 2025-11-26
 
 - [Sam Wiley](https://github.com/samcwiley)
