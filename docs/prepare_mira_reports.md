@@ -33,50 +33,167 @@ This script is a comprehensive data aggregation and processing tool designed to 
     (Optional) A flag to indicate whether to create Parquet files.
 
 -c, --irma-config <String> (default: "default-config")
-    (Optional) The IRMA configuration used for processing.
+    (Optional) The name of the IRMA configuration that was used for running IRMA.
 
 ## How to Run
 After cloning the mira-oxide repo, execute this command to create a mutations of interest table for the samples:
 
 ```bash
-cargo run -- prepare-mira-reports -s <PATH>/samplesheet.csv -i ~<PATH_TO_MIRA_NF_OUTPUTS. -o <OUTDIR> -q <PATH>/qc_test.yaml -p <PLATFORM> -w <PATH>/MIRA-NF -r <RUN_ID> -v <VIRUS> 
+cargo run -- prepare-mira-reports -s <PATH>/samplesheet.csv -i ~<PATH_TO_MIRA_NF_OUTPUTS. -o <OUTDIR> -q <PATH>/qc_test.yaml -p <PLATFORM> -w <PATH>/MIRA-NF -r <RUN_ID> -v <VIRUS> -f
 ```
 
-### Files Outputs
+### Files Outputs with no -f flag invoked
 
 ```
-FASTA written to ./test/flu_run_id_test_amended_consensus_summary.fasta
-FASTA written to ./test/flu_run_id_test_failed_amended_consensus_summary.fasta
-FASTA written to ./test/flu_run_id_test_amino_acid_consensus_summary.fasta
-FASTA written to ./test/flu_run_id_test_failed_amino_acid_consensus_summary.fasta
-CSV written to ./test/flu_run_id_test_coverage.csv
-CSV written to ./test/flu_run_id_test_reads.csv
-CSV written to ./test/flu_run_id_test_alleles.csv
-CSV written to ./test/flu_run_id_test_indels.csv
-CSV written to ./test/flu_run_id_test_variants.csv
-CSV written to ./test/flu_run_id_test_summary.csv
-CSV written to ./test/flu_run_id_test_amended_consensus.csv
-CSV written to ./test/flu_run_id_test_amino_acid_consensus.csv
-CSV written to ./test/flu_run_id_test_irma_config.csv
-Split-oriented JSON written to ./test/coverage.json
-Split-oriented JSON written to ./test/reads.json
-Split-oriented JSON written to ./test/vtype.json
-Split-oriented JSON written to ./test/alleles.json
-Split-oriented JSON written to ./test/indels.json
-Data written to ref_data.json
-Split-oriented JSON written to ./test/dais_vars.json
-JSON written to ./test/qc_statement.json
-Split-oriented JSON written to ./test/irma_summary.json
-Split-oriented JSON written to ./test/pass_fail_qc.json
-Split-oriented JSON written to ./test/nt_sequences.json
-PARQUET written to ./test/flu_run_id_test_coverage.parq
-PARQUET written to ./test/flu_run_id_test_reads.parq
-PARQUET written to ./test/flu_run_id_test_alleles.parq
-PARQUET written to ./test/flu_run_id_test_indels.parq
-PARQUET written to ./test/flu_run_id_test_variants.parq
-PARQUET written to ./test/flu_run_id_test_summary.parq
-PARQUET written to ./test/flu_run_id_test_amended_consensus.parq
-PARQUET written to ./test/flu_run_id_test_amino_acid_consensus.parq
-PARQUET written to ./test/flu_run_id_test_irma_config.parq
+Starting data ingestion...
+Finished ingesting data.
+Writing Output Files...
+Writing FASTA files
+ -> FASTA written to ./test/run_id_test_amended_consensus_summary.fasta
+ -> FASTA written to ./test/run_id_test_failed_amended_consensus_summary.fasta
+ -> FASTA written to ./test/run_id_test_amino_acid_consensus_summary.fasta
+ -> FASTA written to ./test/run_id_test_failed_amino_acid_consensus_summary.fasta
+Writing CSV files
+ -> CSV written to ./test/run_id_test_coverage.csv
+ -> CSV written to ./test/run_id_test_reads.csv
+ -> CSV written to ./test/run_id_test_all_alleles.csv
+ -> CSV written to ./test/run_id_test_indels.csv
+ -> CSV written to ./test/run_id_test_filtered_variants.csv
+ -> CSV written to ./test/run_id_test_aavars.csv
+ -> CSV written to ./test/run_id_test_summary.csv
+ -> CSV written to ./test/run_id_test_amended_consensus.csv
+ -> CSV written to ./test/run_id_test_amino_acid_consensus.csv
+ -> CSV written to ./test/run_id_test_irma_config.csv
+Writing JSON files
+ -> JSON written to ./test/coverage.json
+ -> JSON written to ./test/reads.json
+ -> JSON written to ./test/vtype.json
+ -> JSON written to ./test/alleles.json
+ -> JSON written to ./test/indels.json
+ -> JSON written to ./test/dais_vars.json
+ -> JSON written to ./test/qc_statement.json
+ -> JSON written to ./test/irma_summary.json
+ -> JSON written to ./test/pass_fail_qc.json
+ -> JSON written to ./test/nt_sequences.json
+Building coverage plots for 2 samples as JSONs
+  -> saved ./test/coveragefig_s1_linear.json
+  -> saved ./test/coveragefig_s3_linear.json
+Building read sankey plots as JSON
+  -> read sankey plot json saved to ./test/readsfig_s3.json
+  -> read sankey plot json saved to ./test/readsfig_s2.json
+  -> read sankey plot json saved to ./test/readsfig_s1.json
+Building coverage heatmap as JSON
+  -> coverage heatmap json saved to ./test/heatmap.json
+Building pass_fail_heatmap as JSON
+  -> pass_fail heatmap json saved to ./test/pass_fail_heatmap.json
+Building barcode distribution pie figure as JSON
+  -> barcode distribution pie figure saved to ./test/barcode_distribution.json
+Building static HTML file
+  -> static HTML saved to "./test/MIRA-summary-run_id_test.html"
 ```
 
+
+### Files Outputs when -f flag invoked
+
+```
+Starting data ingestion...
+Finished ingesting data.
+Writing Output Files...
+Writing FASTA files
+ -> FASTA written to ./test/run_id_test_amended_consensus_summary.fasta
+ -> FASTA written to ./test/run_id_test_failed_amended_consensus_summary.fasta
+ -> FASTA written to ./test/run_id_test_amino_acid_consensus_summary.fasta
+ -> FASTA written to ./test/run_id_test_failed_amino_acid_consensus_summary.fasta
+Writing CSV files
+ -> CSV written to ./test/run_id_test_coverage.csv
+ -> CSV written to ./test/run_id_test_reads.csv
+ -> CSV written to ./test/run_id_test_all_alleles.csv
+ -> CSV written to ./test/run_id_test_indels.csv
+ -> CSV written to ./test/run_id_test_filtered_variants.csv
+ -> CSV written to ./test/run_id_test_aavars.csv
+ -> CSV written to ./test/run_id_test_summary.csv
+ -> CSV written to ./test/run_id_test_amended_consensus.csv
+ -> CSV written to ./test/run_id_test_amino_acid_consensus.csv
+ -> CSV written to ./test/run_id_test_irma_config.csv
+Writing JSON files
+ -> JSON written to ./test/coverage.json
+ -> JSON written to ./test/reads.json
+ -> JSON written to ./test/vtype.json
+ -> JSON written to ./test/alleles.json
+ -> JSON written to ./test/indels.json
+ -> JSON written to ./test/dais_vars.json
+ -> JSON written to ./test/qc_statement.json
+ -> JSON written to ./test/irma_summary.json
+ -> JSON written to ./test/pass_fail_qc.json
+ -> JSON written to ./test/nt_sequences.json
+Writing PARQUET files
+ -> PARQUET written to ./test/run_id_test_coverage.parq
+ -> PARQUET written to ./test/run_id_test_reads.parq
+ -> PARQUET written to ./test/run_id_test_all_alleles.parq
+ -> PARQUET written to ./test/run_id_test_indels.parq
+ -> PARQUET written to ./test/run_id_test_minor_variants.parq
+ -> PARQUET written to ./test/run_id_test_summary.parq
+ -> PARQUET written to ./test/run_id_test_amended_consensus.parq
+ -> PARQUET written to ./test/run_id_test_amino_acid_consensus.parq
+ -> PARQUET written to ./test/run_id_test_irma_config.parq
+ -> PARQUET written to ./test/run_id_test_samplesheet.parq
+Building coverage plots for 2 samples as JSONs
+  -> saved ./test/coveragefig_s1_linear.json
+  -> saved ./test/coveragefig_s3_linear.json
+Building read sankey plots as JSON
+  -> read sankey plot json saved to ./test/readsfig_s3.json
+  -> read sankey plot json saved to ./test/readsfig_s2.json
+  -> read sankey plot json saved to ./test/readsfig_s1.json
+Building coverage heatmap as JSON
+  -> coverage heatmap json saved to ./test/heatmap.json
+Building pass_fail_heatmap as JSON
+  -> pass_fail heatmap json saved to ./test/pass_fail_heatmap.json
+Building barcode distribution pie figure as JSON
+  -> barcode distribution pie figure saved to ./test/barcode_distribution.json
+Building static HTML file
+  -> static HTML saved to "./test/MIRA-summary-run_id_test.html"
+```
+
+## Notes
+This ingest error can be ignored (will be fixed when using IRMA v1.3.1):
+```
+Warning: Failed to deserialize record: CSV error: record 19 (line: 20, byte: 769): found record with 2 fields, but the previous record has 3 fields
+Warning: Failed to deserialize record: CSV error: record 47 (line: 48, byte: 1960): found record with 2 fields, but the previous record has 3 fields
+Warning: Failed to deserialize record: CSV error: record 51 (line: 52, byte: 2178): found record with 1 fields, but the previous record has 3 fields
+Warning: Failed to deserialize record: CSV error: record 61 (line: 62, byte: 2619): found record with 2 fields, but the previous record has 3 fields
+Warning: Failed to deserialize record: CSV error: record 64 (line: 65, byte: 2739): found record with 1 fields, but the previous record has 3 fields
+```
+
+**creating the samplesheet.parq is on my to do list**
+
+## Finding your way to the bugs
+### Main Process
+`src/processes/prepare_mira_reports.rs`
+This the top layer where a lot of the decision logic exists. Divided into 3 sections: data ingest, data processing and writing files out.
+
+### Ingesting Data
+`src/io/data_ingest.rs`
+contains data struct definitions, file collection and parsing to structs, adds metadata to ingested data when needed (i.e. sample_id) and helper functions to make these things happen. 
+
+### Data Processing
+`src/utils/data_processing.rs`
+contains data struct definitions to transformed data, performs data transformation, quality filtering and sequence processing. Also contains the helper function to make this happen
+
+### Writing to Files
+`src/io/write_fasta_files.rs`
+`src/io/write_csv_files.rs `
+`src/io/write_json_files.rs `
+`src/io/write_parquet_files.rs`
+Each script writes out the file type indicated
+
+### Figures to JSONs
+`src/io/coverage_json_per_sample.rs`
+`src/io/coverage_to_heatmap.rs `
+`src/io/create_passfail_heatmap.rs`
+`src/io/reads_to_piechart.rs`
+`src/io/reads_to_sankey_json.rs`
+Each script writes out the file type indicated
+
+### Creating the Static HTML Files
+`src/io/create_statichtml.rs`
+Uses json's created above to create a static HTML

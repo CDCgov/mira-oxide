@@ -90,7 +90,7 @@ pub struct ReportsArgs {
     parq: bool,
 
     #[arg(short = 'c', long, default_value = "default-config")]
-    /// (Optional) The IRMA configuration used for processing.
+    /// (Optional) The name of the IRMA configuration that was used for running IRMA.
     irma_config: String,
 }
 
