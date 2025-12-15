@@ -540,9 +540,19 @@ pub fn extract_subtype_flu(dais_vars: &[DaisVarsData]) -> Result<Vec<Subtype>, B
     let mut sample_hemagglutinin_map: HashMap<String, String> = HashMap::new();
     let mut sample_neuraminidase_map: HashMap<String, String> = HashMap::new();
 
+    // collect all sample IDs
+    let mut all_sample_ids: HashSet<String> = HashSet::new();
+    for entry in dais_vars {
+        let hold_sample = entry.sample_id.clone().ok_or("Missing sample_id")?;
+        let sample_id = hold_sample[..hold_sample.len() - 2].to_string();
+        all_sample_ids.insert(sample_id);
+    }
+
+    // HA extraction
     for entry in dais_vars {
         let hold_sample = entry.sample_id.clone().ok_or("Missing sample_id")?;
         let sample_ha: String = hold_sample[..hold_sample.len() - 2].to_string();
+
         let ha = if entry.protein == "HA" {
             match entry.reference_id.as_str() {
                 "CALI07" => "H1",
@@ -558,14 +568,17 @@ pub fn extract_subtype_flu(dais_vars: &[DaisVarsData]) -> Result<Vec<Subtype>, B
         } else {
             ""
         };
+
         if !ha.is_empty() {
             sample_hemagglutinin_map.insert(sample_ha, ha.to_string());
         }
     }
 
+    // NA extraction
     for entry in dais_vars {
         let hold_sample = entry.sample_id.clone().ok_or("Missing sample_id")?;
         let sample_na: String = hold_sample[..hold_sample.len() - 2].to_string();
+
         let na = if entry.protein == "NA" {
             match entry.reference_id.as_str() {
                 "CALI07" => "N1",
@@ -581,27 +594,26 @@ pub fn extract_subtype_flu(dais_vars: &[DaisVarsData]) -> Result<Vec<Subtype>, B
         } else {
             ""
         };
+
         if !na.is_empty() {
             sample_neuraminidase_map.insert(sample_na, na.to_string());
         }
     }
-    //Combine ha and na from the hashmaps where sample IDs match
-    let mut all_samples: HashMap<String, String> = HashMap::new();
 
-    for (sample_id, ha) in &sample_hemagglutinin_map {
-        all_samples.insert(sample_id.clone(), ha.clone());
-    }
+    // Combine HA and NA, default to Undetermined
+    for sample_id in all_sample_ids {
+        let ha = sample_hemagglutinin_map
+            .get(&sample_id)
+            .cloned()
+            .unwrap_or_default();
 
-    for (sample_id, na) in &sample_neuraminidase_map {
-        if let Some(existing) = all_samples.get_mut(sample_id) {
-            *existing = format!("{existing}{na}");
-        } else {
-            all_samples.insert(sample_id.clone(), na.clone());
-        }
-    }
+        let na = sample_neuraminidase_map
+            .get(&sample_id)
+            .cloned()
+            .unwrap_or_default();
 
-    //Process all_samples to determine subtype
-    for (sample_id, combined) in all_samples {
+        let combined = format!("{ha}{na}");
+
         let subtype = if combined.is_empty() {
             "Undetermined".to_string()
         } else {
@@ -609,7 +621,7 @@ pub fn extract_subtype_flu(dais_vars: &[DaisVarsData]) -> Result<Vec<Subtype>, B
         };
 
         subtype_data.push(Subtype {
-            sample_id: Some(sample_id.clone()),
+            sample_id: Some(sample_id),
             subtype,
         });
     }
@@ -1041,10 +1053,13 @@ pub fn create_irma_summary_vec(
             }
         }
 
-        for entry in subtype_vec {
-            if sample.sample_id == entry.sample_id.clone() {
-                sample.subtype = Some(entry.subtype.clone());
-            }
+        if let Some(entry) = subtype_vec
+            .iter()
+            .find(|entry| entry.sample_id == sample.sample_id)
+        {
+            sample.subtype = Some(entry.subtype.clone());
+        } else {
+            sample.subtype = Some("Undetermined".to_string());
         }
     }
 
