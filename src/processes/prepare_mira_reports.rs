@@ -39,10 +39,11 @@ use csv::ReaderBuilder;
 use either::Either;
 use serde::{self, Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::json;
+use std::fs;
 use std::sync::Arc;
 use std::{
     error::Error,
-    fs::{File, OpenOptions},
+    fs::*,
     io::{BufRead, BufReader, BufWriter, Read, Stdin, Write, stdin, stdout},
     path::{Path, PathBuf},
 };
@@ -116,8 +117,24 @@ pub enum Samplesheet {
     ONT(Vec<SamplesheetO>),
 }
 
+fn ensure_output_directory(output_path: &Path) -> std::io::Result<()> {
+    let dir = if output_path.extension().is_some() {
+        output_path.parent()
+    } else {
+        Some(output_path)
+    };
+
+    if let Some(dir) = dir {
+        fs::create_dir_all(dir)?;
+    }
+
+    Ok(())
+}
+
 #[allow(clippy::too_many_lines)]
 pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Error>> {
+    ensure_output_directory(&args.output_path)?;
+
     println!("Starting data ingestion...");
     /////////////// Read in and process data from IRMA and Dais ///////////////
     // Read in samplesheet
