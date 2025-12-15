@@ -60,6 +60,3 @@ SHELL ["/bin/bash", "-c"]
 
 # Default command to run when the container starts
 CMD ["bash"]
-
-# Default command to run when the container starts
-CMD ["bash"]
