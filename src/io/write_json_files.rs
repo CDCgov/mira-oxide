@@ -53,7 +53,7 @@ pub fn write_structs_to_split_json_file<T: Serialize>(
 
     std::fs::write(file_path, serde_json::to_string_pretty(&split_json)?)?;
 
-    println!("Split-oriented JSON written to {file_path}");
+    println!(" -> JSON written to {file_path}");
 
     Ok(())
 }
@@ -114,7 +114,7 @@ pub fn write_irma_summary_to_pass_fail_json_file(
     // Write the JSON to the specified file
     std::fs::write(file_path, serde_json::to_string_pretty(&split_json)?)?;
 
-    println!("Split-oriented JSON written to {file_path}");
+    println!(" -> JSON written to {file_path}");
 
     Ok(())
 }
@@ -178,7 +178,7 @@ pub fn negative_qc_statement(
     let mut file = File::create(output_file)?;
     file.write_all(json_output.to_string().as_bytes())?;
 
-    println!("JSON written to {output_file}");
+    println!(" -> JSON written to {output_file}");
     Ok(())
 }
 

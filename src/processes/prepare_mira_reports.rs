@@ -307,10 +307,11 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
 
     //////////////////////////////// Processing data for Dashboard Figures ////////////////////////////////
     let transformed_cov_data = transform_coverage_to_heatmap(&coverage_data, &args.virus);
-    //println!("{transformed_cov_data:?}");
 
     //////////////////////////////// Write all files ////////////////////////////////
+    println!("Writing Output Files...");
 
+    println!("Writing FASTA files");
     write_out_all_fasta_files(
         &args.output_path,
         &processed_nt_seq.passed_seqs,
@@ -320,6 +321,7 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
         &args.runid,
     )?;
 
+    println!("Writing CSV files");
     write_out_all_csv_mira_reports(
         &args.output_path,
         &coverage_data,
@@ -335,6 +337,7 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
         &args.virus,
     )?;
 
+    println!("Writing JSON files");
     write_out_all_json_files(
         &args.output_path,
         &coverage_data,
@@ -352,6 +355,7 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
     // Write fields to parq if flag given
     // Why separate you ask? parquet set up is niche
     if args.parq {
+        println!("Writing PARQUET files");
         write_coverage_to_parquet(
             &coverage_data,
             &format!(

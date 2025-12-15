@@ -11,7 +11,7 @@ pub fn write_to_fasta(output_file: &str, seq_data_vec: &[SeqData]) -> Result<(),
         writeln!(file, "{}", seq_data.sequence)?;
     }
 
-    println!("FASTA written to {output_file}");
+    println!(" -> FASTA written to {output_file}");
 
     Ok(())
 }

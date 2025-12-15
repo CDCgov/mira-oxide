@@ -37,7 +37,7 @@ pub fn write_structs_to_csv_file<T: Serialize>(
     }
 
     csv_writer.flush()?;
-    println!("CSV written to {file_path}");
+    println!(" -> CSV written to {file_path}");
 
     Ok(())
 }

@@ -146,7 +146,7 @@ pub fn write_coverage_to_parquet(
     writer.write(&record_batch)?;
     writer.close()?;
 
-    println!("PARQUET written to {output_file}");
+    println!(" -> PARQUET written to {output_file}");
 
     Ok(())
 }
@@ -213,7 +213,7 @@ pub fn write_reads_to_parquet(
     writer.write(&record_batch)?;
     writer.close()?;
 
-    println!("PARQUET written to {output_file}");
+    println!(" -> PARQUET written to {output_file}");
 
     Ok(())
 }
@@ -290,7 +290,7 @@ pub fn write_alleles_to_parquet(
     writer.write(&record_batch)?;
     writer.close()?;
 
-    println!("PARQUET written to {output_file}");
+    println!(" -> PARQUET written to {output_file}");
 
     Ok(())
 }
@@ -372,7 +372,7 @@ pub fn write_indels_to_parquet(
     writer.write(&record_batch)?;
     writer.close()?;
 
-    println!("PARQUET written to {output_file}");
+    println!(" -> PARQUET written to {output_file}");
 
     Ok(())
 }
@@ -452,7 +452,7 @@ pub fn write_minor_vars_to_parquet(
     writer.write(&record_batch)?;
     writer.close()?;
 
-    println!("PARQUET written to {output_file}");
+    println!(" -> PARQUET written to {output_file}");
 
     Ok(())
 }
@@ -558,7 +558,7 @@ pub fn write_irma_summary_to_parquet(
     writer.write(&record_batch)?;
     writer.close()?;
 
-    println!("PARQUET written to {output_file}");
+    println!(" -> PARQUET written to {output_file}");
 
     Ok(())
 }
@@ -614,7 +614,7 @@ pub fn write_nt_seq_to_parquet(
     writer.write(&record_batch)?;
     writer.close()?;
 
-    println!("PARQUET written to {output_file}");
+    println!(" -> PARQUET written to {output_file}");
 
     Ok(())
 }
@@ -670,7 +670,7 @@ pub fn write_aa_seq_to_parquet(
     writer.write(&record_batch)?;
     writer.close()?;
 
-    println!("PARQUET written to {output_file}");
+    println!(" -> PARQUET written to {output_file}");
 
     Ok(())
 }
@@ -723,7 +723,7 @@ pub fn write_run_info_to_parquet(
     writer.write(&record_batch)?;
     writer.close()?;
 
-    println!("PARQUET written to {output_file}");
+    println!(" -> PARQUET written to {output_file}");
 
     Ok(())
 }
@@ -782,7 +782,7 @@ pub fn write_samplesheet_to_parquet(
             writer.write(&record_batch)?;
             writer.close()?;
 
-            println!("PARQUET written to {output_file}");
+            println!(" -> PARQUET written to {output_file}");
         }
         Samplesheet::ONT(data) => {
             // Extract fields from SamplesheetO
@@ -830,7 +830,7 @@ pub fn write_samplesheet_to_parquet(
             writer.write(&record_batch)?;
             writer.close()?;
 
-            println!("PARQUET written to {output_file}");
+            println!(" -> PARQUET written to {output_file}");
         }
     }
 
