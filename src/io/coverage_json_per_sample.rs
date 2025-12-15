@@ -282,6 +282,5 @@ pub fn create_coverage_plot(
         });
     }
 
-    println!(" --> All coverage JSONs saved");
     Ok(json_vec)
 }
