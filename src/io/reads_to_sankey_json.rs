@@ -191,7 +191,7 @@ pub fn reads_to_sankey_json(
 
         let sankeyfig = dash_reads_to_sankey(&sample_data, virus);
 
-        let file_path = format!("{output_file}/readsfig_{sample}.json");
+        let file_path = format!("{output_file}readsfig_{sample}.json");
         std::fs::write(file_path.clone(), sankeyfig.to_string()).expect("Unable to write file");
         println!("  -> read sankey plot json saved to {file_path}");
 

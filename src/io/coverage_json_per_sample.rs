@@ -271,7 +271,7 @@ pub fn create_coverage_plot(
 
     for sample in samples {
         let coverage_fig = create_sample_coverage_fig(&sample, data, &segments, true, virus)?;
-        let file_name = format!("{output_file}/coveragefig_{sample}_linear.json");
+        let file_name = format!("{output_file}coveragefig_{sample}_linear.json");
         let json_value = serde_json::to_value(&coverage_fig)?;
         let json_output = serde_json::to_string_pretty(&json_value)?;
         std::fs::write(&file_name, json_output)?;

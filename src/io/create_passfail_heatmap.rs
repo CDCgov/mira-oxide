@@ -340,7 +340,7 @@ pub fn create_passfail_heatmap(
         "layout": layout
     });
 
-    let file_path = format!("{output_path}/pass_fail_heatmap.json");
+    let file_path = format!("{output_path}pass_fail_heatmap.json");
     let mut file = File::create(&file_path).expect("Unable to create file");
     file.write_all(plot_json.to_string().as_bytes())
         .expect("Unable to write data");

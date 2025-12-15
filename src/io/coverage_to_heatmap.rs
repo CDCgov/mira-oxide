@@ -152,7 +152,7 @@ pub fn coverage_to_heatmap_json(
         "layout": layout
     });
 
-    let file_path = format!("{output_file}/heatmap.json");
+    let file_path = format!("{output_file}heatmap.json");
     std::fs::write(&file_path, plot_json.to_string()).expect("Failed to write heatmap JSON");
     println!("  -> coverage heatmap json saved to {file_path}");
 

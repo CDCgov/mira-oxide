@@ -62,7 +62,7 @@ pub fn create_barcode_distribution_figure(
     });
 
     // Save to file
-    let file_path = format!("{output_path}/barcode_distribution.json");
+    let file_path = format!("{output_path}barcode_distribution.json");
     std::fs::write(&file_path, plot_json.to_string())
         .expect("Failed to write barcode distribution JSON");
 
