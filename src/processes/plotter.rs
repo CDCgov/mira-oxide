@@ -1,3 +1,4 @@
+#![allow(clippy::cast_precision_loss, clippy::struct_excessive_bools)]
 use clap::Parser;
 use csv::ReaderBuilder;
 use glob::glob;
@@ -16,7 +17,8 @@ use std::{
 };
 
 // Add this function to generate consistent colors for segment names
-fn get_segment_color(segment_name: &str) -> &'static str {
+#[must_use]
+pub fn get_segment_color(segment_name: &str) -> &'static str {
     // This ensures the same segment always gets the same color across all plots
     // Check if segment_name contains any of our known segment identifiers
     if segment_name.contains("PB2") {
@@ -39,7 +41,7 @@ fn get_segment_color(segment_name: &str) -> &'static str {
         // For any other segments, use a hash of the segment name to pick a color
         let hash = segment_name
             .bytes()
-            .fold(0u32, |acc, b| acc.wrapping_add(b as u32));
+            .fold(0u32, |acc, b| acc.wrapping_add(u32::from(b)));
         match hash % 10 {
             0 => "#3366CC", // blue
             1 => "#DC3912", // red
@@ -109,7 +111,7 @@ pub struct PlotterArgs {
     output: Option<PathBuf>,
 }
 
-fn generate_plot_coverage(input_directory: &Path) -> Result<Plot, Box<dyn Error>> {
+pub fn generate_plot_coverage(input_directory: &Path) -> Result<Plot, Box<dyn Error>> {
     // Create a Plotly plot
     let mut plot = Plot::new();
 
@@ -197,7 +199,8 @@ fn generate_plot_coverage(input_directory: &Path) -> Result<Plot, Box<dyn Error>
     Ok(plot)
 }
 
-fn generate_plot_coverage_seg(input_directory: &Path) -> Result<Plot, Box<dyn Error>> {
+#[allow(clippy::type_complexity)]
+pub fn generate_plot_coverage_seg(input_directory: &Path) -> Result<Plot, Box<dyn Error>> {
     // Init a Plotly plot
     let mut plot = Plot::new();
 
@@ -205,11 +208,12 @@ fn generate_plot_coverage_seg(input_directory: &Path) -> Result<Plot, Box<dyn Er
     let mut file_paths = Vec::new();
 
     // First, count files and collect paths
-    let tmp = glob(&format!(
+    for path in (glob(&format!(
         "{}/tables/*coverage.txt",
         input_directory.display()
-    ))?;
-    for path in tmp.flatten() {
+    ))?)
+    .flatten()
+    {
         //file_count += 1;
         file_paths.push(path);
     }
@@ -219,18 +223,17 @@ fn generate_plot_coverage_seg(input_directory: &Path) -> Result<Plot, Box<dyn Er
     let cols = 2; //(file_count + rows - 1) / rows; // Ceiling division
 
     // Load variant data into a HashMap keyed by segment name
-    // todo: fix this type
-    #[allow(clippy::type_complexity)]
+    // TODO: consider a struct with named fields
     let mut variants_data: HashMap<String, Vec<(u32, String, String, u32, u32, f32)>> =
         HashMap::new();
 
     // Look for variant files with matching prefixes in the directory
-    let tmp1 = glob(&format!(
+    for variant_path in (glob(&format!(
         "{}/tables/*variants.txt",
         input_directory.display()
-    ))?;
-    let tmp2 = tmp1;
-    for variant_path in tmp2.flatten() {
+    ))?)
+    .flatten()
+    {
         let file = File::open(&variant_path)?;
 
         // Create a TSV reader
@@ -473,8 +476,9 @@ fn generate_plot_coverage_seg(input_directory: &Path) -> Result<Plot, Box<dyn Er
     Ok(plot)
 }
 
-// TO DO: fix colors for Sankey diagram
-fn generate_sankey_plot(input_directory: &Path) -> Result<Plot, Box<dyn Error>> {
+// TO DO: fix colors for Sankey diagram, abstract parts of this
+#[allow(clippy::too_many_lines)]
+pub fn generate_sankey_plot(input_directory: &Path) -> Result<Plot, Box<dyn Error>> {
     // Path to READ_COUNTS.txt
     let read_counts_path = input_directory.join("tables").join("READ_COUNTS.txt");
 
@@ -507,21 +511,18 @@ fn generate_sankey_plot(input_directory: &Path) -> Result<Plot, Box<dyn Error>> 
 
     // Process data and build node map first
     let mut records = Vec::new();
+    for line in lines.map_while(Result::ok) {
+        let parts: Vec<&str> = line.split('\t').collect();
+        if parts.len() >= 3 {
+            let record = parts[0];
+            let reads: u32 = parts[1].parse().unwrap_or(0);
 
-    lines.for_each(|line| {
-        if let Ok(line) = line {
-            let parts: Vec<&str> = line.split('\t').collect();
-            if parts.len() >= 3 {
-                let record = parts[0];
-                let reads: u32 = parts[1].parse().unwrap_or(0);
-
-                // Skip "NA" values and 0 reads
-                if parts[1] != "NA" && reads > 0 {
-                    records.push((record.to_string(), reads));
-                }
+            // Skip "NA" values and 0 reads
+            if parts[1] != "NA" && reads > 0 {
+                records.push((record.to_string(), reads));
             }
         }
-    });
+    }
 
     // Add initial nodes
     add_node(
@@ -578,7 +579,8 @@ fn generate_sankey_plot(input_directory: &Path) -> Result<Plot, Box<dyn Error>> 
             _ => {
                 if let Some(stripped) = record.strip_prefix("4-") {
                     primary_match_sum += *reads;
-                    four_segments.push((stripped.to_string(), *reads))
+                    let segment = stripped.to_string();
+                    four_segments.push((segment, *reads));
                 }
             }
         }
@@ -617,17 +619,19 @@ fn generate_sankey_plot(input_directory: &Path) -> Result<Plot, Box<dyn Error>> 
 
     // Now process 5- records as before
     for (record, reads) in &records {
-        if let Some(segment) = record.strip_prefix("5-") {
-            let segment_color = get_segment_color(segment);
+        if let Some(stripped) = record.strip_prefix("5-") {
+            let segment = stripped.to_string();
+            let segment_color = get_segment_color(&segment);
             add_node(
-                segment,
+                &segment,
                 &mut node_labels,
                 &mut node_map,
                 &mut node_colors,
                 segment_color,
             );
+            // Link from Alt Match to this segment
             source_indices.push(node_map["Alt Match"]);
-            target_indices.push(node_map[segment]);
+            target_indices.push(node_map[&segment]);
             values.push(*reads);
         }
     }
@@ -662,7 +666,10 @@ fn generate_sankey_plot(input_directory: &Path) -> Result<Plot, Box<dyn Error>> 
     let mut plot = Plot::new();
 
     // Create Sankey trace
-    let node_labels_refs: Vec<&str> = node_labels.iter().map(|s| s.as_str()).collect();
+    let node_labels_refs: Vec<&str> = node_labels
+        .iter()
+        .map(std::string::String::as_str)
+        .collect();
 
     // Explicitly define x and y positions for each node
     let n = node_labels.len();
@@ -700,7 +707,7 @@ fn generate_sankey_plot(input_directory: &Path) -> Result<Plot, Box<dyn Error>> 
             _ => {
                 // Segment nodes: stack vertically in last column
                 x[i] = 0.7;
-                y[i] = 0.1 + 0.8 * (seg_idx as f64) / ((n - 5).max(1) as f64);
+                y[i] = 0.1 + 0.8 * f64::from(seg_idx) / ((n - 5).max(1) as f64);
                 seg_idx += 1;
             }
         }
@@ -769,7 +776,8 @@ fn generate_sankey_plot(input_directory: &Path) -> Result<Plot, Box<dyn Error>> 
 }
 
 // Helper function to add node and maintain the node map
-fn add_node(
+#[allow(clippy::implicit_hasher)]
+pub fn add_node(
     name: &str,
     labels: &mut Vec<String>,
     node_map: &mut HashMap<String, usize>,

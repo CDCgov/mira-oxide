@@ -21,7 +21,7 @@ fn extract_version_line(contents: &str) -> Option<&str> {
     contents.lines().find(|line| line.starts_with("Version"))
 }
 
-pub fn check_mira_version(args: MiraVersionArgs) -> io::Result<()> {
+pub fn check_mira_version(args: &MiraVersionArgs) -> io::Result<()> {
     let local_desc_path = args.local_version_path.join("DESCRIPTION");
     let local_contents = fs::read_to_string(&local_desc_path)?;
 
@@ -41,7 +41,7 @@ pub fn check_mira_version(args: MiraVersionArgs) -> io::Result<()> {
     if current >= available {
         println!("MIRA-NF version up to date!");
     } else {
-        println!("MIRA-NF {} is now available!", available);
+        println!("MIRA-NF {available} is now available!");
     }
 
     Ok(())

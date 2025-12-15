@@ -4,4 +4,5 @@ pub mod check_mira_version;
 pub mod find_chemistry;
 pub mod plotter;
 pub mod positions_of_interest;
+pub mod prepare_mira_reports;
 pub mod variants_of_interest;
