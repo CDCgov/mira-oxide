@@ -49,21 +49,21 @@ Starting data ingestion...
 Finished ingesting data.
 Writing Output Files...
 Writing FASTA files
- -> FASTA written to ./test/run_id_test_amended_consensus_summary.fasta
- -> FASTA written to ./test/run_id_test_failed_amended_consensus_summary.fasta
- -> FASTA written to ./test/run_id_test_amino_acid_consensus_summary.fasta
- -> FASTA written to ./test/run_id_test_failed_amino_acid_consensus_summary.fasta
+ -> FASTA written to ./test/mira_run_id_test_amended_consensus.fasta
+ -> FASTA written to ./test/mira_run_id_test_failed_amended_consensus.fasta
+ -> FASTA written to ./test/mira_run_id_test_amino_acid_consensus.fasta
+ -> FASTA written to ./test/mira_run_id_test_failed_amino_acid_consensus.fasta
 Writing CSV files
- -> CSV written to ./test/run_id_test_coverage.csv
- -> CSV written to ./test/run_id_test_reads.csv
- -> CSV written to ./test/run_id_test_all_alleles.csv
- -> CSV written to ./test/run_id_test_indels.csv
- -> CSV written to ./test/run_id_test_filtered_variants.csv
- -> CSV written to ./test/run_id_test_aavars.csv
- -> CSV written to ./test/run_id_test_summary.csv
- -> CSV written to ./test/run_id_test_amended_consensus.csv
- -> CSV written to ./test/run_id_test_amino_acid_consensus.csv
- -> CSV written to ./test/run_id_test_irma_config.csv
+ -> CSV written to ./test/mira_run_id_test_coverage.csv
+ -> CSV written to ./test/mira_run_id_test_reads.csv
+ -> CSV written to ./test/mira_run_id_test_all_alleles.csv
+ -> CSV written to ./test/mira_run_id_test_indels.csv
+ -> CSV written to ./test/mira_run_id_test_filtered_variants.csv
+ -> CSV written to ./test/mira_run_id_test_aavars.csv
+ -> CSV written to ./test/mira_run_id_test_summary.csv
+ -> CSV written to ./test/mira_run_id_test_amended_consensus.csv
+ -> CSV written to ./test/mira_run_id_test_amino_acid_consensus.csv
+ -> CSV written to ./test/mira_run_id_test_irma_config.csv
 Writing JSON files
  -> JSON written to ./test/coverage.json
  -> JSON written to ./test/reads.json
@@ -76,12 +76,12 @@ Writing JSON files
  -> JSON written to ./test/pass_fail_qc.json
  -> JSON written to ./test/nt_sequences.json
 Building coverage plots for 2 samples as JSONs
-  -> saved ./test/coveragefig_s1_linear.json
   -> saved ./test/coveragefig_s3_linear.json
+  -> saved ./test/coveragefig_s1_linear.json
 Building read sankey plots as JSON
-  -> read sankey plot json saved to ./test/readsfig_s3.json
   -> read sankey plot json saved to ./test/readsfig_s2.json
   -> read sankey plot json saved to ./test/readsfig_s1.json
+  -> read sankey plot json saved to ./test/readsfig_s3.json
 Building coverage heatmap as JSON
   -> coverage heatmap json saved to ./test/heatmap.json
 Building pass_fail_heatmap as JSON
@@ -89,7 +89,7 @@ Building pass_fail_heatmap as JSON
 Building barcode distribution pie figure as JSON
   -> barcode distribution pie figure saved to ./test/barcode_distribution.json
 Building static HTML file
-  -> static HTML saved to "./test/MIRA-summary-run_id_test.html"
+  -> static HTML saved to "./test/mira_run_id_test_summary.html"
 ```
 
 
@@ -100,21 +100,21 @@ Starting data ingestion...
 Finished ingesting data.
 Writing Output Files...
 Writing FASTA files
- -> FASTA written to ./test/run_id_test_amended_consensus_summary.fasta
- -> FASTA written to ./test/run_id_test_failed_amended_consensus_summary.fasta
- -> FASTA written to ./test/run_id_test_amino_acid_consensus_summary.fasta
- -> FASTA written to ./test/run_id_test_failed_amino_acid_consensus_summary.fasta
+ -> FASTA written to ./test/mira_run_id_test_amended_consensus.fasta
+ -> FASTA written to ./test/mira_run_id_test_failed_amended_consensus.fasta
+ -> FASTA written to ./test/mira_run_id_test_amino_acid_consensus.fasta
+ -> FASTA written to ./test/mira_run_id_test_failed_amino_acid_consensus.fasta
 Writing CSV files
- -> CSV written to ./test/run_id_test_coverage.csv
- -> CSV written to ./test/run_id_test_reads.csv
- -> CSV written to ./test/run_id_test_all_alleles.csv
- -> CSV written to ./test/run_id_test_indels.csv
- -> CSV written to ./test/run_id_test_filtered_variants.csv
- -> CSV written to ./test/run_id_test_aavars.csv
- -> CSV written to ./test/run_id_test_summary.csv
- -> CSV written to ./test/run_id_test_amended_consensus.csv
- -> CSV written to ./test/run_id_test_amino_acid_consensus.csv
- -> CSV written to ./test/run_id_test_irma_config.csv
+ -> CSV written to ./test/mira_run_id_test_coverage.csv
+ -> CSV written to ./test/mira_run_id_test_reads.csv
+ -> CSV written to ./test/mira_run_id_test_all_alleles.csv
+ -> CSV written to ./test/mira_run_id_test_indels.csv
+ -> CSV written to ./test/mira_run_id_test_filtered_variants.csv
+ -> CSV written to ./test/mira_run_id_test_aavars.csv
+ -> CSV written to ./test/mira_run_id_test_summary.csv
+ -> CSV written to ./test/mira_run_id_test_amended_consensus.csv
+ -> CSV written to ./test/mira_run_id_test_amino_acid_consensus.csv
+ -> CSV written to ./test/mira_run_id_test_irma_config.csv
 Writing JSON files
  -> JSON written to ./test/coverage.json
  -> JSON written to ./test/reads.json
@@ -127,23 +127,23 @@ Writing JSON files
  -> JSON written to ./test/pass_fail_qc.json
  -> JSON written to ./test/nt_sequences.json
 Writing PARQUET files
- -> PARQUET written to ./test/run_id_test_coverage.parq
- -> PARQUET written to ./test/run_id_test_reads.parq
- -> PARQUET written to ./test/run_id_test_all_alleles.parq
- -> PARQUET written to ./test/run_id_test_indels.parq
- -> PARQUET written to ./test/run_id_test_minor_variants.parq
- -> PARQUET written to ./test/run_id_test_summary.parq
- -> PARQUET written to ./test/run_id_test_amended_consensus.parq
- -> PARQUET written to ./test/run_id_test_amino_acid_consensus.parq
- -> PARQUET written to ./test/run_id_test_irma_config.parq
- -> PARQUET written to ./test/run_id_test_samplesheet.parq
+ -> PARQUET written to ./test/mira_run_id_test_coverage.parq
+ -> PARQUET written to ./test/mira_run_id_test_reads.parq
+ -> PARQUET written to ./test/mira_run_id_test_all_alleles.parq
+ -> PARQUET written to ./test/mira_run_id_test_indels.parq
+ -> PARQUET written to ./test/mira_run_id_test_minor_variants.parq
+ -> PARQUET written to ./test/mira_run_id_test_summary.parq
+ -> PARQUET written to ./test/mira_run_id_test_amended_consensus.parq
+ -> PARQUET written to ./test/mira_run_id_test_amino_acid_consensus.parq
+ -> PARQUET written to ./test/mira_run_id_test_irma_config.parq
+ -> PARQUET written to ./test/mira_run_id_test_samplesheet.parq
 Building coverage plots for 2 samples as JSONs
-  -> saved ./test/coveragefig_s1_linear.json
   -> saved ./test/coveragefig_s3_linear.json
+  -> saved ./test/coveragefig_s1_linear.json
 Building read sankey plots as JSON
-  -> read sankey plot json saved to ./test/readsfig_s3.json
   -> read sankey plot json saved to ./test/readsfig_s2.json
   -> read sankey plot json saved to ./test/readsfig_s1.json
+  -> read sankey plot json saved to ./test/readsfig_s3.json
 Building coverage heatmap as JSON
   -> coverage heatmap json saved to ./test/heatmap.json
 Building pass_fail_heatmap as JSON
@@ -151,11 +151,11 @@ Building pass_fail_heatmap as JSON
 Building barcode distribution pie figure as JSON
   -> barcode distribution pie figure saved to ./test/barcode_distribution.json
 Building static HTML file
-  -> static HTML saved to "./test/MIRA-summary-run_id_test.html"
+  -> static HTML saved to "./test/mira_run_id_test_summary.html"
 ```
 
 ## Notes
-This ingest error can be ignored (will be fixed when using IRMA v1.3.1):
+This ingest error can be ignored (will occur with IRMA veresions prior to v1.3.1):
 ```
 Warning: Failed to deserialize record: CSV error: record 19 (line: 20, byte: 769): found record with 2 fields, but the previous record has 3 fields
 Warning: Failed to deserialize record: CSV error: record 47 (line: 48, byte: 1960): found record with 2 fields, but the previous record has 3 fields
