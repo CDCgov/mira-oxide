@@ -87,7 +87,7 @@ pub fn write_out_all_csv_mira_reports(
         "instrument",
     ];
     write_structs_to_csv_file(
-        &format!("{}/{runid}_coverage.csv", output_path.display()),
+        &format!("{}/mira_{runid}_coverage.csv", output_path.display()),
         coverage_data,
         &coverage_columns,
         &coverage_struct_values,
@@ -115,7 +115,7 @@ pub fn write_out_all_csv_mira_reports(
         "instrument",
     ];
     write_structs_to_csv_file(
-        &format!("{}/{runid}_reads.csv", output_path.display()),
+        &format!("{}/mira_{runid}_reads.csv", output_path.display()),
         read_data,
         &reads_columns,
         &reads_struct_values,
@@ -183,7 +183,7 @@ pub fn write_out_all_csv_mira_reports(
     };
 
     write_structs_to_csv_file(
-        &format!("{}/{runid}_all_alleles.csv", output_path.display()),
+        &format!("{}/mira_{runid}_all_alleles.csv", output_path.display()),
         &allele_data.all_alleles,
         &allele_columns,
         &allele_struct_values,
@@ -217,7 +217,7 @@ pub fn write_out_all_csv_mira_reports(
         "instrument",
     ];
     write_structs_to_csv_file(
-        &format!("{}/{runid}_indels.csv", output_path.display()),
+        &format!("{}/mira_{runid}_indels.csv", output_path.display()),
         indel_data,
         &indels_columns,
         &indels_struct_values,
@@ -269,7 +269,10 @@ pub fn write_out_all_csv_mira_reports(
     };
 
     write_structs_to_csv_file(
-        &format!("{}/{runid}_filtered_variants.csv", output_path.display()),
+        &format!(
+            "{}/mira_{runid}_filtered_variants.csv",
+            output_path.display()
+        ),
         &allele_data.filtered_alleles,
         &minor_variant_columns,
         &minor_variant_struct_values,
@@ -285,13 +288,13 @@ pub fn write_out_all_csv_mira_reports(
     ];
 
     write_structs_to_csv_file(
-        &format!("{}/{runid}_aavars.csv", output_path.display()),
+        &format!("{}/mira_{runid}_aavars.csv", output_path.display()),
         dais_vars,
         &aavars_columns,
         &aavars_columns,
     )?;
 
-    // write out the {runid}_summary.csv
+    // write out the mira_{runid}_summary.csv
     let summary_columns: Vec<&str> = if virus == "sc2-wgs" {
         vec![
             "sample_id",
@@ -331,7 +334,7 @@ pub fn write_out_all_csv_mira_reports(
     };
 
     write_structs_to_csv_file(
-        &format!("{}/{runid}_summary.csv", output_path.display()),
+        &format!("{}/mira_{runid}_summary.csv", output_path.display()),
         irma_summary,
         &summary_columns,
         &summary_columns,
@@ -348,7 +351,10 @@ pub fn write_out_all_csv_mira_reports(
     ];
 
     write_structs_to_csv_file(
-        &format!("{}/{runid}_amended_consensus.csv", output_path.display()),
+        &format!(
+            "{}/mira_{runid}_amended_consensus.csv",
+            output_path.display()
+        ),
         nt_seq_vec,
         &seq_columns,
         &seq_columns,
@@ -366,7 +372,10 @@ pub fn write_out_all_csv_mira_reports(
     ];
 
     write_structs_to_csv_file(
-        &format!("{}/{runid}_amino_acid_consensus.csv", output_path.display()),
+        &format!(
+            "{}/mira_{runid}_amino_acid_consensus.csv",
+            output_path.display()
+        ),
         aa_seq_vec,
         &seq_columns,
         &aa_struct_values,
@@ -390,7 +399,7 @@ pub fn write_out_all_csv_mira_reports(
         "timestamp",
     ];
     write_structs_to_csv_file(
-        &format!("{}/{runid}_irma_config.csv", output_path.display()),
+        &format!("{}/mira_{runid}_irma_config.csv", output_path.display()),
         run_info,
         &run_info_columns,
         &run_info_struct_values,

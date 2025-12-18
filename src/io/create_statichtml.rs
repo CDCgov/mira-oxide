@@ -102,7 +102,11 @@ fn write_sample_plot_html(
 </html>
 "#
     );
-    let out_path = output_path.join(format!("MIRA_{sample}_coverage.html"));
+    let out_path = output_path.join(format!("mira_{sample}_coverage.html"));
+    println!(
+        "  -> coverge and sankey HTML saved to {:?}",
+        out_path.display()
+    );
     write(out_path, html)
 }
 
@@ -665,7 +669,7 @@ pub fn generate_html_report(
     );
 
     // Write to file
-    let out_path = output_path.join(format!("MIRA-summary-{runid}.html"));
+    let out_path = output_path.join(format!("mira_{runid}_summary.html"));
     write(&out_path, html_string)?;
 
     println!("  -> static HTML saved to {:?}", out_path.display());

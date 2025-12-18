@@ -185,7 +185,8 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
     }));
 
     //Read in DAIS-ribosome data
-    let dais_seq_data = dais_sequence_data_collection(&args.irma_path)?;
+    //In MIRA-NF the DAIS outputs are fed right to the working directory to be used in this step
+    let dais_seq_data = dais_sequence_data_collection("./")?;
     let mut dais_ref_data: Vec<DaisSeqData> = Vec::new();
     if args.virus.to_lowercase() == "flu" || args.virus.to_lowercase() == "rsv" {
         dais_ref_data = dais_ref_seq_data_collection(&args.workdir_path, &args.virus)?;
@@ -318,11 +319,11 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
         &args.platform,
     )?;
 
-    //Sort into passing and failing
+    // Sort into passing and failing
     let processed_nt_seq = divide_nt_into_pass_fail_vec(&nt_seq_vec, &args.platform, &args.virus)?;
     let processed_aa_seq = divide_aa_into_pass_fail_vec(&aa_seq_vec, &args.platform, &args.virus)?;
 
-    //////////////////////////////// Processing data for Dashboard Figures ////////////////////////////////
+    // Processing data for Dashboard Figures
     let transformed_cov_data = transform_coverage_to_heatmap(&coverage_data, &args.virus);
 
     //////////////////////////////// Write all files ////////////////////////////////
@@ -376,31 +377,39 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
         write_coverage_to_parquet(
             &coverage_data,
             &format!(
-                "{}/{}_coverage.parq",
+                "{}/mira_{}_coverage.parq",
                 &args.output_path.display(),
                 args.runid
             ),
         )?;
         write_reads_to_parquet(
             &read_data,
-            &format!("{}/{}_reads.parq", &args.output_path.display(), args.runid),
+            &format!(
+                "{}/mira_{}_reads.parq",
+                &args.output_path.display(),
+                args.runid
+            ),
         )?;
         write_alleles_to_parquet(
             &allele_data.all_alleles,
             &format!(
-                "{}/{}_all_alleles.parq",
+                "{}/mira_{}_all_alleles.parq",
                 &args.output_path.display(),
                 args.runid
             ),
         )?;
         write_indels_to_parquet(
             &indel_data,
-            &format!("{}/{}_indels.parq", &args.output_path.display(), args.runid),
+            &format!(
+                "{}/mira_{}_indels.parq",
+                &args.output_path.display(),
+                args.runid
+            ),
         )?;
         write_minor_vars_to_parquet(
             &allele_data.filtered_alleles,
             &format!(
-                "{}/{}_minor_variants.parq",
+                "{}/mira_{}_minor_variants.parq",
                 &args.output_path.display(),
                 args.runid
             ),
@@ -409,7 +418,7 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
             &irma_summary,
             &args.virus,
             &format!(
-                "{}/{}_summary.parq",
+                "{}/mira_{}_summary.parq",
                 &args.output_path.display(),
                 args.runid
             ),
@@ -417,7 +426,7 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
         write_nt_seq_to_parquet(
             &nt_seq_vec,
             &format!(
-                "{}/{}_amended_consensus.parq",
+                "{}/mira_{}_amended_consensus.parq",
                 &args.output_path.display(),
                 args.runid
             ),
@@ -425,7 +434,7 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
         write_aa_seq_to_parquet(
             &aa_seq_vec,
             &format!(
-                "{}/{}_amino_acid_consensus.parq",
+                "{}/mira_{}_amino_acid_consensus.parq",
                 &args.output_path.display(),
                 args.runid
             ),
@@ -433,7 +442,7 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
         write_run_info_to_parquet(
             &run_info,
             &format!(
-                "{}/{}_irma_config.parq",
+                "{}/mira_{}_irma_config.parq",
                 &args.output_path.display(),
                 args.runid
             ),
@@ -441,7 +450,7 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
         write_samplesheet_to_parquet(
             samplesheet,
             &format!(
-                "{}/{}_samplesheet.parq",
+                "{}/mira_{}_samplesheet.parq",
                 &args.output_path.display(),
                 args.runid
             ),
