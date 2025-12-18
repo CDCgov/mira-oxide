@@ -3,6 +3,13 @@
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1] - 2025-12-18
+
+- [Amanda Sullivan](https://github.com/mandysulli)
+
+### `Fixed`
+- [PR #55](https://github.com/CDCgov/mira-oxide/pull/55) - Fix filepath, subtype and spike coverage logic in prepare-mira-reports subrocess to be compatible with MIRA-MF
+
 ## [1.2.0] - 2025-12-15
 
 - [Amanda Sullivan](https://github.com/mandysulli)

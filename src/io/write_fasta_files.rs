@@ -27,7 +27,7 @@ pub fn write_out_all_fasta_files(
 ) -> Result<(), Box<dyn Error>> {
     let _ = write_to_fasta(
         &format!(
-            "{}/{runid}_amended_consensus_summary.fasta",
+            "{}/mira_{runid}_amended_consensus.fasta",
             output_path.display()
         ),
         nt_passed_vec,
@@ -35,7 +35,7 @@ pub fn write_out_all_fasta_files(
 
     let _ = write_to_fasta(
         &format!(
-            "{}/{runid}_failed_amended_consensus_summary.fasta",
+            "{}/mira_{runid}_failed_amended_consensus.fasta",
             output_path.display()
         ),
         nt_fail_vec,
@@ -43,7 +43,7 @@ pub fn write_out_all_fasta_files(
 
     let _ = write_to_fasta(
         &format!(
-            "{}/{runid}_amino_acid_consensus_summary.fasta",
+            "{}/mira_{runid}_amino_acid_consensus.fasta",
             output_path.display()
         ),
         aa_passed_vec,
@@ -51,7 +51,7 @@ pub fn write_out_all_fasta_files(
 
     let _ = write_to_fasta(
         &format!(
-            "{}/{runid}_failed_amino_acid_consensus_summary.fasta",
+            "{}/mira_{runid}_failed_amino_acid_consensus.fasta",
             output_path.display()
         ),
         aa_fail_vec,
