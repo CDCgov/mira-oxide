@@ -866,7 +866,7 @@ pub fn dais_sequence_data_collection(
 ) -> Result<Vec<DaisSeqData>, Box<dyn std::error::Error>> {
     // Construct the glob pattern for matching files
     //If using * situation, you will have to use glob
-    let pattern = format!("{}/DAIS_ribosome.seq", dais_path.as_ref().display());
+    let pattern = format!("{}DAIS_ribosome.seq", dais_path.as_ref().display());
 
     let mut dais_seq_data: Vec<DaisSeqData> = Vec::new();
 

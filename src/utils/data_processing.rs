@@ -65,7 +65,7 @@ pub struct MeltedRecord {
 }
 
 /// Processed Cov Calcs
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct ProcessedCoverage {
     pub sample: String,
     pub reference: String,
@@ -1024,16 +1024,17 @@ pub fn create_irma_summary_vec(
             }
         }
 
-        if pos_calc_cov_vec.is_some() {
-            if let Some(result) = pos_calc_cov_vec {
-                for entry in result {
-                    if sample.sample_id == Some(entry.sample.clone())
-                        && sample.reference == Some(entry.reference.clone())
-                    {
-                        sample.spike_percent_coverage = entry.percent_reference_covered;
-                        sample.spike_median_coverage = Some(entry.median_coverage);
-                    }
-                }
+        if let Some(result) = pos_calc_cov_vec {
+            if let Some(entry) = result.iter().find(|entry| {
+                sample.sample_id == Some(entry.sample.clone())
+                    && sample.reference == Some(entry.reference.clone())
+            }) {
+                sample.spike_percent_coverage =
+                    Some(entry.percent_reference_covered.unwrap_or(0.0));
+                sample.spike_median_coverage = Some(entry.median_coverage);
+            } else {
+                sample.spike_percent_coverage = Some(0.0);
+                sample.spike_median_coverage = Some(0);
             }
         }
 

@@ -185,7 +185,8 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
     }));
 
     //Read in DAIS-ribosome data
-    let dais_seq_data = dais_sequence_data_collection(&args.irma_path)?;
+    //In MIRA-NF the DAIS outputs are fed right to the working directory to be used in this step
+    let dais_seq_data = dais_sequence_data_collection("./")?;
     let mut dais_ref_data: Vec<DaisSeqData> = Vec::new();
     if args.virus.to_lowercase() == "flu" || args.virus.to_lowercase() == "rsv" {
         dais_ref_data = dais_ref_seq_data_collection(&args.workdir_path, &args.virus)?;
