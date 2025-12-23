@@ -738,7 +738,6 @@ pub fn write_samplesheet_to_parquet(
     match samplesheet {
         Samplesheet::Illumina(data) => {
             // Extract fields from SamplesheetI
-            let barcode_vec: Vec<Option<String>> = vec![None; data.len()];
             let sample_id_vec: Vec<String> = extract_field(&data, |item| item.sample_id.clone());
             let sample_type_vec: Vec<Option<String>> =
                 extract_field(&data, |item| item.sample_type.clone());
@@ -748,7 +747,6 @@ pub fn write_samplesheet_to_parquet(
             let instrument_vec: Vec<String> = vec![instrument.to_string(); data.len()];
 
             // Convert the vectors into Arrow columns
-            let barcode_array: ArrayRef = Arc::new(StringArray::from(barcode_vec));
             let sample_id_array: ArrayRef = Arc::new(StringArray::from(sample_id_vec));
             let sample_type_array: ArrayRef = Arc::new(StringArray::from(sample_type_vec));
             let runid_array: ArrayRef = Arc::new(StringArray::from(runid_vec));
@@ -756,7 +754,6 @@ pub fn write_samplesheet_to_parquet(
 
             // Define the schema for the Arrow IPC file
             let fields = vec![
-                Field::new("Barcode #", DataType::Utf8, true),
                 Field::new("Sample ID", DataType::Utf8, false),
                 Field::new("Sample Type", DataType::Utf8, true),
                 Field::new("Run ID", DataType::Utf8, false),
@@ -768,7 +765,6 @@ pub fn write_samplesheet_to_parquet(
             let record_batch = RecordBatch::try_new(
                 schema.clone(),
                 vec![
-                    barcode_array,
                     sample_id_array,
                     sample_type_array,
                     runid_array,
