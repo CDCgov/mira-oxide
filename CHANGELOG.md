@@ -6,9 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.2.2] - 2025-12-23
 
 - [Amanda Sullivan](https://github.com/mandysulli)
+- [Kristine Lacek](https://github.com/kristinelacek)
 
 ### `Fixed`
-- Fix samplesheet.parq schema fix for handling Illumina.
+- [PR #57](https://github.com/CDCgov/mira-oxide/pull/57) - Fix samplesheet.parq schema fix for handling Illumina.
 
 ## [1.2.1] - 2025-12-18
 
