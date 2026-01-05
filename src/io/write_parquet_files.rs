@@ -687,6 +687,7 @@ pub fn write_run_info_to_parquet(
     let irma_vec = extract_field(run_info_data, |item| item.irma.clone());
     let runid_vec = extract_field(run_info_data, |item| item.run_id.clone());
     let instrument_vec = extract_field(run_info_data, |item| item.instrument.clone());
+    let assembly_time_vec = extract_field(run_info_data, |item| item.timestamp.clone());
 
     // Convert the vectors into Arrow columns
     let program_name_array: ArrayRef = Arc::new(StringArray::from(program_name_vec));
@@ -694,6 +695,7 @@ pub fn write_run_info_to_parquet(
     let irma_array: ArrayRef = Arc::new(StringArray::from(irma_vec));
     let runid_array: ArrayRef = Arc::new(StringArray::from(runid_vec));
     let instrument_array: ArrayRef = Arc::new(StringArray::from(instrument_vec));
+    let assembly_time_array: ArrayRef = Arc::new(StringArray::from(assembly_time_vec));
 
     // Define the schema for the Arrow IPC file
     let fields = vec![
@@ -702,6 +704,7 @@ pub fn write_run_info_to_parquet(
         Field::new("irma", DataType::Utf8, true),
         Field::new("runid", DataType::Utf8, true),
         Field::new("machine", DataType::Utf8, true),
+        Field::new("assembly_time", DataType::Utf8, true),
     ];
     let schema = Arc::new(Schema::new(fields));
 
@@ -714,6 +717,7 @@ pub fn write_run_info_to_parquet(
             irma_array,
             runid_array,
             instrument_array,
+            assembly_time_array,
         ],
     )?;
 
