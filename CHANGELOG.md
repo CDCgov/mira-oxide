@@ -3,6 +3,14 @@
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.3] - 2025-01-05
+
+- [Amanda Sullivan](https://github.com/mandysulli)
+- [Kristine Lacek](https://github.com/kristinelacek)
+
+### `Fixed`
+- [PR #58](https://github.com/CDCgov/mira-oxide/pull/58) - Add assembly_time coumn to the run_info.parq
+
 ## [1.2.2] - 2025-12-23
 
 - [Amanda Sullivan](https://github.com/mandysulli)
