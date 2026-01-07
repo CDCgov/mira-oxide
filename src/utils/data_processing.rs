@@ -635,7 +635,7 @@ pub fn extract_subtype_sc2(dais_vars: &[DaisVarsData]) -> Result<Vec<Subtype>, B
     for entry in dais_vars {
         subtype_data.push(Subtype {
             sample_id: entry.sample_id.clone(),
-            subtype: entry.reference_id.clone(),
+            subtype: entry.ctype.clone(),
         });
     }
 
