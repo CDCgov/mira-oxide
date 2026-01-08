@@ -163,6 +163,7 @@ pub trait HasSampleType {
     fn sample_type(&self) -> String;
 }
 
+/////////////// Imps ///////////////
 impl HasSampleType for SamplesheetI {
     fn sample_type(&self) -> String {
         self.sample_type.clone().unwrap_or_default()
@@ -198,6 +199,22 @@ impl HasSampleId for ReadsData {
             static EMPTY_STRING: String = String::new();
             &EMPTY_STRING
         })
+    }
+}
+
+impl NextcladeSequences {
+    pub fn new() -> Self {
+        Self {
+            influenza_a_h3n2_ha: Vec::new(),
+            influenza_a_h1n1pdm_ha: Vec::new(),
+            influenza_b_victoria_ha: Vec::new(),
+            influenza_a_h1n1pdm_na: Vec::new(),
+            influenza_a_h3n2_na: Vec::new(),
+            influenza_b_victoria_na: Vec::new(),
+            rsv_a: Vec::new(),
+            rsv_b: Vec::new(),
+            sars_cov_2: Vec::new(),
+        }
     }
 }
 

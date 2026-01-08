@@ -8,12 +8,13 @@ use crate::io::reads_to_sankey_json::reads_to_sankey_json;
 use crate::io::write_fasta_files::write_out_nextclade_fasta_files;
 use crate::io::write_parquet_files::write_samplesheet_to_parquet;
 use crate::utils::data_processing::{
-    DaisVarsData, ProcessedCoverage, Subtype, collect_analysis_metadata, collect_negatives,
-    collect_sample_id, compute_cvv_dais_variants, compute_dais_variants, create_aa_seq_vec,
-    create_irma_summary_vec, create_nt_seq_vec, create_vtype_data, divide_aa_into_pass_fail_vec,
-    divide_nt_into_nextclade_vec, divide_nt_into_pass_fail_vec, extract_field, extract_subtype_flu,
-    extract_subtype_sc2, melt_reads_data, process_position_coverage_data,
-    process_wgs_coverage_data, return_seg_data, transform_coverage_to_heatmap,
+    DaisVarsData, NextcladeSequences, ProcessedCoverage, Subtype, collect_analysis_metadata,
+    collect_negatives, collect_sample_id, compute_cvv_dais_variants, compute_dais_variants,
+    create_aa_seq_vec, create_irma_summary_vec, create_nt_seq_vec, create_vtype_data,
+    divide_aa_into_pass_fail_vec, divide_nt_into_nextclade_vec, divide_nt_into_pass_fail_vec,
+    extract_field, extract_subtype_flu, extract_subtype_sc2, melt_reads_data,
+    process_position_coverage_data, process_wgs_coverage_data, return_seg_data,
+    transform_coverage_to_heatmap,
 };
 use crate::{
     io::{
@@ -89,6 +90,10 @@ pub struct ReportsArgs {
     #[arg(short = 'f', long)]
     /// (Optional) A flag to indicate whether to create parquet files.
     parq: bool,
+
+    #[arg(short = 'n', long)]
+    /// (Optional) A flag to indicate whether to create nextclade input files.
+    nextclade_files: bool,
 
     #[arg(short = 'c', long, default_value = "default-config")]
     /// (Optional) The name of the IRMA configuration that was used for running IRMA.
@@ -302,7 +307,7 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
             sample.add_pass_fail_qc(&dais_vars_data, &seq_data, &qc_values)?;
         }
     }
-    println!("{seq_data:#?}");
+
     // Construct seq info and add pass fail information
     let nt_seq_vec = create_nt_seq_vec(
         &seq_data,
@@ -312,7 +317,6 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
         &args.runid,
         &args.platform,
     )?;
-    println!("{nt_seq_vec:#?}");
 
     let aa_seq_vec = create_aa_seq_vec(
         &dais_seq_data,
@@ -326,8 +330,12 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
     let processed_nt_seq = divide_nt_into_pass_fail_vec(&nt_seq_vec, &args.platform, &args.virus)?;
     let processed_aa_seq = divide_aa_into_pass_fail_vec(&aa_seq_vec, &args.platform, &args.virus)?;
 
-    let nextclade_nt_seq = divide_nt_into_nextclade_vec(&nt_seq_vec, &args.platform, &args.virus)?;
-    //println!("{nextclade_nt_seq:#?}");
+    // Create nextclade sequence vectors for fasta files if flag given
+    let nextclade_nt_seq = if args.nextclade_files {
+        divide_nt_into_nextclade_vec(&nt_seq_vec, &args.platform, &args.virus)?
+    } else {
+        NextcladeSequences::new()
+    };
 
     // Processing data for Dashboard Figures
     let transformed_cov_data = transform_coverage_to_heatmap(&coverage_data, &args.virus);
@@ -345,7 +353,10 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
         &args.runid,
     )?;
 
-    write_out_nextclade_fasta_files(&args.output_path, &nextclade_nt_seq, &args.runid)?;
+    // Write fasta inputs files for next if flag given
+    if args.nextclade_files {
+        write_out_nextclade_fasta_files(&args.output_path, &nextclade_nt_seq, &args.runid)?;
+    }
 
     println!("Writing CSV files");
     write_out_all_csv_mira_reports(
