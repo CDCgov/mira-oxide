@@ -135,6 +135,20 @@ pub struct ProcessedSequences {
     pub failed_seqs: Vec<SeqData>,
 }
 
+// Nextclade Seqs Struct
+#[derive(Debug)]
+pub struct NextcladeSequences {
+    pub influenza_a_h3n2_ha: Vec<SeqData>,
+    pub influenza_a_h1n1pdm_ha: Vec<SeqData>,
+    pub influenza_b_victoria_ha: Vec<SeqData>,
+    pub influenza_a_h1n1pdm_na: Vec<SeqData>,
+    pub influenza_a_h3n2_na: Vec<SeqData>,
+    pub influenza_b_victoria_na: Vec<SeqData>,
+    pub rsv_a: Vec<SeqData>,
+    pub rsv_b: Vec<SeqData>,
+    pub sars_cov_2: Vec<SeqData>,
+}
+
 // Transform Cov for Heatmap Struct
 #[derive(Debug, Clone)]
 pub struct TransformedData {
@@ -1490,6 +1504,85 @@ pub fn divide_aa_into_pass_fail_vec(
     };
 
     Ok(processed_aa_seqs)
+}
+
+// Creating seq vecs for nextclade fastas
+pub fn divide_nt_into_nextclade_vec(
+    nt_seq_vec: &[NTSequences],
+    platform: &str,
+    virus: &str,
+) -> Result<NextcladeSequences, Box<dyn Error>> {
+    let mut nextclade_seqs = NextcladeSequences {
+        influenza_a_h3n2_ha: Vec::new(),
+        influenza_a_h1n1pdm_ha: Vec::new(),
+        influenza_b_victoria_ha: Vec::new(),
+        influenza_a_h1n1pdm_na: Vec::new(),
+        influenza_a_h3n2_na: Vec::new(),
+        influenza_b_victoria_na: Vec::new(),
+        rsv_a: Vec::new(),
+        rsv_b: Vec::new(),
+        sars_cov_2: Vec::new(),
+    };
+
+    for entry in nt_seq_vec {
+        let is_pass = match (platform, virus) {
+            ("illumina", "flu") => {
+                entry.qc_decision == "Pass"
+                    || (entry.qc_decision.contains("Premature stop codon")
+                        && !entry.qc_decision.contains(';')
+                        && !entry.reference.contains("HA")
+                        && !entry.reference.contains("NA"))
+            }
+            ("illumina", "sc2-wgs") => {
+                entry.qc_decision == "Pass"
+                    || (entry.qc_decision.contains("Premature stop codon")
+                        && !entry.qc_decision.contains(';')
+                        && !entry.qc_decision.contains("Premature stop codon 'S'"))
+            }
+            ("illumina", "rsv") => {
+                entry.qc_decision == "Pass"
+                    || (entry.qc_decision.contains("Premature stop codon")
+                        && !entry.qc_decision.contains(';')
+                        && !entry.reference.contains('F')
+                        && !entry.reference.contains('G'))
+            }
+            ("ont", _) => {
+                entry.qc_decision == "Pass"
+                    || (entry.qc_decision.contains("Premature stop codon")
+                        && !entry.qc_decision.contains(';'))
+            }
+            _ => {
+                return Err(format!(
+                    "Unhandled case for platform '{platform}' and virus '{virus}'"
+                )
+                .into());
+            }
+        };
+
+        if !is_pass {
+            continue;
+        }
+
+        let seq = SeqData {
+            name: format!("{} | {}", entry.sample_id, entry.reference),
+            sequence: entry.sequence.clone(),
+        };
+
+        match entry.reference.as_str() {
+            "A_HA_H3" => nextclade_seqs.influenza_a_h3n2_ha.push(seq),
+            "A_HA_H1" => nextclade_seqs.influenza_a_h1n1pdm_ha.push(seq),
+            "B_HA" => nextclade_seqs.influenza_b_victoria_ha.push(seq),
+            "A_NA_N1" => nextclade_seqs.influenza_a_h1n1pdm_na.push(seq),
+            "A_NA_N2" => nextclade_seqs.influenza_a_h3n2_na.push(seq),
+            "B_NA" => nextclade_seqs.influenza_b_victoria_na.push(seq),
+            "RSV_AD" => nextclade_seqs.rsv_a.push(seq),
+            "RSV_BD" => nextclade_seqs.rsv_b.push(seq),
+            "SARS-CoV-2" => nextclade_seqs.sars_cov_2.push(seq),
+            _ => {}
+        }
+    }
+
+    Ok(nextclade_seqs)
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -16,8 +16,8 @@ pub fn write_to_fasta(output_file: &str, seq_data_vec: &[SeqData]) -> Result<(),
     Ok(())
 }
 
-//////////////// Function to collection and write out all fasta files ///////////////
-pub fn write_out_all_fasta_files(
+//////////////// Function to collection and write out all consensus fasta files ///////////////
+pub fn write_out_all_consensus_fasta_files(
     output_path: &Path,
     nt_passed_vec: &[SeqData],
     nt_fail_vec: &[SeqData],
@@ -57,5 +57,16 @@ pub fn write_out_all_fasta_files(
         aa_fail_vec,
     );
 
+    Ok(())
+}
+
+pub fn write_out_nextclade_fasta_files(
+    output_path: &Path,
+    nt_passed_vec: &[SeqData],
+    nt_fail_vec: &[SeqData],
+    aa_passed_vec: &[SeqData],
+    aa_fail_vec: &[SeqData],
+    runid: &str,
+) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
