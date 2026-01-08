@@ -606,7 +606,7 @@ pub fn amended_consensus_data_collection(
     organism: &str,
 ) -> Result<Vec<SeqData>, Box<dyn std::error::Error>> {
     // Determine the glob pattern based on the organism
-    let pattern = if organism == "flu" {
+    let pattern = if organism == "flu" || organism == "sc2-spike" {
         format!(
             "{}/*/IRMA/*/amended_consensus/*fa",
             irma_path.as_ref().display()

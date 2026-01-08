@@ -5,6 +5,7 @@ use crate::io::create_passfail_heatmap::create_passfail_heatmap;
 use crate::io::create_statichtml::generate_html_report;
 use crate::io::reads_to_piechart::create_barcode_distribution_figure;
 use crate::io::reads_to_sankey_json::reads_to_sankey_json;
+use crate::io::write_fasta_files::write_out_nextclade_fasta_files;
 use crate::io::write_parquet_files::write_samplesheet_to_parquet;
 use crate::utils::data_processing::{
     DaisVarsData, ProcessedCoverage, Subtype, collect_analysis_metadata, collect_negatives,
@@ -301,7 +302,7 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
             sample.add_pass_fail_qc(&dais_vars_data, &seq_data, &qc_values)?;
         }
     }
-
+    println!("{seq_data:#?}");
     // Construct seq info and add pass fail information
     let nt_seq_vec = create_nt_seq_vec(
         &seq_data,
@@ -311,6 +312,7 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
         &args.runid,
         &args.platform,
     )?;
+    println!("{nt_seq_vec:#?}");
 
     let aa_seq_vec = create_aa_seq_vec(
         &dais_seq_data,
@@ -325,7 +327,7 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
     let processed_aa_seq = divide_aa_into_pass_fail_vec(&aa_seq_vec, &args.platform, &args.virus)?;
 
     let nextclade_nt_seq = divide_nt_into_nextclade_vec(&nt_seq_vec, &args.platform, &args.virus)?;
-    println!("{nextclade_nt_seq:#?}");
+    //println!("{nextclade_nt_seq:#?}");
 
     // Processing data for Dashboard Figures
     let transformed_cov_data = transform_coverage_to_heatmap(&coverage_data, &args.virus);
@@ -342,6 +344,8 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
         &processed_aa_seq.failed_seqs,
         &args.runid,
     )?;
+
+    write_out_nextclade_fasta_files(&args.output_path, &nextclade_nt_seq, &args.runid)?;
 
     println!("Writing CSV files");
     write_out_all_csv_mira_reports(

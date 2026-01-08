@@ -1,6 +1,6 @@
 use std::{error::Error, fs::File, io::Write, path::Path};
 
-use crate::io::data_ingest::SeqData;
+use crate::{io::data_ingest::SeqData, utils::data_processing::NextcladeSequences};
 
 //////////////// Function to write fasta ///////////////
 pub fn write_to_fasta(output_file: &str, seq_data_vec: &[SeqData]) -> Result<(), Box<dyn Error>> {
@@ -62,11 +62,92 @@ pub fn write_out_all_consensus_fasta_files(
 
 pub fn write_out_nextclade_fasta_files(
     output_path: &Path,
-    nt_passed_vec: &[SeqData],
-    nt_fail_vec: &[SeqData],
-    aa_passed_vec: &[SeqData],
-    aa_fail_vec: &[SeqData],
+    nextclade_seqs: &NextcladeSequences,
     runid: &str,
 ) -> Result<(), Box<dyn Error>> {
+    if !nextclade_seqs.influenza_a_h3n2_ha.is_empty() {
+        write_to_fasta(
+            &format!(
+                "{}/nextclade_{runid}_influenza-a-h3n2-ha.fasta",
+                output_path.display()
+            ),
+            &nextclade_seqs.influenza_a_h3n2_ha,
+        )?;
+    }
+
+    if !nextclade_seqs.influenza_a_h1n1pdm_ha.is_empty() {
+        write_to_fasta(
+            &format!(
+                "{}/nextclade_{runid}_influenza-a-h1n1pdm-ha.fasta",
+                output_path.display()
+            ),
+            &nextclade_seqs.influenza_a_h1n1pdm_ha,
+        )?;
+    }
+
+    if !nextclade_seqs.influenza_b_victoria_ha.is_empty() {
+        write_to_fasta(
+            &format!(
+                "{}/nextclade_{runid}_influenza-b-victoria-ha.fasta",
+                output_path.display()
+            ),
+            &nextclade_seqs.influenza_b_victoria_ha,
+        )?;
+    }
+
+    if !nextclade_seqs.influenza_a_h1n1pdm_na.is_empty() {
+        write_to_fasta(
+            &format!(
+                "{}/nextclade_{runid}_influenza-a-h1n1pdm-na.fasta",
+                output_path.display()
+            ),
+            &nextclade_seqs.influenza_a_h1n1pdm_na,
+        )?;
+    }
+
+    if !nextclade_seqs.influenza_a_h3n2_na.is_empty() {
+        write_to_fasta(
+            &format!(
+                "{}/nextclade_{runid}_influenza-a-h3n2-na.fasta",
+                output_path.display()
+            ),
+            &nextclade_seqs.influenza_a_h3n2_na,
+        )?;
+    }
+
+    if !nextclade_seqs.influenza_b_victoria_na.is_empty() {
+        write_to_fasta(
+            &format!(
+                "{}/nextclade_{runid}_influenza-b-victoria-na.fasta",
+                output_path.display()
+            ),
+            &nextclade_seqs.influenza_b_victoria_na,
+        )?;
+    }
+
+    if !nextclade_seqs.rsv_a.is_empty() {
+        write_to_fasta(
+            &format!("{}/nextclade_{runid}_rsv-a.fasta", output_path.display()),
+            &nextclade_seqs.rsv_a,
+        )?;
+    }
+
+    if !nextclade_seqs.rsv_b.is_empty() {
+        write_to_fasta(
+            &format!("{}/nextclade_{runid}_rsv-b.fasta", output_path.display()),
+            &nextclade_seqs.rsv_b,
+        )?;
+    }
+
+    if !nextclade_seqs.sars_cov_2.is_empty() {
+        write_to_fasta(
+            &format!(
+                "{}/nextclade_{runid}_sars-cov-2.fasta",
+                output_path.display()
+            ),
+            &nextclade_seqs.sars_cov_2,
+        )?;
+    }
+
     Ok(())
 }
