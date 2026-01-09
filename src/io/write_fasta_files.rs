@@ -68,7 +68,7 @@ pub fn write_out_nextclade_fasta_files(
     if !nextclade_seqs.influenza_a_h3n2_ha.is_empty() {
         write_to_fasta(
             &format!(
-                "{}/nextclade_{runid}_influenza-a-h3n2-ha.fasta",
+                "{}/nextclade_{runid}_flu_h3n2_ha.fasta",
                 output_path.display()
             ),
             &nextclade_seqs.influenza_a_h3n2_ha,
@@ -78,7 +78,7 @@ pub fn write_out_nextclade_fasta_files(
     if !nextclade_seqs.influenza_a_h1n1pdm_ha.is_empty() {
         write_to_fasta(
             &format!(
-                "{}/nextclade_{runid}_influenza-a-h1n1pdm-ha.fasta",
+                "{}/nextclade_{runid}_flu_h1n1pdm_ha.fasta",
                 output_path.display()
             ),
             &nextclade_seqs.influenza_a_h1n1pdm_ha,
@@ -88,7 +88,7 @@ pub fn write_out_nextclade_fasta_files(
     if !nextclade_seqs.influenza_b_victoria_ha.is_empty() {
         write_to_fasta(
             &format!(
-                "{}/nextclade_{runid}_influenza-b-victoria-ha.fasta",
+                "{}/nextclade_{runid}_flu_vic_ha.fasta",
                 output_path.display()
             ),
             &nextclade_seqs.influenza_b_victoria_ha,
@@ -98,7 +98,7 @@ pub fn write_out_nextclade_fasta_files(
     if !nextclade_seqs.influenza_a_h1n1pdm_na.is_empty() {
         write_to_fasta(
             &format!(
-                "{}/nextclade_{runid}_influenza-a-h1n1pdm-na.fasta",
+                "{}/nextclade_{runid}_flu_h1n1pdm_na.fasta",
                 output_path.display()
             ),
             &nextclade_seqs.influenza_a_h1n1pdm_na,
@@ -108,7 +108,7 @@ pub fn write_out_nextclade_fasta_files(
     if !nextclade_seqs.influenza_a_h3n2_na.is_empty() {
         write_to_fasta(
             &format!(
-                "{}/nextclade_{runid}_influenza-a-h3n2-na.fasta",
+                "{}/nextclade_{runid}_flu_h3n2_na.fasta",
                 output_path.display()
             ),
             &nextclade_seqs.influenza_a_h3n2_na,
@@ -118,7 +118,7 @@ pub fn write_out_nextclade_fasta_files(
     if !nextclade_seqs.influenza_b_victoria_na.is_empty() {
         write_to_fasta(
             &format!(
-                "{}/nextclade_{runid}_influenza-b-victoria-na.fasta",
+                "{}/nextclade_{runid}_flu_vic_na.fasta",
                 output_path.display()
             ),
             &nextclade_seqs.influenza_b_victoria_na,
@@ -127,14 +127,14 @@ pub fn write_out_nextclade_fasta_files(
 
     if !nextclade_seqs.rsv_a.is_empty() {
         write_to_fasta(
-            &format!("{}/nextclade_{runid}_rsv-a.fasta", output_path.display()),
+            &format!("{}/nextclade_{runid}_rsv_a.fasta", output_path.display()),
             &nextclade_seqs.rsv_a,
         )?;
     }
 
     if !nextclade_seqs.rsv_b.is_empty() {
         write_to_fasta(
-            &format!("{}/nextclade_{runid}_rsv-b.fasta", output_path.display()),
+            &format!("{}/nextclade_{runid}_rsv_b.fasta", output_path.display()),
             &nextclade_seqs.rsv_b,
         )?;
     }

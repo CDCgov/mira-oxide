@@ -91,10 +91,6 @@ pub struct ReportsArgs {
     /// (Optional) A flag to indicate whether to create parquet files.
     parq: bool,
 
-    #[arg(short = 'n', long)]
-    /// (Optional) A flag to indicate whether to create nextclade input files.
-    nextclade_files: bool,
-
     #[arg(short = 'c', long, default_value = "default-config")]
     /// (Optional) The name of the IRMA configuration that was used for running IRMA.
     irma_config: String,
@@ -331,12 +327,7 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
     let processed_aa_seq = divide_aa_into_pass_fail_vec(&aa_seq_vec, &args.platform, &args.virus)?;
 
     // Create nextclade sequence vectors for fasta files if flag given
-    let nextclade_nt_seq = if args.nextclade_files {
-        divide_nt_into_nextclade_vec(&nt_seq_vec, &args.platform, &args.virus)?
-    } else {
-        NextcladeSequences::new()
-    };
-
+    let nextclade_nt_seq = divide_nt_into_nextclade_vec(&nt_seq_vec, &args.platform, &args.virus)?;
     // Processing data for Dashboard Figures
     let transformed_cov_data = transform_coverage_to_heatmap(&coverage_data, &args.virus);
 
@@ -353,10 +344,8 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
         &args.runid,
     )?;
 
-    // Write fasta inputs files for next if flag given
-    if args.nextclade_files {
-        write_out_nextclade_fasta_files(&args.output_path, &nextclade_nt_seq, &args.runid)?;
-    }
+    // Write fasta inputs files
+    write_out_nextclade_fasta_files(&args.output_path, &nextclade_nt_seq, &args.runid)?;
 
     println!("Writing CSV files");
     write_out_all_csv_mira_reports(

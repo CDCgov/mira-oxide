@@ -202,22 +202,6 @@ impl HasSampleId for ReadsData {
     }
 }
 
-impl NextcladeSequences {
-    pub fn new() -> Self {
-        Self {
-            influenza_a_h3n2_ha: Vec::new(),
-            influenza_a_h1n1pdm_ha: Vec::new(),
-            influenza_b_victoria_ha: Vec::new(),
-            influenza_a_h1n1pdm_na: Vec::new(),
-            influenza_a_h3n2_na: Vec::new(),
-            influenza_b_victoria_na: Vec::new(),
-            rsv_a: Vec::new(),
-            rsv_b: Vec::new(),
-            sars_cov_2: Vec::new(),
-        }
-    }
-}
-
 /// Functions to convert values in a vector of structs to vector
 /// Some perform type converions
 pub fn extract_field<V, T, U, F>(data: V, extractor: F) -> Vec<U>

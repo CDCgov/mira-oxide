@@ -39,7 +39,7 @@ This script is a comprehensive data aggregation and processing tool designed to 
 After cloning the mira-oxide repo, execute this command to create a mutations of interest table for the samples:
 
 ```bash
-cargo run -- prepare-mira-reports -s <PATH>/samplesheet.csv -i ~<PATH_TO_MIRA_NF_OUTPUTS. -o <OUTDIR> -q <PATH>/qc_test.yaml -p <PLATFORM> -w <PATH>/MIRA-NF -r <RUN_ID> -v <VIRUS> -f
+cargo run -- prepare-mira-reports -s <PATH>/samplesheet.csv -i ~<PATH_TO_MIRA_NF_OUTPUTS. -o <OUTDIR> -q <PATH>/qc_test.yaml -p <PLATFORM> -w <PATH>/MIRA-NF -r <RUN_ID> -v <VIRUS> -f (optional) -n (optional) -c <CONFIG> (optional)
 ```
 
 **NOTE: This script expects you to have the DAIS_ribosome.seq file to be in the location that you are deploying the command for MIRA-NF compatibility**
@@ -55,6 +55,7 @@ Writing FASTA files
  -> FASTA written to ./test/mira_run_id_test_failed_amended_consensus.fasta
  -> FASTA written to ./test/mira_run_id_test_amino_acid_consensus.fasta
  -> FASTA written to ./test/mira_run_id_test_failed_amino_acid_consensus.fasta
+ **NEXTCLADE FASTA FILES**
 Writing CSV files
  -> CSV written to ./test/mira_run_id_test_coverage.csv
  -> CSV written to ./test/mira_run_id_test_reads.csv
@@ -106,6 +107,7 @@ Writing FASTA files
  -> FASTA written to ./test/mira_run_id_test_failed_amended_consensus.fasta
  -> FASTA written to ./test/mira_run_id_test_amino_acid_consensus.fasta
  -> FASTA written to ./test/mira_run_id_test_failed_amino_acid_consensus.fasta
+  **NEXTCLADE FASTA FILES**
 Writing CSV files
  -> CSV written to ./test/mira_run_id_test_coverage.csv
  -> CSV written to ./test/mira_run_id_test_reads.csv
@@ -154,6 +156,19 @@ Building barcode distribution pie figure as JSON
   -> barcode distribution pie figure saved to ./test/barcode_distribution.json
 Building static HTML file
   -> static HTML saved to "./test/mira_run_id_test_summary.html"
+```
+
+### Potential FASTA files created by the nextclade flag
+```
+nextclade_<runid>_influenza-a-h3n2-ha.fasta
+nextclade_<runid>_influenza-a-h1n1pdm-ha.fasta
+nextclade_<runid>_influenza-b-victoria-ha.fasta
+nextclade_<runid>_influenza-a-h1n1pdm-na.fasta
+nextclade_<runid>_influenza-a-h3n2-na.fasta
+nextclade_<runid>_influenza-b-victoria-na.fasta
+nextclade_<runid>_rsv-a.fasta
+nextclade_<runid>_rsv-b.fasta
+nextclade_<runid>_sars-cov-2.fasta
 ```
 
 ## Notes
