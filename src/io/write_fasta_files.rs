@@ -60,6 +60,7 @@ pub fn write_out_all_consensus_fasta_files(
     Ok(())
 }
 
+//Write out nextclade fasta files. The names used match the dataset names from nexclade - needed in MIRA-NF.
 pub fn write_out_nextclade_fasta_files(
     output_path: &Path,
     nextclade_seqs: &NextcladeSequences,
