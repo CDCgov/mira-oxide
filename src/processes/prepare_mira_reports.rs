@@ -328,6 +328,7 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
 
     // Create nextclade sequence vectors for fasta files if flag given
     let nextclade_nt_seq = divide_nt_into_nextclade_vec(&nt_seq_vec, &args.platform, &args.virus)?;
+
     // Processing data for Dashboard Figures
     let transformed_cov_data = transform_coverage_to_heatmap(&coverage_data, &args.virus);
 

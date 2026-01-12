@@ -3,6 +3,15 @@
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2025-01-05
+
+- [Amanda Sullivan](https://github.com/mandysulli)
+
+### `Added`
+- [PR #60](https://github.com/CDCgov/mira-oxide/pull/60) - Added divide_nt_into_nextclade_vec and write_out_nextclade_fasta_files funcitons to write out nextclade fastsa files that are divided by subtype( and segment for flu).
+- [PR #60](https://github.com/CDCgov/mira-oxide/pull/60) - Added summary_report_update function to add the nextclade clade results back into the summary.csv and sumary.parq files.
+
+
 ## [1.2.3] - 2025-01-05
 
 - [Amanda Sullivan](https://github.com/mandysulli)
