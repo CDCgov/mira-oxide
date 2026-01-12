@@ -3,7 +3,10 @@ use serde::Serialize;
 use serde_json::Value;
 use std::{error::Error, path::Path};
 
-use crate::utils::data_processing::{AASequences, DaisVarsData, IRMASummary, NTSequences};
+use crate::{
+    processes::summary_report_update::UpdatedIRMASummary,
+    utils::data_processing::{AASequences, DaisVarsData, IRMASummary, NTSequences},
+};
 
 use super::data_ingest::{AlleleDataCollection, CoverageData, IndelsData, ReadsData, RunInfo};
 
@@ -405,5 +408,148 @@ pub fn write_out_all_csv_mira_reports(
         &run_info_struct_values,
     )?;
 
+    Ok(())
+}
+
+//////////////// Function to collection and write out all CSV files ///////////////
+#[allow(clippy::too_many_lines, clippy::too_many_arguments)]
+pub fn write_out_updated_summary_csv(
+    summary_data: &[UpdatedIRMASummary],
+    virus: &str,
+    runid: &str,
+    output_path: &Path,
+) -> Result<(), Box<dyn Error>> {
+    let summary_struct_values: Vec<&str> = if virus == "sc2-wgs" {
+        vec![
+            "sample_id",
+            "total_reads",
+            "pass_qc",
+            "reads_mapped",
+            "reference",
+            "percent_reference_coverage",
+            "median_coverage",
+            "count_minor_snv",
+            "count_minor_indel",
+            "spike_percent_coverage",
+            "spike_median_coverage",
+            "pass_fail_reason",
+            "subtype",
+            "mira_module",
+            "runid",
+            "instrument",
+            "nextclade_field_1",
+            "nextclade_field_2",
+            "nextclade_field_3",
+        ]
+    } else if virus == "flu" {
+        vec![
+            "sample_id",
+            "total_reads",
+            "pass_qc",
+            "reads_mapped",
+            "reference",
+            "percent_reference_coverage",
+            "median_coverage",
+            "count_minor_snv",
+            "count_minor_indel",
+            "pass_fail_reason",
+            "subtype",
+            "mira_module",
+            "runid",
+            "instrument",
+            "nextclade_field_1",
+            "nextclade_field_2",
+            "nextclade_field_3",
+        ]
+    } else {
+        vec![
+            "sample_id",
+            "total_reads",
+            "pass_qc",
+            "reads_mapped",
+            "reference",
+            "percent_reference_coverage",
+            "median_coverage",
+            "count_minor_snv",
+            "count_minor_indel",
+            "pass_fail_reason",
+            "subtype",
+            "mira_module",
+            "runid",
+            "instrument",
+            "nextclade_field_1",
+            "nextclade_field_2",
+        ]
+    };
+
+    let summary_columns: Vec<&str> = if virus == "sc2-wgs" {
+        vec![
+            "sample_id",
+            "total_reads",
+            "pass_qc",
+            "reads_mapped",
+            "reference",
+            "percent_reference_coverage",
+            "median_coverage",
+            "count_minor_snv",
+            "count_minor_indel",
+            "spike_percent_coverage",
+            "spike_median_coverage",
+            "pass_fail_reason",
+            "subtype",
+            "mira_module",
+            "runid",
+            "instrument",
+            "clade",
+            "clade_who",
+            "nextclade_pango",
+        ]
+    } else if virus == "flu" {
+        vec![
+            "sample_id",
+            "total_reads",
+            "pass_qc",
+            "reads_mapped",
+            "reference",
+            "percent_reference_coverage",
+            "median_coverage",
+            "count_minor_snv",
+            "count_minor_indel",
+            "pass_fail_reason",
+            "subtype",
+            "mira_module",
+            "runid",
+            "instrument",
+            "clade",
+            "short_clade",
+            "subclade",
+        ]
+    } else {
+        vec![
+            "sample_id",
+            "total_reads",
+            "pass_qc",
+            "reads_mapped",
+            "reference",
+            "percent_reference_coverage",
+            "median_coverage",
+            "count_minor_snv",
+            "count_minor_indel",
+            "pass_fail_reason",
+            "subtype",
+            "mira_module",
+            "runid",
+            "instrument",
+            "clade",
+            "g_clade",
+        ]
+    };
+
+    write_structs_to_csv_file(
+        &format!("{}/mira_{runid}_summary.csv", output_path.display()),
+        summary_data,
+        &summary_columns,
+        &summary_struct_values,
+    )?;
     Ok(())
 }

@@ -4,7 +4,10 @@ use std::{collections::HashMap, error::Error, path::PathBuf};
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 
-use crate::io::data_ingest::{NextcladeData, create_reader, nextclade_data_collection, read_csv};
+use crate::io::{
+    data_ingest::{NextcladeData, create_reader, nextclade_data_collection, read_csv},
+    write_csv_files::write_out_updated_summary_csv,
+};
 
 #[derive(Debug, Parser)]
 #[command(
@@ -70,6 +73,14 @@ pub struct UpdatedIRMASummary {
     pub nextclade_field_3: Option<String>,
 }
 
+fn normalize_nextclade_field(field: &mut Option<String>) {
+    let is_empty = field.as_ref().map(|s| s.trim().is_empty()).unwrap_or(true);
+
+    if is_empty {
+        *field = Some("Undetermined".to_string());
+    }
+}
+
 pub fn summary_report_update_process(args: &SummaryUpdateArgs) -> Result<(), Box<dyn Error>> {
     let summary_path = create_reader(&args.summary_csv)?;
     let mut summary_data: Vec<UpdatedIRMASummary> = read_csv(summary_path, true)?;
@@ -88,33 +99,33 @@ pub fn summary_report_update_process(args: &SummaryUpdateArgs) -> Result<(), Box
             continue;
         };
 
-        let Some(nc) = nextclade_map.get(sample_id) else {
-            continue;
-        };
-
-        match args.virus.as_str() {
-            "flu" => {
-                summary.nextclade_field_1 = nc.clade.clone();
-                summary.nextclade_field_2 = nc.short_clade.clone();
-                summary.nextclade_field_3 = nc.subclade.clone();
+        if let Some(nc) = nextclade_map.get(sample_id) {
+            match args.virus.as_str() {
+                "flu" => {
+                    summary.nextclade_field_1 = nc.clade.clone();
+                    summary.nextclade_field_2 = nc.short_clade.clone();
+                    summary.nextclade_field_3 = nc.subclade.clone();
+                }
+                "sc2-wgs" => {
+                    summary.nextclade_field_1 = nc.clade.clone();
+                    summary.nextclade_field_2 = nc.clade_who.clone();
+                    summary.nextclade_field_3 = nc.nextclade_pango.clone();
+                }
+                "rsv" => {
+                    summary.nextclade_field_1 = nc.clade.clone();
+                    summary.nextclade_field_2 = nc.g_clade.clone();
+                }
+                _ => {}
             }
-            "sc2-wgs" => {
-                summary.nextclade_field_1 = nc.clade.clone();
-                summary.nextclade_field_2 = nc.clade_who.clone();
-                summary.nextclade_field_3 = nc.nextclade_pango.clone();
-            }
-            "rsv" => {
-                summary.nextclade_field_1 = nc.clade.clone();
-                summary.nextclade_field_2 = nc.g_clade.clone();
-            }
-            _ => {}
         }
+
+        // NIf there is no nextclade results for a sample, set fields to "Undetermined"
+        normalize_nextclade_field(&mut summary.nextclade_field_1);
+        normalize_nextclade_field(&mut summary.nextclade_field_2);
+        normalize_nextclade_field(&mut summary.nextclade_field_3);
     }
 
-    println!("{summary_data:#?}");
-
-    // At this point summary_data is updated and ready to write out
-    // write_csv / write_parquet can happen here
+    write_out_updated_summary_csv(&summary_data, &args.virus, &args.runid, &args.output_path)?;
 
     Ok(())
 }
