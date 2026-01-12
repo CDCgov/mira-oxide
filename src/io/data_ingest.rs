@@ -246,6 +246,29 @@ pub struct DaisSeqData {
     pub sample_nt_positions: String,
 }
 
+/////////////// Structs to hold nextcalde data ///////////////
+/// Dais Sequence Data
+#[derive(Serialize, Deserialize, Debug)]
+pub struct NextcladeData {
+    #[serde(rename = "index")]
+    pub index: Option<String>,
+    #[serde(rename = "seqName")]
+    pub seq_name: String,
+    #[serde(rename = "clade")]
+    pub clade: Option<String>,
+    #[serde(rename = "short-clade")]
+    pub short_clade: Option<String>,
+    #[serde(rename = "subclade")]
+    pub subclade: Option<String>,
+    #[serde(rename = "clade_who")]
+    pub clade_who: Option<String>,
+    #[serde(rename = "Nextclade_pango")]
+    pub nextclade_pango: Option<String>,
+    #[serde(rename = "G_clade")]
+    pub g_clade: Option<String>,
+    pub sample_id: Option<String>,
+}
+
 /////////////// Imp for the process_txt_with_sample_function ///////////////
 /// Define a trait for structs that have a `sample_id` field
 trait GetSampleId {
@@ -919,4 +942,50 @@ pub fn dais_ref_seq_data_collection(
     }
 
     Ok(dais_seq_data)
+}
+
+/////////////// Data reading functions for Nextclade ///////////////
+///  Collect read data created by IRMA and save to vector of `ReadsData`
+pub fn nextclade_data_collection(
+    work_path: impl AsRef<Path>,
+    virus: &str,
+) -> Result<Vec<NextcladeData>, Box<dyn std::error::Error>> {
+    let base = work_path.as_ref().display();
+
+    let patterns: Vec<String> = match virus {
+        "flu" => vec![format!("{}/flu*ha.tsv", base)],
+        "rsv" => vec![format!("{}/rsv_a.tsv", base), format!("{}/rsv_b.tsv", base)],
+        "sc2-wgs" | "sc2-spike" => vec![format!("{}/sars-cov-2.tsv", base)],
+        _ => {
+            return Err(format!("Unsupported virus type: {virus}").into());
+        }
+    };
+
+    let mut nextclade_data = Vec::new();
+
+    for pattern in patterns {
+        for entry in glob(&pattern)? {
+            match entry {
+                Ok(path) => {
+                    let _sample = extract_sample_name(&path)?;
+                    let file = File::open(&path)?;
+                    let reader = BufReader::new(file);
+
+                    let mut records: Vec<NextcladeData> = process_txt_without_sample(reader, true);
+                    // Get sample_id
+                    for record in &mut records {
+                        record.sample_id = record
+                            .seq_name
+                            .split(" | ")
+                            .next()
+                            .map(std::string::ToString::to_string);
+                    }
+                    nextclade_data.append(&mut records);
+                }
+                Err(e) => eprintln!("Error reading file: {e}"),
+            }
+        }
+    }
+
+    Ok(nextclade_data)
 }

@@ -2,6 +2,9 @@
 use std::{error::Error, path::PathBuf};
 
 use clap::Parser;
+use serde::{Deserialize, Serialize};
+
+use crate::io::data_ingest::{create_reader, nextclade_data_collection, read_csv};
 
 #[derive(Debug, Parser)]
 #[command(
@@ -43,7 +46,37 @@ pub struct SummaryUpdateArgs {
     parq: bool,
 }
 
+/// Summary struct
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct UpdatedIRMASummary {
+    pub sample_id: Option<String>,
+    pub total_reads: Option<i32>,
+    pub pass_qc: Option<i32>,
+    pub reads_mapped: Option<i32>,
+    pub reference: Option<String>,
+    pub percent_reference_coverage: Option<f64>,
+    pub median_coverage: Option<i32>,
+    pub count_minor_snv: Option<i32>,
+    pub count_minor_indel: Option<i32>,
+    pub spike_percent_coverage: Option<f64>,
+    pub spike_median_coverage: Option<i32>,
+    pub pass_fail_reason: Option<String>,
+    pub subtype: Option<String>,
+    pub mira_module: Option<String>,
+    pub runid: Option<String>,
+    pub instrument: Option<String>,
+    pub nextclade_field_1: Option<String>,
+    pub nextclade_field_2: Option<String>,
+    pub nextclade_field_3: Option<String>,
+}
+
 pub fn summary_report_update_process(args: &SummaryUpdateArgs) -> Result<(), Box<dyn Error>> {
-    let _ = args;
+    let summary_path = create_reader(&args.summary_csv)?;
+    let summary_data: Vec<UpdatedIRMASummary> = read_csv(summary_path, true)?;
+    //println!("{summary_data:#?}");
+
+    let nextclade_data = nextclade_data_collection(&args.workdir_path, &args.virus)?;
+    println!("{nextclade_data:#?}");
+
     Ok(())
 }
