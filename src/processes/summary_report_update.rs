@@ -1,10 +1,10 @@
 #![allow(dead_code, unused_imports)]
-use std::{error::Error, path::PathBuf};
+use std::{collections::HashMap, error::Error, path::PathBuf};
 
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 
-use crate::io::data_ingest::{create_reader, nextclade_data_collection, read_csv};
+use crate::io::data_ingest::{NextcladeData, create_reader, nextclade_data_collection, read_csv};
 
 #[derive(Debug, Parser)]
 #[command(
@@ -72,11 +72,49 @@ pub struct UpdatedIRMASummary {
 
 pub fn summary_report_update_process(args: &SummaryUpdateArgs) -> Result<(), Box<dyn Error>> {
     let summary_path = create_reader(&args.summary_csv)?;
-    let summary_data: Vec<UpdatedIRMASummary> = read_csv(summary_path, true)?;
-    //println!("{summary_data:#?}");
+    let mut summary_data: Vec<UpdatedIRMASummary> = read_csv(summary_path, true)?;
 
     let nextclade_data = nextclade_data_collection(&args.workdir_path, &args.virus)?;
-    println!("{nextclade_data:#?}");
+
+    // Build lookup table: sample_id -> NextcladeData
+    let nextclade_map: HashMap<String, NextcladeData> = nextclade_data
+        .into_iter()
+        .filter_map(|n| n.sample_id.clone().map(|id| (id, n)))
+        .collect();
+
+    // Merge nextclade data into summary
+    for summary in &mut summary_data {
+        let Some(sample_id) = &summary.sample_id else {
+            continue;
+        };
+
+        let Some(nc) = nextclade_map.get(sample_id) else {
+            continue;
+        };
+
+        match args.virus.as_str() {
+            "flu" => {
+                summary.nextclade_field_1 = nc.clade.clone();
+                summary.nextclade_field_2 = nc.short_clade.clone();
+                summary.nextclade_field_3 = nc.subclade.clone();
+            }
+            "sc2-wgs" => {
+                summary.nextclade_field_1 = nc.clade.clone();
+                summary.nextclade_field_2 = nc.clade_who.clone();
+                summary.nextclade_field_3 = nc.nextclade_pango.clone();
+            }
+            "rsv" => {
+                summary.nextclade_field_1 = nc.clade.clone();
+                summary.nextclade_field_2 = nc.g_clade.clone();
+            }
+            _ => {}
+        }
+    }
+
+    println!("{summary_data:#?}");
+
+    // At this point summary_data is updated and ready to write out
+    // write_csv / write_parquet can happen here
 
     Ok(())
 }

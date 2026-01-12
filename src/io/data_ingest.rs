@@ -247,7 +247,7 @@ pub struct DaisSeqData {
 }
 
 /////////////// Structs to hold nextcalde data ///////////////
-/// Dais Sequence Data
+/// Nextclade Data
 #[derive(Serialize, Deserialize, Debug)]
 pub struct NextcladeData {
     #[serde(rename = "index")]
@@ -955,7 +955,8 @@ pub fn nextclade_data_collection(
     let patterns: Vec<String> = match virus {
         "flu" => vec![format!("{}/flu*ha.tsv", base)],
         "rsv" => vec![format!("{}/rsv_a.tsv", base), format!("{}/rsv_b.tsv", base)],
-        "sc2-wgs" | "sc2-spike" => vec![format!("{}/sars-cov-2.tsv", base)],
+        // There should be no sc2-spike nextclade results
+        "sc2-wgs" => vec![format!("{}/sars-cov-2.tsv", base)],
         _ => {
             return Err(format!("Unsupported virus type: {virus}").into());
         }
