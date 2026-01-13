@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use crate::io::{
     data_ingest::{NextcladeData, create_reader, nextclade_data_collection, read_csv},
     write_csv_files::write_out_updated_summary_csv,
+    write_parquet_files::write_updated_irma_summary_to_parquet,
 };
 
 #[derive(Debug, Parser)]
@@ -74,10 +75,17 @@ pub struct UpdatedIRMASummary {
 }
 
 fn normalize_nextclade_field(field: &mut Option<String>) {
-    let is_empty = field.as_ref().map(|s| s.trim().is_empty()).unwrap_or(true);
+    let is_empty = field.as_ref().is_none_or(|s| s.trim().is_empty());
 
     if is_empty {
         *field = Some("Undetermined".to_string());
+    }
+
+    // replace "na" (any case) with empty string
+    if let Some(val) = field.as_ref() {
+        if val.eq_ignore_ascii_case("na") {
+            *field = Some(String::new());
+        }
     }
 }
 
@@ -144,6 +152,19 @@ pub fn summary_report_update_process(args: &SummaryUpdateArgs) -> Result<(), Box
     }
 
     write_out_updated_summary_csv(&summary_data, &args.virus, &args.runid, &args.output_path)?;
+
+    if args.parq {
+        println!("Writing PARQUET files");
+        write_updated_irma_summary_to_parquet(
+            &summary_data,
+            &args.virus,
+            &format!(
+                "{}/mira_{}_summary.parq",
+                &args.output_path.display(),
+                args.runid
+            ),
+        )?;
+    }
 
     Ok(())
 }
