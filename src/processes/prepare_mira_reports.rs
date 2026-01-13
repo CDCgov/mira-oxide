@@ -5,13 +5,15 @@ use crate::io::create_passfail_heatmap::create_passfail_heatmap;
 use crate::io::create_statichtml::generate_html_report;
 use crate::io::reads_to_piechart::create_barcode_distribution_figure;
 use crate::io::reads_to_sankey_json::reads_to_sankey_json;
+use crate::io::write_fasta_files::write_out_nextclade_fasta_files;
 use crate::io::write_parquet_files::write_samplesheet_to_parquet;
 use crate::utils::data_processing::{
-    DaisVarsData, ProcessedCoverage, Subtype, collect_analysis_metadata, collect_negatives,
-    collect_sample_id, compute_cvv_dais_variants, compute_dais_variants, create_aa_seq_vec,
-    create_irma_summary_vec, create_nt_seq_vec, create_vtype_data, divide_aa_into_pass_fail_vec,
-    divide_nt_into_pass_fail_vec, extract_field, extract_subtype_flu, extract_subtype_sc2,
-    melt_reads_data, process_position_coverage_data, process_wgs_coverage_data, return_seg_data,
+    DaisVarsData, NextcladeSequences, ProcessedCoverage, Subtype, collect_analysis_metadata,
+    collect_negatives, collect_sample_id, compute_cvv_dais_variants, compute_dais_variants,
+    create_aa_seq_vec, create_irma_summary_vec, create_nt_seq_vec, create_vtype_data,
+    divide_aa_into_pass_fail_vec, divide_nt_into_nextclade_vec, divide_nt_into_pass_fail_vec,
+    extract_field, extract_subtype_flu, extract_subtype_sc2, melt_reads_data,
+    process_position_coverage_data, process_wgs_coverage_data, return_seg_data,
     transform_coverage_to_heatmap,
 };
 use crate::{
@@ -24,7 +26,7 @@ use crate::{
             run_info_collection,
         },
         write_csv_files::write_out_all_csv_mira_reports,
-        write_fasta_files::write_out_all_fasta_files,
+        write_fasta_files::write_out_all_consensus_fasta_files,
         write_json_files::{negative_qc_statement, write_out_all_json_files},
         write_parquet_files::{
             write_aa_seq_to_parquet, write_alleles_to_parquet, write_coverage_to_parquet,
@@ -311,6 +313,7 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
         &args.runid,
         &args.platform,
     )?;
+
     let aa_seq_vec = create_aa_seq_vec(
         &dais_seq_data,
         &irma_summary,
@@ -323,6 +326,9 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
     let processed_nt_seq = divide_nt_into_pass_fail_vec(&nt_seq_vec, &args.platform, &args.virus)?;
     let processed_aa_seq = divide_aa_into_pass_fail_vec(&aa_seq_vec, &args.platform, &args.virus)?;
 
+    // Create nextclade sequence vectors for fasta files if flag given
+    let nextclade_nt_seq = divide_nt_into_nextclade_vec(&nt_seq_vec, &args.platform, &args.virus)?;
+
     // Processing data for Dashboard Figures
     let transformed_cov_data = transform_coverage_to_heatmap(&coverage_data, &args.virus);
 
@@ -330,7 +336,7 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
     println!("Writing Output Files...");
 
     println!("Writing FASTA files");
-    write_out_all_fasta_files(
+    write_out_all_consensus_fasta_files(
         &args.output_path,
         &processed_nt_seq.passed_seqs,
         &processed_nt_seq.failed_seqs,
@@ -338,6 +344,9 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
         &processed_aa_seq.failed_seqs,
         &args.runid,
     )?;
+
+    // Write fasta inputs files
+    write_out_nextclade_fasta_files(&args.output_path, &nextclade_nt_seq, &args.runid)?;
 
     println!("Writing CSV files");
     write_out_all_csv_mira_reports(
