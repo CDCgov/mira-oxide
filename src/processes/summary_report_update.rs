@@ -27,11 +27,6 @@ pub struct SummaryUpdateArgs {
     /// The filepath to the input summary csv
     summary_csv: PathBuf,
 
-    #[arg(short = 'p', long)]
-    /// The platform used to generate the data.
-    /// Options: illumina or ont
-    platform: String,
-
     #[arg(short = 'v', long)]
     /// The virus the the data was generated from.
     /// Options: flu, sc2-wgs, sc2-spike or rsv
@@ -40,10 +35,6 @@ pub struct SummaryUpdateArgs {
     #[arg(short = 'r', long)]
     /// The run id. Used to create custom file names associated with `run_id`.
     runid: String,
-
-    #[arg(short = 'w', long)]
-    /// The file path to the user's cloned MIRA-NF repo.
-    workdir_path: PathBuf,
 
     #[arg(short = 'f', long)]
     /// (Optional) A flag to indicate whether to create parquet files.
@@ -93,7 +84,7 @@ pub fn summary_report_update_process(args: &SummaryUpdateArgs) -> Result<(), Box
     let summary_path = create_reader(&args.summary_csv)?;
     let mut summary_data: Vec<UpdatedIRMASummary> = read_csv(summary_path, true)?;
 
-    let nextclade_data = nextclade_data_collection(&args.workdir_path, &args.virus)?;
+    let nextclade_data = nextclade_data_collection(&args.nextclade_path, &args.virus)?;
 
     // Build lookup table: sample_id -> NextcladeData
     let nextclade_map: HashMap<String, NextcladeData> = nextclade_data
