@@ -1,5 +1,6 @@
 use crate::io::data_ingest::ReadsData;
 use crate::processes::prepare_mira_reports::Samplesheet;
+use crate::processes::summary_report_update::UpdatedIRMASummary;
 use crate::utils::data_processing::{AASequences, IRMASummary, NTSequences, extract_field};
 use arrow::array::Float64Array;
 use arrow::{
@@ -834,5 +835,156 @@ pub fn write_samplesheet_to_parquet(
         }
     }
 
+    Ok(())
+}
+
+/// Write the updated IRMA summary data to a parquet file
+#[allow(clippy::too_many_lines)]
+pub fn write_updated_irma_summary_to_parquet(
+    summary_data: &[UpdatedIRMASummary],
+    virus: &str,
+    output_file: &str,
+) -> Result<(), Box<dyn Error>> {
+    if summary_data.is_empty() {
+        return Err("Input data is empty".into());
+    }
+
+    // Common fields
+    let sample_id_vec = extract_field(summary_data, |i| i.sample_id.clone());
+    let total_reads_vec = extract_field(summary_data, |i| i.total_reads);
+    let pass_qc_vec = extract_field(summary_data, |i| i.pass_qc);
+    let reads_mapped_vec = extract_field(summary_data, |i| i.reads_mapped);
+    let reference_vec = extract_field(summary_data, |i| i.reference.clone());
+    let percent_reference_coverage_vec =
+        extract_field(summary_data, |i| i.percent_reference_coverage);
+    let median_coverage_vec = extract_field(summary_data, |i| i.median_coverage);
+    let count_minor_snv_vec = extract_field(summary_data, |i| i.count_minor_snv);
+    let count_minor_indel_vec = extract_field(summary_data, |i| i.count_minor_indel);
+
+    let pass_fail_reason_vec = extract_field(summary_data, |i| i.pass_fail_reason.clone());
+    let subtype_vec = extract_field(summary_data, |i| i.subtype.clone());
+    let mira_module_vec = extract_field(summary_data, |i| i.mira_module.clone());
+    let runid_vec = extract_field(summary_data, |i| i.runid.clone());
+    let instrument_vec = extract_field(summary_data, |i| i.instrument.clone());
+
+    let mut fields = vec![
+        Field::new("sample_id", DataType::Utf8, true),
+        Field::new("total_reads", DataType::Int32, true),
+        Field::new("pass_qc", DataType::Int32, true),
+        Field::new("reads_mapped", DataType::Int32, true),
+        Field::new("reference", DataType::Utf8, true),
+        Field::new("percent_reference_coverage", DataType::Float64, true),
+        Field::new("median_coverage", DataType::Int32, true),
+        Field::new("count_minor_snv", DataType::Int32, true),
+        Field::new("count_minor_indel", DataType::Int32, true),
+    ];
+
+    let mut arrays: Vec<ArrayRef> = vec![
+        Arc::new(StringArray::from(sample_id_vec)) as ArrayRef,
+        Arc::new(Int32Array::from(total_reads_vec)) as ArrayRef,
+        Arc::new(Int32Array::from(pass_qc_vec)) as ArrayRef,
+        Arc::new(Int32Array::from(reads_mapped_vec)) as ArrayRef,
+        Arc::new(StringArray::from(reference_vec)) as ArrayRef,
+        Arc::new(Float64Array::from(percent_reference_coverage_vec)) as ArrayRef,
+        Arc::new(Int32Array::from(median_coverage_vec)) as ArrayRef,
+        Arc::new(Int32Array::from(count_minor_snv_vec)) as ArrayRef,
+        Arc::new(Int32Array::from(count_minor_indel_vec)) as ArrayRef,
+    ];
+
+    // SC2 spike fields
+    if virus == "sc2-wgs" {
+        let spike_percent_coverage_vec = extract_field(summary_data, |i| i.spike_percent_coverage);
+        let spike_median_coverage_vec = extract_field(summary_data, |i| i.spike_median_coverage);
+
+        fields.push(Field::new(
+            "spike_percent_coverage",
+            DataType::Float64,
+            true,
+        ));
+        fields.push(Field::new("spike_median_coverage", DataType::Int32, true));
+
+        arrays.push(Arc::new(Float64Array::from(spike_percent_coverage_vec)) as ArrayRef);
+        arrays.push(Arc::new(Int32Array::from(spike_median_coverage_vec)) as ArrayRef);
+    }
+
+    // Common trailing fields
+    fields.extend([
+        Field::new("pass_fail_reason", DataType::Utf8, true),
+        Field::new("mira_module", DataType::Utf8, true),
+        Field::new("runid", DataType::Utf8, true),
+        Field::new("instrument", DataType::Utf8, true),
+        Field::new("subtype", DataType::Utf8, true),
+    ]);
+
+    arrays.extend(vec![
+        Arc::new(StringArray::from(pass_fail_reason_vec)) as ArrayRef,
+        Arc::new(StringArray::from(mira_module_vec)) as ArrayRef,
+        Arc::new(StringArray::from(runid_vec)) as ArrayRef,
+        Arc::new(StringArray::from(instrument_vec)) as ArrayRef,
+        Arc::new(StringArray::from(subtype_vec)) as ArrayRef,
+    ]);
+
+    // Virus-specific Nextclade fields
+    match virus {
+        "sc2-wgs" => {
+            let clade_vec = extract_field(summary_data, |i| i.nextclade_field_1.clone());
+            let clade_who_vec = extract_field(summary_data, |i| i.nextclade_field_2.clone());
+            let pango_vec = extract_field(summary_data, |i| i.nextclade_field_3.clone());
+
+            fields.extend([
+                Field::new("clade", DataType::Utf8, true),
+                Field::new("clade_who", DataType::Utf8, true),
+                Field::new("nextclade_pango", DataType::Utf8, true),
+            ]);
+
+            arrays.extend(vec![
+                Arc::new(StringArray::from(clade_vec)) as ArrayRef,
+                Arc::new(StringArray::from(clade_who_vec)) as ArrayRef,
+                Arc::new(StringArray::from(pango_vec)) as ArrayRef,
+            ]);
+        }
+        "flu" => {
+            let clade_vec = extract_field(summary_data, |i| i.nextclade_field_1.clone());
+            let short_clade_vec = extract_field(summary_data, |i| i.nextclade_field_2.clone());
+            let subclade_vec = extract_field(summary_data, |i| i.nextclade_field_3.clone());
+
+            fields.extend([
+                Field::new("clade", DataType::Utf8, true),
+                Field::new("short_clade", DataType::Utf8, true),
+                Field::new("subclade", DataType::Utf8, true),
+            ]);
+
+            arrays.extend(vec![
+                Arc::new(StringArray::from(clade_vec)) as ArrayRef,
+                Arc::new(StringArray::from(short_clade_vec)) as ArrayRef,
+                Arc::new(StringArray::from(subclade_vec)) as ArrayRef,
+            ]);
+        }
+        _ => {
+            let clade_vec = extract_field(summary_data, |i| i.nextclade_field_1.clone());
+            let g_clade_vec = extract_field(summary_data, |i| i.nextclade_field_2.clone());
+
+            fields.extend([
+                Field::new("clade", DataType::Utf8, true),
+                Field::new("g_clade", DataType::Utf8, true),
+            ]);
+
+            arrays.extend(vec![
+                Arc::new(StringArray::from(clade_vec)) as ArrayRef,
+                Arc::new(StringArray::from(g_clade_vec)) as ArrayRef,
+            ]);
+        }
+    }
+
+    // Write parquet
+    let schema = Arc::new(Schema::new(fields));
+    let record_batch = RecordBatch::try_new(schema.clone(), arrays)?;
+
+    let file = File::create(output_file)?;
+    let mut writer = ArrowWriter::try_new(file, schema, None)?;
+    writer.write(&record_batch)?;
+    writer.close()?;
+
+    println!(" -> PARQUET written to {output_file}");
     Ok(())
 }

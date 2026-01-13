@@ -12,6 +12,7 @@ use crate::processes::{
     plotter::{PlotterArgs, plotter_process},
     positions_of_interest::{PositionsArgs, positions_of_interest_process},
     prepare_mira_reports::{ReportsArgs, prepare_mira_reports_process},
+    summary_report_update::{SummaryUpdateArgs, summary_report_update_process},
     variants_of_interest::{VariantsArgs, variants_of_interest_process},
 };
 use clap::{Parser, Subcommand};
@@ -43,6 +44,8 @@ enum Commands {
     CheckMiraVersion(MiraVersionArgs),
     /// Prepare MIRA report
     PrepareMiraReports(ReportsArgs),
+    /// Summary report update
+    SummaryReportUpdate(SummaryUpdateArgs),
 }
 
 fn main() {
@@ -74,6 +77,10 @@ fn main() {
         Commands::PrepareMiraReports(cmd_args) => {
             prepare_mira_reports_process(&cmd_args)
                 .unwrap_or_else(|e| panic!("{module}::PrepareMiraReports: {e}"));
+        }
+        Commands::SummaryReportUpdate(cmd_args) => {
+            summary_report_update_process(&cmd_args)
+                .unwrap_or_else(|e| panic!("{module}::SummaryReportUpdate: {e}"));
         }
     }
 }
