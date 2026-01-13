@@ -105,6 +105,15 @@ pub fn summary_report_update_process(args: &SummaryUpdateArgs) -> Result<(), Box
                     summary.nextclade_field_1 = nc.clade.clone();
                     summary.nextclade_field_2 = nc.short_clade.clone();
                     summary.nextclade_field_3 = nc.subclade.clone();
+
+                    // If short_clade is missing → "na"
+                    if summary
+                        .nextclade_field_2
+                        .as_ref()
+                        .is_none_or(|s| s.trim().is_empty())
+                    {
+                        summary.nextclade_field_2 = Some("na".to_string());
+                    }
                 }
                 "sc2-wgs" => {
                     summary.nextclade_field_1 = nc.clade.clone();
@@ -114,6 +123,15 @@ pub fn summary_report_update_process(args: &SummaryUpdateArgs) -> Result<(), Box
                 "rsv" => {
                     summary.nextclade_field_1 = nc.clade.clone();
                     summary.nextclade_field_2 = nc.g_clade.clone();
+
+                    // If g_clade is missing → "na"
+                    if summary
+                        .nextclade_field_2
+                        .as_ref()
+                        .is_none_or(|s| s.trim().is_empty())
+                    {
+                        summary.nextclade_field_2 = Some("na".to_string());
+                    }
                 }
                 _ => {}
             }
