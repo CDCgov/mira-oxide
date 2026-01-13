@@ -968,7 +968,6 @@ pub fn nextclade_data_collection(
         for entry in glob(&pattern)? {
             match entry {
                 Ok(path) => {
-                    let _sample = extract_sample_name(&path)?;
                     let file = File::open(&path)?;
                     let reader = BufReader::new(file);
 
