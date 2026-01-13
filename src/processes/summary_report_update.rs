@@ -20,7 +20,7 @@ pub struct SummaryUpdateArgs {
     nextclade_path: PathBuf,
 
     #[arg(short = 'o', long)]
-    /// The file path where the `prepare_mira_report` outputs will be saved.
+    /// The file path where the `summary_report_updates` outputs will be saved.
     output_path: PathBuf,
 
     #[arg(short = 's', long)]
@@ -81,10 +81,11 @@ fn normalize_nextclade_field(field: &mut Option<String>) {
 }
 
 pub fn summary_report_update_process(args: &SummaryUpdateArgs) -> Result<(), Box<dyn Error>> {
+    println!("Starting data ingestion...");
     let summary_path = create_reader(&args.summary_csv)?;
     let mut summary_data: Vec<UpdatedIRMASummary> = read_csv(summary_path, true)?;
-
     let nextclade_data = nextclade_data_collection(&args.nextclade_path, &args.virus)?;
+    println!("Finished ingesting data.");
 
     // Build lookup table: sample_id -> NextcladeData
     let nextclade_map: HashMap<String, NextcladeData> = nextclade_data

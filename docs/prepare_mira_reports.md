@@ -1,7 +1,5 @@
 # Prepare MIRA Reports Package
 
-Still under construction
-
 This script is a comprehensive data aggregation and processing tool designed to streamline the analysis of outputs from the IRMA (Iterative Refinement Meta-Assembler) and DAIS-ribosome pipelines. It begins by ingesting various input files, including samplesheets, QC configuration files, and IRMA/DAIS outputs, to extract key data such as coverage, reads, alleles, indels, and sequence information. The script processes this data to compute metrics like coverage percentages, median coverage, and amino acid variants, while also extracting subtype information for viruses such as influenza, RSV, and SARS-CoV-2. Quality control checks are applied to determine pass/fail statuses for samples and sequences based on predefined criteria. The processed data is then organized into structured outputs, including nucleotide and amino acid sequences categorized as passing or failing QC. Finally, the script generates multiple output formats, including FASTA, CSV, JSON, and optionally Parquet files, to facilitate downstream analysis and reporting. This tool provides a robust and automated workflow for aggregating, transforming, and summarizing bioinformatics data, enabling efficient and standardized reporting of viral sequencing results.
 
 ## Commands
@@ -39,64 +37,13 @@ This script is a comprehensive data aggregation and processing tool designed to 
 After cloning the mira-oxide repo, execute this command to create a mutations of interest table for the samples:
 
 ```bash
-cargo run -- prepare-mira-reports -s <PATH>/samplesheet.csv -i ~<PATH_TO_MIRA_NF_OUTPUTS. -o <OUTDIR> -q <PATH>/qc_test.yaml -p <PLATFORM> -w <PATH>/MIRA-NF -r <RUN_ID> -v <VIRUS> -f (optional) -n (optional) -c <CONFIG> (optional)
+cargo run -- prepare-mira-reports -s <PATH>/samplesheet.csv -i ~<PATH_TO_MIRA_NF_OUTPUTS> -o <OUTDIR> -q <PATH>/qc_test.yaml -p <PLATFORM> -w <PATH>/MIRA-NF -r <RUN_ID> -v <VIRUS> -f (optional) -c <CONFIG> (optional)
 ```
 
 **NOTE: This script expects you to have the DAIS_ribosome.seq file to be in the location that you are deploying the command for MIRA-NF compatibility**
 
-### Files Outputs with no -f flag invoked
-
-```
-Starting data ingestion...
-Finished ingesting data.
-Writing Output Files...
-Writing FASTA files
- -> FASTA written to ./test/mira_run_id_test_amended_consensus.fasta
- -> FASTA written to ./test/mira_run_id_test_failed_amended_consensus.fasta
- -> FASTA written to ./test/mira_run_id_test_amino_acid_consensus.fasta
- -> FASTA written to ./test/mira_run_id_test_failed_amino_acid_consensus.fasta
- **NEXTCLADE FASTA FILES**
-Writing CSV files
- -> CSV written to ./test/mira_run_id_test_coverage.csv
- -> CSV written to ./test/mira_run_id_test_reads.csv
- -> CSV written to ./test/mira_run_id_test_all_alleles.csv
- -> CSV written to ./test/mira_run_id_test_indels.csv
- -> CSV written to ./test/mira_run_id_test_filtered_variants.csv
- -> CSV written to ./test/mira_run_id_test_aavars.csv
- -> CSV written to ./test/mira_run_id_test_summary.csv
- -> CSV written to ./test/mira_run_id_test_amended_consensus.csv
- -> CSV written to ./test/mira_run_id_test_amino_acid_consensus.csv
- -> CSV written to ./test/mira_run_id_test_irma_config.csv
-Writing JSON files
- -> JSON written to ./test/coverage.json
- -> JSON written to ./test/reads.json
- -> JSON written to ./test/vtype.json
- -> JSON written to ./test/alleles.json
- -> JSON written to ./test/indels.json
- -> JSON written to ./test/dais_vars.json
- -> JSON written to ./test/qc_statement.json
- -> JSON written to ./test/irma_summary.json
- -> JSON written to ./test/pass_fail_qc.json
- -> JSON written to ./test/nt_sequences.json
-Building coverage plots for 2 samples as JSONs
-  -> saved ./test/coveragefig_s3_linear.json
-  -> saved ./test/coveragefig_s1_linear.json
-Building read sankey plots as JSON
-  -> read sankey plot json saved to ./test/readsfig_s2.json
-  -> read sankey plot json saved to ./test/readsfig_s1.json
-  -> read sankey plot json saved to ./test/readsfig_s3.json
-Building coverage heatmap as JSON
-  -> coverage heatmap json saved to ./test/heatmap.json
-Building pass_fail_heatmap as JSON
-  -> pass_fail heatmap json saved to ./test/pass_fail_heatmap.json
-Building barcode distribution pie figure as JSON
-  -> barcode distribution pie figure saved to ./test/barcode_distribution.json
-Building static HTML file
-  -> static HTML saved to "./test/mira_run_id_test_summary.html"
-```
-
-
-### Files Outputs when -f flag invoked
+### Files Outputs
+### Where parquet files only generated when -f flag invoked
 
 ```
 Starting data ingestion...
@@ -180,8 +127,6 @@ Warning: Failed to deserialize record: CSV error: record 51 (line: 52, byte: 217
 Warning: Failed to deserialize record: CSV error: record 61 (line: 62, byte: 2619): found record with 2 fields, but the previous record has 3 fields
 Warning: Failed to deserialize record: CSV error: record 64 (line: 65, byte: 2739): found record with 1 fields, but the previous record has 3 fields
 ```
-
-**creating the samplesheet.parq is on my to do list**
 
 ## Finding your way to the bugs
 ### Main Process
