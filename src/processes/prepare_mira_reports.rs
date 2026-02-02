@@ -234,7 +234,7 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
     //Gather subtype information
     let mut subtype_data: Vec<Subtype> = Vec::new();
     if args.virus.to_lowercase() == "flu" {
-        subtype_data = extract_subtype_flu(&dais_vars_data)?;
+        subtype_data = extract_subtype_flu(&dais_vars_data, &calculated_cov_vec)?;
     } else if args.virus.to_lowercase() == "sc2-wgs" || args.virus.to_lowercase() == "sc2-spike" {
         subtype_data = extract_subtype_sc2(&dais_vars_data)?;
     } else if args.virus.to_lowercase() == "rsv" {
