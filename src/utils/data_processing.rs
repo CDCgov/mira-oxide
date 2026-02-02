@@ -550,12 +550,26 @@ fn compute_aa_variants(aligned_aa_sequence: &str, ref_aa_sequence: &str) -> Stri
 }
 
 /// Get subtypes for flu
-pub fn extract_subtype_flu(dais_vars: &[DaisVarsData]) -> Result<Vec<Subtype>, Box<dyn Error>> {
+pub fn extract_subtype_flu(
+    dais_vars: &[DaisVarsData],
+    coverage_data: &[ProcessedCoverage],
+) -> Result<Vec<Subtype>, Box<dyn Error>> {
     let mut subtype_data: Vec<Subtype> = Vec::new();
     let mut sample_hemagglutinin_map: HashMap<String, String> = HashMap::new();
     let mut sample_neuraminidase_map: HashMap<String, String> = HashMap::new();
 
-    // collect all sample IDs
+    // Map sample_id -> HA percent_reference_covered
+    let mut ha_coverage_map: HashMap<String, f64> = HashMap::new();
+    for cov in coverage_data {
+        if cov.reference.contains("HA") {
+            ha_coverage_map.insert(
+                cov.sample.clone(),
+                cov.percent_reference_covered.unwrap_or(0.0),
+            );
+        }
+    }
+
+    // Collect all sample IDs
     let mut all_sample_ids: HashSet<String> = HashSet::new();
     for entry in dais_vars {
         let hold_sample = entry.sample_id.clone().ok_or("Missing sample_id")?;
@@ -566,7 +580,7 @@ pub fn extract_subtype_flu(dais_vars: &[DaisVarsData]) -> Result<Vec<Subtype>, B
     // HA extraction
     for entry in dais_vars {
         let hold_sample = entry.sample_id.clone().ok_or("Missing sample_id")?;
-        let sample_ha: String = hold_sample[..hold_sample.len() - 2].to_string();
+        let sample_ha = hold_sample[..hold_sample.len() - 2].to_string();
 
         let ha = if entry.protein == "HA" {
             match entry.reference_id.as_str() {
@@ -592,7 +606,7 @@ pub fn extract_subtype_flu(dais_vars: &[DaisVarsData]) -> Result<Vec<Subtype>, B
     // NA extraction
     for entry in dais_vars {
         let hold_sample = entry.sample_id.clone().ok_or("Missing sample_id")?;
-        let sample_na: String = hold_sample[..hold_sample.len() - 2].to_string();
+        let sample_na = hold_sample[..hold_sample.len() - 2].to_string();
 
         let na = if entry.protein == "NA" {
             match entry.reference_id.as_str() {
@@ -615,7 +629,7 @@ pub fn extract_subtype_flu(dais_vars: &[DaisVarsData]) -> Result<Vec<Subtype>, B
         }
     }
 
-    // Combine HA and NA, default to Undetermined
+    // Combine HA and NA, apply HA coverage rule
     for sample_id in all_sample_ids {
         let ha = sample_hemagglutinin_map
             .get(&sample_id)
@@ -629,11 +643,19 @@ pub fn extract_subtype_flu(dais_vars: &[DaisVarsData]) -> Result<Vec<Subtype>, B
 
         let combined = format!("{ha}{na}");
 
-        let subtype = if combined.is_empty() {
+        let mut subtype = if combined.is_empty() {
             "Undetermined".to_string()
         } else {
             combined
         };
+
+        // Downgrade if HA coverage < 100
+        if subtype.as_str() == "BYAM" {
+            let ha_coverage = ha_coverage_map.get(&sample_id).copied().unwrap_or(0.0);
+            if ha_coverage < 100.0 {
+                subtype = "Undetermined".to_string();
+            }
+        }
 
         subtype_data.push(Subtype {
             sample_id: Some(sample_id),
@@ -1120,7 +1142,7 @@ impl IRMASummary {
         }
 
         if let Some(med_cov) = self.median_coverage
-            && med_cov < qc_values.perc_ref_covered.try_into().unwrap()
+            && med_cov < qc_values.med_cov.try_into().unwrap()
         {
             let new_entry = format!("Median coverage < {}", qc_values.med_cov);
             if let Some(ref mut pf_reason) = self.pass_fail_reason {
