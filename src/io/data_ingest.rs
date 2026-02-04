@@ -815,7 +815,7 @@ fn format_timestamp(secs: u64, nanos: u32) -> String {
 
 // Helper function to determine if a year is a leap year
 fn is_leap_year(year: u64) -> bool {
-    (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0)
+    (year.is_multiple_of(4) && !year.is_multiple_of(100)) || year.is_multiple_of(400)
 }
 
 // Helper function to calculate the number of days in a year
@@ -863,7 +863,7 @@ pub fn run_info_collection(
 }
 
 /////////////// Data reading functions for DAIS-ribosome ///////////////
-/// Read tab-delimited data a withouot including sample name
+/// Read tab-delimited data a without including sample name
 pub fn process_txt<R, T>(reader: R, has_headers: bool) -> Result<Vec<T>, Box<dyn std::error::Error>>
 where
     R: Read,

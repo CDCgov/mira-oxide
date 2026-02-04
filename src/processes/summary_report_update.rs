@@ -73,10 +73,10 @@ fn normalize_nextclade_field(field: &mut Option<String>) {
     }
 
     // replace "na" (any case) with empty string
-    if let Some(val) = field.as_ref() {
-        if val.eq_ignore_ascii_case("na") {
-            *field = Some(String::new());
-        }
+    if let Some(val) = field.as_ref()
+        && val.eq_ignore_ascii_case("na")
+    {
+        *field = Some(String::new());
     }
 }
 

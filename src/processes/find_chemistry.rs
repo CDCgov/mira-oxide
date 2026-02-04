@@ -257,8 +257,7 @@ impl fmt::Display for ChemistryOutput {
     }
 }
 
-/// Averages the first five sequence lengths if possible. If the file has no
-/// sequences, returns None
+/// Averages the first five sequence lengths if possible. If the file has no sequences, returns None
 fn get_average_line_length<P: AsRef<Path>>(fastq_path: P) -> Result<Option<usize>, std::io::Error> {
     const SAMPLE_SIZE: usize = 5;
 
@@ -273,10 +272,9 @@ fn get_average_line_length<P: AsRef<Path>>(fastq_path: P) -> Result<Option<usize
         count += 1;
     }
 
-    if count == 0 {
-        Ok(None)
-    } else {
-        Ok(Some(total_len / count))
+    match total_len.checked_div(count) {
+        Some(avg) => Ok(Some(avg)),
+        None => Ok(None),
     }
 }
 

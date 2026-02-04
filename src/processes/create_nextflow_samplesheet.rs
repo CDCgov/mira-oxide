@@ -41,7 +41,7 @@ struct SampleRow {
 #[allow(clippy::format_push_string)]
 pub fn create_nextflow_samplesheet(args: &SamplesheetArgs) -> io::Result<()> {
     // Match Python's time.sleep(60)
-    thread::sleep(Duration::from_secs(60));
+    thread::sleep(Duration::from_mins(1));
 
     let mut rdr = Reader::from_path(&args.samplesheet)?;
     let mut output = String::new();

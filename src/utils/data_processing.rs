@@ -739,7 +739,7 @@ fn calculate_median(values: &[i32]) -> i32 {
     if len == 0 {
         return 0; // Return 0 for empty input
     }
-    if len % 2 == 0 {
+    if len.is_multiple_of(2) {
         // For even-length arrays, calculate the average of the two middle values
         i32::midpoint(sorted_values[len / 2 - 1], sorted_values[len / 2])
     } else {
@@ -1170,32 +1170,30 @@ impl IRMASummary {
             self.pass_fail_reason = Some("Pass".to_string());
         }
 
-        if let Some(spike_coverage) = self.spike_percent_coverage {
-            if let Some(perc_ref_spike_covered) = qc_values.perc_ref_spike_covered {
-                if spike_coverage < f64::from(perc_ref_spike_covered) {
-                    let new_entry = format!(
-                        "Less than {}% of S gene reference covered",
-                        qc_values.perc_ref_covered
-                    );
-                    if let Some(ref mut pf_reason) = self.pass_fail_reason {
-                        append_with_delim(pf_reason, &new_entry, ';');
-                    } else {
-                        self.pass_fail_reason = Some(new_entry);
-                    }
-                }
+        if let Some(spike_coverage) = self.spike_percent_coverage
+            && let Some(perc_ref_spike_covered) = qc_values.perc_ref_spike_covered
+            && spike_coverage < f64::from(perc_ref_spike_covered)
+        {
+            let new_entry = format!(
+                "Less than {}% of S gene reference covered",
+                qc_values.perc_ref_covered
+            );
+            if let Some(ref mut pf_reason) = self.pass_fail_reason {
+                append_with_delim(pf_reason, &new_entry, ';');
+            } else {
+                self.pass_fail_reason = Some(new_entry);
             }
         }
 
-        if let Some(spike_med_cov) = self.spike_median_coverage {
-            if let Some(spike_med_covered) = qc_values.med_spike_cov {
-                if spike_med_cov < spike_med_covered.try_into().unwrap() {
-                    let new_entry = format!("Median coverage of S gene < {}", qc_values.med_cov);
-                    if let Some(ref mut pf_reason) = self.pass_fail_reason {
-                        append_with_delim(pf_reason, &new_entry, ';');
-                    } else {
-                        self.pass_fail_reason = Some(new_entry);
-                    }
-                }
+        if let Some(spike_med_cov) = self.spike_median_coverage
+            && let Some(spike_med_covered) = qc_values.med_spike_cov
+            && spike_med_cov < spike_med_covered.try_into().unwrap()
+        {
+            let new_entry = format!("Median coverage of S gene < {}", qc_values.med_cov);
+            if let Some(ref mut pf_reason) = self.pass_fail_reason {
+                append_with_delim(pf_reason, &new_entry, ';');
+            } else {
+                self.pass_fail_reason = Some(new_entry);
             }
         }
 
@@ -1230,62 +1228,61 @@ pub fn create_nt_seq_vec(
             let sample_id = parts[1].to_string();
 
             for sample in vtype_vec {
-                if let Some(vtype_sample_id) = &sample.sample_id {
-                    if sample_id == *vtype_sample_id {
-                        //A vs B segemnt identificaiton logic
-                        let segment = if sample.vtype == "A" {
-                            match segment_number {
-                                "1" => Some("PB2"),
-                                "2" => Some("PB1"),
-                                "3" => Some("PA"),
-                                "4" => Some("HA"),
-                                "5" => Some("NP"),
-                                "6" => Some("NA"),
-                                "7" => Some("MP"),
-                                "8" => Some("NS"),
-                                _ => None,
-                            }
-                        } else if sample.vtype == "B" {
-                            match segment_number {
-                                "1" => Some("PB1"),
-                                "2" => Some("PB2"),
-                                "3" => Some("PA"),
-                                "4" => Some("HA"),
-                                "5" => Some("NP"),
-                                "6" => Some("NA"),
-                                "7" => Some("MP"),
-                                "8" => Some("NS"),
-                                _ => None,
-                            }
-                        } else {
-                            None
-                        };
-
-                        let mut assigned_segment = String::new();
-                        if let Some(segment) = segment {
-                            assigned_segment = (*segment).to_string();
+                if let Some(vtype_sample_id) = &sample.sample_id
+                    && sample_id == *vtype_sample_id
+                {
+                    //A vs B segemnt identificaiton logic
+                    let segment = if sample.vtype == "A" {
+                        match segment_number {
+                            "1" => Some("PB2"),
+                            "2" => Some("PB1"),
+                            "3" => Some("PA"),
+                            "4" => Some("HA"),
+                            "5" => Some("NP"),
+                            "6" => Some("NA"),
+                            "7" => Some("MP"),
+                            "8" => Some("NS"),
+                            _ => None,
                         }
+                    } else if sample.vtype == "B" {
+                        match segment_number {
+                            "1" => Some("PB1"),
+                            "2" => Some("PB2"),
+                            "3" => Some("PA"),
+                            "4" => Some("HA"),
+                            "5" => Some("NP"),
+                            "6" => Some("NA"),
+                            "7" => Some("MP"),
+                            "8" => Some("NS"),
+                            _ => None,
+                        }
+                    } else {
+                        None
+                    };
 
-                        for record in irma_summary_vec {
-                            if let Some(record_sample_id) = &record.sample_id {
-                                if sample_id == *record_sample_id
-                                    && record.reference == Some(sample.original_ref.clone())
-                                    && assigned_segment == sample.ref_type
-                                {
-                                    nt_seq_vec.push(NTSequences {
-                                        sample_id: sample_id.clone(),
-                                        sequence: entry.sequence.clone(),
-                                        target_ref: Some(assigned_segment.clone()),
-                                        reference: sample.original_ref.clone(),
-                                        qc_decision: record
-                                            .pass_fail_reason
-                                            .clone()
-                                            .unwrap_or_else(String::new),
-                                        runid: runid.to_owned(),
-                                        instrument: instrument.to_owned(),
-                                    });
-                                }
-                            }
+                    let mut assigned_segment = String::new();
+                    if let Some(segment) = segment {
+                        assigned_segment = (*segment).to_string();
+                    }
+
+                    for record in irma_summary_vec {
+                        if let Some(record_sample_id) = &record.sample_id
+                            && sample_id == *record_sample_id
+                            && record.reference == Some(sample.original_ref.clone())
+                            && assigned_segment == sample.ref_type
+                        {
+                            nt_seq_vec.push(NTSequences {
+                                sample_id: sample_id.clone(),
+                                sequence: entry.sequence.clone(),
+                                target_ref: Some(assigned_segment.clone()),
+                                reference: sample.original_ref.clone(),
+                                qc_decision: record
+                                    .pass_fail_reason
+                                    .clone()
+                                    .unwrap_or_else(String::new),
+                                runid: runid.to_owned(),
+                                instrument: instrument.to_owned(),
+                            });
                         }
                     }
                 }
@@ -1294,21 +1291,18 @@ pub fn create_nt_seq_vec(
     } else {
         for entry in seq_data {
             for record in irma_summary_vec {
-                if let Some(record_sample_id) = &record.sample_id {
-                    if entry.name == *record_sample_id {
-                        nt_seq_vec.push(NTSequences {
-                            sample_id: record_sample_id.clone(),
-                            sequence: entry.sequence.clone(),
-                            target_ref: None,
-                            reference: record.reference.clone().unwrap_or(String::new()),
-                            qc_decision: record
-                                .pass_fail_reason
-                                .clone()
-                                .unwrap_or_else(String::new),
-                            runid: runid.to_owned(),
-                            instrument: instrument.to_owned(),
-                        });
-                    }
+                if let Some(record_sample_id) = &record.sample_id
+                    && entry.name == *record_sample_id
+                {
+                    nt_seq_vec.push(NTSequences {
+                        sample_id: record_sample_id.clone(),
+                        sequence: entry.sequence.clone(),
+                        target_ref: None,
+                        reference: record.reference.clone().unwrap_or(String::new()),
+                        qc_decision: record.pass_fail_reason.clone().unwrap_or_else(String::new),
+                        runid: runid.to_owned(),
+                        instrument: instrument.to_owned(),
+                    });
                 }
             }
         }

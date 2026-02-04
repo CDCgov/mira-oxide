@@ -5,6 +5,7 @@
         "cybersecurity",
         "Fastq",
         "ISSO",
+        "nextclade",
         "nextflow",
         "runid",
         "Samplesheet"
@@ -13,4 +14,7 @@
         "editor.defaultFormatter": "rust-lang.rust-analyzer",
         "editor.formatOnSave": true,
     },
+    "cSpell.ignoreWords": [
+        "nanos"
+    ],
 }
