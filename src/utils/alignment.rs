@@ -1,5 +1,5 @@
 use zoe::{
-    alignment::{ScalarProfile, sw::sw_scalar_alignment},
+    alignment::{ScalarProfile, sw::sw_scalar_align},
     data::{ByteIndexMap, WeightMatrix},
 };
 
@@ -12,7 +12,7 @@ pub fn align_sequences<'a>(query: &'a [u8], reference: &'a [u8]) -> (Vec<u8>, Ve
 
     let profile = ScalarProfile::<6>::new(query, &WEIGHTS, GAP_OPEN, GAP_EXTEND)
         .expect("Alignment profile failed");
-    let alignment = sw_scalar_alignment(reference, &profile);
+    let alignment = sw_scalar_align(reference, &profile);
     let alignment = match alignment {
         zoe::alignment::MaybeAligned::Some(alignment) => alignment,
         zoe::alignment::MaybeAligned::Overflowed => {

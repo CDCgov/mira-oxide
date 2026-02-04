@@ -2,13 +2,15 @@
     "cSpell.words": [
         "ATSDR",
         "CFPB",
+        "cybersecurity",
+        "Fastq",
         "ISSO",
-        "cybersecurity"
+        "nextflow",
+        "runid",
+        "Samplesheet"
     ],
-
     "[rust]": {
         "editor.defaultFormatter": "rust-lang.rust-analyzer",
         "editor.formatOnSave": true,
     },
 }
-
