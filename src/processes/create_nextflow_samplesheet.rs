@@ -61,6 +61,9 @@ pub fn create_nextflow_samplesheet(args: &SamplesheetArgs) -> io::Result<()> {
         let record: SampleRow = result?;
         let id = record.sample_id;
 
+        println!("{id}");
+        println!("{runpath}");
+
         if is_ont {
             let pattern = format!("{runpath}/fastq_pass/cat_fastqs/{id}_nf_combined.fastq*");
 
@@ -82,8 +85,9 @@ pub fn create_nextflow_samplesheet(args: &SamplesheetArgs) -> io::Result<()> {
                 record.sample_type
             ));
         } else {
-            let r1_pattern = format!("{runpath}/*fastq*/{id}*R1*fastq*");
-            let r2_pattern = format!("{runpath}/*fastq*/{id}*R2*fastq*");
+            let r1_pattern = format!("{runpath}/{id}*R1*fastq*");
+            let r2_pattern = format!("{runpath}/{id}*R2*fastq*");
+            println!("{r1_pattern}");
 
             let r1 = glob(&r1_pattern)
                 .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e))?

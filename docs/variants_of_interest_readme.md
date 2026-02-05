@@ -1,6 +1,6 @@
-# Mutations of Interest Package
+# Variants of Interest Package
 
-The mutations of interest package takes a DAIS-ribosome output from your samples of interest, a reference table with sequences that have been aligned using DAIS-ribosome and a table containing the amino acid mutations of interest as inputs. The output is a list of nucleotide and amino acid mutations that were found within the given samples when compared to the reference.
+The variants of interest package takes a DAIS-ribosome output from your samples of interest, a reference table with sequences that have been aligned using DAIS-ribosome and a table containing the amino acid mutations of interest as inputs. The output is a list of samples with codon with aa and codon infromation that had nucleotide variations at the specificed positions when compared to the reference. 
 
 ## DAIS-ribosome output of samples should be structured like this (tab delimited)
 
@@ -18,40 +18,40 @@ EPI_ISL_25690   A/common magpie/Hong Kong/5052/2007   A / H5N1      2b14fd2e8f73
 EPI_ISL_140   A/Hong Kong/1073/99   A / H9N2      a591bc9ad3a54f705940ad8483684cfc278c742c   A_HA_H9   BGD0994   HA-signal   METISLITILLVVTASNA   ATGGAAACAATATCACTAATAACTATACTACTAGTAGTAACAGCAAGCAATGCA
 ```
 
-### The Known Mutations of Interest Table input should be structured like this (tab delimited)
+### The Known Variants of Interest Table input should be structured like this (tab delimited)
 
 ```text
-protein position    mutation_of_int phenotypic_consensus
-HA   7   H    inference description
-HA   8   Q    inference description
-HA   94   N   inference description
-HA   121   N   inference description 
+subtype	protein	positions	amino_acid	phenotypic_consequence
+A / H1N1	NA	275	Y	true
+A / H1N1	NA	223	X	true
+A / H1N1	NA	119	V	true
+A / H1N1	NA	292	K	true
+A / H1N1	NA	294	S	true
+A / H1N1	NA	197	N	true
+A / H1N1	PA	38	T	true
+A / H3N2	NA	119	V	true
+B	NA	197	N	true
+B	PA	38	T	true
 ```
 
-After cloning the mira-oxide repo, execute this command to create a mutations of interest table for the samples:
+After cloning the mira-oxide repo, execute this command to create a variants of interest table for the samples:
 
 ```bash
-cargo run -p mutations_of_interest_table -- -i <PATH>/DAIS_ribosome.seq -r <PATH>/ref_table.txt -o <PATH>/outputs.csv -m <PATH>/muts_of_interest.txt
+cargo run -p variants-of-interest -- -i <PATH>/DAIS_ribosome.seq -r <PATH>/ref_table.txt -o <PATH>/outputs.csv -m <PATH>/variants_of_interest.txt
 ```
 
 If you would like the output to have another deliminator (default: ","), then the `-d` flag can be used to pass another deliminator.
 
-### The Mutations of Interest Table output should be structured like this (comma delimited)
+### The Variants of Interest Table output should be structured like this (comma delimited)
 
 ```text
-sample, reference_strain,gisaid_accession,ctype,dais_reference,protein,nt_mutation,aa_mutation,phenotypic_consequence
-s3_4,A/Georgia/12/2022,EPI_ISL_15724408,A_HA_H1,CALI07,HA,G:923:A,R:308:K,Inference description
-s3_4,A/Wisconsin/67/2022,EPI_ISL_15928538,A_HA_H1,CALI07,HA,G:923:A,R:308:K,Inference description
-s3_4,A/Michigan/383/2018,EPI_ISL_320690,A_HA_H1,CALI07,HA,G:923:A,R:308:K,Inference description
-s3_4,A/Michigan/383/2018,EPI_ISL_320690,A_HA_H1,CALI07,HA,G:924:A,R:308:K,Inference description
-s3_4,A/West Virginia/30/2022,EPI_ISL_15724406,A_HA_H1,CALI07,HA,G:923:A,R:308:K,Inference description
-s1_2,A/duck/Bangladesh/19097/2013,EPI_ISL_151729,A_PB1,HK4801,PB1,C:295:.,H:99:.,amino acid information missing
-s1_2,A/duck/Bangladesh/19097/2013,EPI_ISL_151729,A_PB1,HK4801,PB1,A:296:.,H:99:.,amino acid information missing
-s1_2,A/duck/Bangladesh/19097/2013,EPI_ISL_151729,A_PB1,HK4801,PB1,C:297:.,H:99:.,amino acid information missing
+sample,reference_strain,gisaid_accession,ctype,dais_reference,protein,sample_codon,reference_codon,aa_mutation,phenotypic_consequence
+sample_4_3,A/West Virginia/30/2022,EPI_ISL_15724406,A_PA,HK4801,PA,ATT,ATA,I:38:I,
+sample_3_3,A/California/07/2009,EPI_ISL_227813,A_PA,HK4801,PA,ATA,ATT,I:38:I,
 ```
 
 ----------------------------------------------------------------------------------
 
-## Mutations of Interest Package Version 0.3.0
+## Variants of Interest Package Version 0.3.0
 
 ![Alt text](../assets/images/coming_soon.png)
