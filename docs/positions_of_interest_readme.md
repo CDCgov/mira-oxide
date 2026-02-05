@@ -86,6 +86,6 @@ sample_1_3,B/Connecticut/01/2021,EPI_ISL_3856740,B_PA,PHUKET3073,PA,ATC,ATC,I:38
 
 ----------------------------------------------------------------------------------
 
-## Positions of Interest Package Version 0.3.0
+## Positions of Interest Package Version with Minor Variants
 
 ![Alt text](../assets/images/coming_soon.png)

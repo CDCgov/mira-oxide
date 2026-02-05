@@ -17,7 +17,7 @@ pub struct SamplesheetArgs {
     #[arg(short = 's', long)]
     pub samplesheet: PathBuf,
 
-    /// Run directory path
+    /// Run directory path to fastq files
     #[arg(short = 'r', long)]
     pub runid: PathBuf,
 
@@ -61,9 +61,6 @@ pub fn create_nextflow_samplesheet(args: &SamplesheetArgs) -> io::Result<()> {
         let record: SampleRow = result?;
         let id = record.sample_id;
 
-        println!("{id}");
-        println!("{runpath}");
-
         if is_ont {
             let pattern = format!("{runpath}/fastq_pass/cat_fastqs/{id}_nf_combined.fastq*");
 
@@ -87,7 +84,6 @@ pub fn create_nextflow_samplesheet(args: &SamplesheetArgs) -> io::Result<()> {
         } else {
             let r1_pattern = format!("{runpath}/{id}*R1*fastq*");
             let r2_pattern = format!("{runpath}/{id}*R2*fastq*");
-            println!("{r1_pattern}");
 
             let r1 = glob(&r1_pattern)
                 .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e))?

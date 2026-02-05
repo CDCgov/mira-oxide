@@ -52,6 +52,6 @@ sample_3_3,A/California/07/2009,EPI_ISL_227813,A_PA,HK4801,PA,ATA,ATT,I:38:I,
 
 ----------------------------------------------------------------------------------
 
-## Variants of Interest Package Version 0.3.0
+## Variants of Interest Package with Minor Variants
 
 ![Alt text](../assets/images/coming_soon.png)
