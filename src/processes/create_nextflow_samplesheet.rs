@@ -40,13 +40,15 @@ struct SampleRow {
 
 #[allow(clippy::format_push_string)]
 pub fn create_nextflow_samplesheet(args: &SamplesheetArgs) -> io::Result<()> {
-    // Match Python's time.sleep(60)
     thread::sleep(Duration::from_mins(1));
 
     let mut rdr = Reader::from_path(&args.samplesheet)?;
     let mut output = String::new();
 
-    let experiment = args.experiment_type.as_str().to_ascii_lowercase();
+    // (sample_id, reason)
+    let mut missing_samples: Vec<(String, String)> = Vec::new();
+
+    let experiment = args.experiment_type.to_ascii_lowercase();
     let runpath = args.runid.to_string_lossy();
 
     let is_ont = experiment.contains("ont");
@@ -64,15 +66,15 @@ pub fn create_nextflow_samplesheet(args: &SamplesheetArgs) -> io::Result<()> {
         if is_ont {
             let pattern = format!("{runpath}/fastq_pass/cat_fastqs/{id}_nf_combined.fastq*");
 
-            let fastq_1 = glob(&pattern)
-                .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e))?
-                .find_map(Result::ok)
-                .ok_or_else(|| {
-                    io::Error::new(
-                        io::ErrorKind::NotFound,
-                        format!("Fastq not found for sample {id}"),
-                    )
-                })?;
+            let fastq_1 = glob(&pattern).ok().and_then(|mut g| g.find_map(Result::ok));
+
+            let fastq_1 = match fastq_1 {
+                Some(fq) => fq,
+                None => {
+                    missing_samples.push((id, "Missing FASTQ file".to_string()));
+                    continue;
+                }
+            };
 
             output.push_str(&format!(
                 "{},{},{},,{}\n",
@@ -82,28 +84,32 @@ pub fn create_nextflow_samplesheet(args: &SamplesheetArgs) -> io::Result<()> {
                 record.sample_type
             ));
         } else {
-            let r1_pattern = format!("{runpath}/{id}*R1*fastq*");
-            let r2_pattern = format!("{runpath}/{id}*R2*fastq*");
+            let r1_pattern = format!("{runpath}/{id}_R1*fastq*");
+            let r2_pattern = format!("{runpath}/{id}_R2*fastq*");
 
             let r1 = glob(&r1_pattern)
-                .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e))?
-                .find_map(Result::ok)
-                .ok_or_else(|| {
-                    io::Error::new(
-                        io::ErrorKind::NotFound,
-                        format!("R1 fastq not found for sample {id}"),
-                    )
-                })?;
+                .ok()
+                .and_then(|mut g| g.find_map(Result::ok));
 
             let r2 = glob(&r2_pattern)
-                .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e))?
-                .find_map(Result::ok)
-                .ok_or_else(|| {
-                    io::Error::new(
-                        io::ErrorKind::NotFound,
-                        format!("R2 fastq not found for sample {id}"),
-                    )
-                })?;
+                .ok()
+                .and_then(|mut g| g.find_map(Result::ok));
+
+            let (r1, r2) = match (r1, r2) {
+                (Some(r1), Some(r2)) => (r1, r2),
+                (None, Some(_)) => {
+                    missing_samples.push((id, "Missing R1 FASTQ".to_string()));
+                    continue;
+                }
+                (Some(_), None) => {
+                    missing_samples.push((id, "Missing R2 FASTQ".to_string()));
+                    continue;
+                }
+                (None, None) => {
+                    missing_samples.push((id, "Missing R1 and R2 FASTQ".to_string()));
+                    continue;
+                }
+            };
 
             output.push_str(&format!(
                 "{},{},{},{}\n",
@@ -117,6 +123,15 @@ pub fn create_nextflow_samplesheet(args: &SamplesheetArgs) -> io::Result<()> {
 
     let mut file = File::create("nextflow_samplesheet.csv")?;
     file.write_all(output.as_bytes())?;
+
+    if !missing_samples.is_empty() {
+        let mut bad_samples = File::create("bad_samples.tsv")?;
+        writeln!(bad_samples, "sample_id\treason")?;
+
+        for (sample_id, reason) in missing_samples {
+            writeln!(bad_samples, "{sample_id}\t{reason}")?;
+        }
+    }
 
     Ok(())
 }
