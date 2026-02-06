@@ -3,7 +3,7 @@ use csv::Reader;
 use glob::glob;
 use serde::Deserialize;
 use std::{
-    fs::File,
+    fs::{self, File},
     io::{self, Write},
     path::PathBuf,
     thread,
@@ -76,6 +76,11 @@ pub fn create_nextflow_samplesheet(args: &SamplesheetArgs) -> io::Result<()> {
                 }
             };
 
+            if fs::metadata(&fastq_1)?.len() == 0 {
+                missing_samples.push((id, "Empty FASTQ".to_string()));
+                continue;
+            }
+
             output.push_str(&format!(
                 "{},{},{},,{}\n",
                 id,
@@ -110,6 +115,21 @@ pub fn create_nextflow_samplesheet(args: &SamplesheetArgs) -> io::Result<()> {
                     continue;
                 }
             };
+
+            // 🔍 Check both files before deciding
+            let r1_empty = fs::metadata(&r1)?.len() == 0;
+            let r2_empty = fs::metadata(&r2)?.len() == 0;
+
+            if r1_empty && r2_empty {
+                missing_samples.push((id, "Empty R1 and R2 FASTQ".to_string()));
+                continue;
+            } else if r1_empty {
+                missing_samples.push((id, "Empty R1 FASTQ".to_string()));
+                continue;
+            } else if r2_empty {
+                missing_samples.push((id, "Empty R2 FASTQ".to_string()));
+                continue;
+            }
 
             output.push_str(&format!(
                 "{},{},{},{}\n",
