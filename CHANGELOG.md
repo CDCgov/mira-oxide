@@ -3,13 +3,13 @@
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.4.0] - 2025-02-05
+## [1.4.0] - 2025-02-06
 
 - [Amanda Sullivan](https://github.com/mandysulli)
 
 ### `Added`
-- [PR #60](https://github.com/CDCgov/mira-oxide/pull/60) - Added create_nextflow_samplesheet.rs to replace create_nextflow_samplesheet_i.py and create_nextflow_samplesheet+o.py in MIRA-NF. Takes the input samplesheet and fastq files and puts them into the nextflow sampleseet format.
-- [PR #60](https://github.com/CDCgov/mira-oxide/pull/60) - Added added functionality to create_nextflow_samplesheet.rs that tells user when fastq files are missing or empty
+- [PR #64](https://github.com/CDCgov/mira-oxide/pull/64) - Added create_nextflow_samplesheet.rs to replace create_nextflow_samplesheet_i.py and create_nextflow_samplesheet+o.py in MIRA-NF. Takes the input samplesheet and fastq files and puts them into the nextflow sampleseet format.
+- [PR #64](https://github.com/CDCgov/mira-oxide/pull/64) - Added added functionality to create_nextflow_samplesheet.rs that tells user when fastq files are missing or empty
 
 ### `Fixed`
 - [PR #64](https://github.com/CDCgov/mira-oxide/pull/64) - Zoe alignment syntax to be compatible with update
