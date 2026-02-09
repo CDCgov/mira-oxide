@@ -28,14 +28,25 @@ pub struct SamplesheetArgs {
 
 #[derive(Debug, Deserialize)]
 struct SampleRow {
-    #[serde(rename = "Sample ID")]
+    #[serde(rename = "sample_id")]
     sample_id: String,
 
-    #[serde(rename = "Sample Type")]
+    #[serde(rename = "sample_type")]
     sample_type: String,
 
-    #[serde(rename = "Barcode #", default)]
+    #[serde(rename = "barcode", default)]
     barcode: String,
+}
+
+pub fn find_fastq(patterns: &[String]) -> Option<PathBuf> {
+    for pattern in patterns {
+        if let Ok(mut paths) = glob(pattern) {
+            if let Some(path) = paths.find_map(Result::ok) {
+                return Some(path);
+            }
+        }
+    }
+    None
 }
 
 #[allow(clippy::format_push_string)]
@@ -89,16 +100,18 @@ pub fn create_nextflow_samplesheet(args: &SamplesheetArgs) -> io::Result<()> {
                 record.sample_type
             ));
         } else {
-            let r1_pattern = format!("{runpath}/{id}_R1*fastq*");
-            let r2_pattern = format!("{runpath}/{id}_R2*fastq*");
+            let r1_patterns = vec![
+                format!("{runpath}/{id}_R1*.fastq*"),
+                format!("{runpath}/{id}_R1*.fq*"),
+            ];
 
-            let r1 = glob(&r1_pattern)
-                .ok()
-                .and_then(|mut g| g.find_map(Result::ok));
+            let r2_patterns = vec![
+                format!("{runpath}/{id}_R2*.fastq*"),
+                format!("{runpath}/{id}_R2*.fq*"),
+            ];
 
-            let r2 = glob(&r2_pattern)
-                .ok()
-                .and_then(|mut g| g.find_map(Result::ok));
+            let r1 = find_fastq(&r1_patterns);
+            let r2 = find_fastq(&r2_patterns);
 
             let (r1, r2) = match (r1, r2) {
                 (Some(r1), Some(r2)) => (r1, r2),

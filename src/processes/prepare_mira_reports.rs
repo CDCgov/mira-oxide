@@ -98,19 +98,19 @@ pub struct ReportsArgs {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct SamplesheetI {
-    #[serde(rename = "Sample ID")]
+    #[serde(rename = "sample_id")]
     pub sample_id: String,
-    #[serde(rename = "Sample Type")]
+    #[serde(rename = "sample_type")]
     pub sample_type: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct SamplesheetO {
-    #[serde(rename = "Barcode #")]
+    #[serde(rename = "barcode")]
     pub barcode: String,
-    #[serde(rename = "Sample ID")]
+    #[serde(rename = "sample_id")]
     pub sample_id: String,
-    #[serde(rename = "Sample Type")]
+    #[serde(rename = "sample_type")]
     pub sample_type: Option<String>,
 }
 
