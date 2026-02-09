@@ -84,7 +84,6 @@ pub struct IRMASummary {
     pub percent_reference_coverage: Option<f64>,
     pub median_coverage: Option<i32>,
     pub count_minor_snv_at_or_over_5_pct: Option<i32>,
-    pub count_minor_indel_at_or_over_20_pct: Option<i32>,
     pub spike_percent_coverage: Option<f64>,
     pub spike_median_coverage: Option<i32>,
     pub pass_fail_reason: Option<String>,
@@ -999,7 +998,6 @@ pub fn create_irma_summary_vec(
 ) -> Result<Vec<IRMASummary>, Box<dyn Error>> {
     let mut irma_summary: Vec<IRMASummary> = Vec::new();
     let allele_count_data = count_minority_alleles(alleles_vec);
-    let indel_count_data = count_minority_indels(indels_vec);
 
     // Populate irma_summary with initial data from reads_count_vec
     for sample in sample_list {
@@ -1016,7 +1014,6 @@ pub fn create_irma_summary_vec(
                     percent_reference_coverage: None,
                     median_coverage: None,
                     count_minor_snv_at_or_over_5_pct: Some(0),
-                    count_minor_indel_at_or_over_20_pct: Some(0),
                     spike_percent_coverage: None,
                     spike_median_coverage: None,
                     pass_fail_reason: None,
@@ -1038,7 +1035,6 @@ pub fn create_irma_summary_vec(
                 percent_reference_coverage: Some(0.0),
                 median_coverage: Some(0),
                 count_minor_snv_at_or_over_5_pct: Some(0),
-                count_minor_indel_at_or_over_20_pct: Some(0),
                 spike_percent_coverage: None,
                 spike_median_coverage: None,
                 pass_fail_reason: Some("Fail".to_owned()),
@@ -1080,14 +1076,6 @@ pub fn create_irma_summary_vec(
                 && sample.reference == Some(entry.reference.clone())
             {
                 sample.count_minor_snv_at_or_over_5_pct = Some(entry.minor_variant_count);
-            }
-        }
-
-        for entry in &indel_count_data {
-            if sample.sample_id == entry.sample_id.clone()
-                && sample.reference == Some(entry.reference.clone())
-            {
-                sample.count_minor_indel_at_or_over_20_pct = Some(entry.minor_variant_count);
             }
         }
 

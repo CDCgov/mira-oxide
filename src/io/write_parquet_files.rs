@@ -476,11 +476,8 @@ pub fn write_irma_summary_to_parquet(
     let percent_reference_coverage_vec =
         extract_field(irma_summary_data, |item| item.percent_reference_coverage);
     let median_coverage_vec = extract_field(irma_summary_data, |item| item.median_coverage);
-    let count_minor_snv_vec = extract_field(irma_summary_data, |item| {
+    let count_minor_snv_at_or_over_5_pct_vec = extract_field(irma_summary_data, |item| {
         item.count_minor_snv_at_or_over_5_pct
-    });
-    let count_minor_indel_vec = extract_field(irma_summary_data, |item| {
-        item.count_minor_indel_at_or_over_20_pct
     });
     let spike_percent_coverage_vec =
         extract_field(irma_summary_data, |item| item.spike_percent_coverage);
@@ -501,8 +498,8 @@ pub fn write_irma_summary_to_parquet(
     let percent_reference_coverage_array: ArrayRef =
         Arc::new(Float64Array::from(percent_reference_coverage_vec));
     let median_coverage_array: ArrayRef = Arc::new(Int32Array::from(median_coverage_vec));
-    let count_minor_snv_array: ArrayRef = Arc::new(Int32Array::from(count_minor_snv_vec));
-    let count_minor_indel_array: ArrayRef = Arc::new(Int32Array::from(count_minor_indel_vec));
+    let count_minor_snv_at_or_over_5_pct_array: ArrayRef =
+        Arc::new(Int32Array::from(count_minor_snv_at_or_over_5_pct_vec));
     let pass_fail_reason_array: ArrayRef = Arc::new(StringArray::from(pass_fail_reason_vec));
     let subtype_array: ArrayRef = Arc::new(StringArray::from(subtype_vec));
     let mira_module_array: ArrayRef = Arc::new(StringArray::from(mira_module_vec));
@@ -517,8 +514,7 @@ pub fn write_irma_summary_to_parquet(
         Field::new("reference", DataType::Utf8, true),
         Field::new("percent_reference_coverage", DataType::Float64, true),
         Field::new("median_coverage", DataType::Int32, true),
-        Field::new("count_minor_snv", DataType::Int32, true),
-        Field::new("count_minor_indel", DataType::Int32, true),
+        Field::new("count_minor_snv_at_or_over_5_pct", DataType::Int32, true),
         Field::new("pass_fail_reason", DataType::Utf8, true),
         Field::new("mira_module", DataType::Utf8, true),
         Field::new("runid", DataType::Utf8, true),
@@ -534,8 +530,7 @@ pub fn write_irma_summary_to_parquet(
         reference_array,
         percent_reference_coverage_array,
         median_coverage_array,
-        count_minor_snv_array,
-        count_minor_indel_array,
+        count_minor_snv_at_or_over_5_pct_array,
         pass_fail_reason_array,
         mira_module_array,
         runid_array,
@@ -862,9 +857,8 @@ pub fn write_updated_irma_summary_to_parquet(
     let percent_reference_coverage_vec =
         extract_field(summary_data, |i| i.percent_reference_coverage);
     let median_coverage_vec = extract_field(summary_data, |i| i.median_coverage);
-    let count_minor_snv_vec = extract_field(summary_data, |i| i.count_minor_snv);
-    let count_minor_indel_vec = extract_field(summary_data, |i| i.count_minor_indel);
-
+    let count_minor_snv_at_or_over_5_pct_vec =
+        extract_field(summary_data, |i| i.count_minor_snv_at_or_over_5_pct);
     let pass_fail_reason_vec = extract_field(summary_data, |i| i.pass_fail_reason.clone());
     let subtype_vec = extract_field(summary_data, |i| i.subtype.clone());
     let mira_module_vec = extract_field(summary_data, |i| i.mira_module.clone());
@@ -880,7 +874,6 @@ pub fn write_updated_irma_summary_to_parquet(
         Field::new("percent_reference_coverage", DataType::Float64, true),
         Field::new("median_coverage", DataType::Int32, true),
         Field::new("count_minor_snv", DataType::Int32, true),
-        Field::new("count_minor_indel", DataType::Int32, true),
     ];
 
     let mut arrays: Vec<ArrayRef> = vec![
@@ -891,8 +884,7 @@ pub fn write_updated_irma_summary_to_parquet(
         Arc::new(StringArray::from(reference_vec)) as ArrayRef,
         Arc::new(Float64Array::from(percent_reference_coverage_vec)) as ArrayRef,
         Arc::new(Int32Array::from(median_coverage_vec)) as ArrayRef,
-        Arc::new(Int32Array::from(count_minor_snv_vec)) as ArrayRef,
-        Arc::new(Int32Array::from(count_minor_indel_vec)) as ArrayRef,
+        Arc::new(Int32Array::from(count_minor_snv_at_or_over_5_pct_vec)) as ArrayRef,
     ];
 
     // SC2 spike fields

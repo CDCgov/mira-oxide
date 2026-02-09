@@ -40,10 +40,10 @@ struct SampleRow {
 
 pub fn find_fastq(patterns: &[String]) -> Option<PathBuf> {
     for pattern in patterns {
-        if let Ok(mut paths) = glob(pattern) {
-            if let Some(path) = paths.find_map(Result::ok) {
-                return Some(path);
-            }
+        if let Ok(mut paths) = glob(pattern)
+            && let Some(path) = paths.find_map(Result::ok)
+        {
+            return Some(path);
         }
     }
     None

@@ -241,15 +241,11 @@ fn irma_summary_to_plotly_json(summary: &[IRMASummary]) -> String {
             row.count_minor_snv_at_or_over_5_pct
                 .map_or(String::new(), |v| v.to_string()),
         );
-        columns[8].push(
-            row.count_minor_indel_at_or_over_20_pct
-                .map_or(String::new(), |v| v.to_string()),
-        );
-        columns[9].push(row.pass_fail_reason.as_deref().unwrap_or("").to_string());
-        columns[10].push(row.subtype.as_deref().unwrap_or("").to_string());
-        columns[11].push(row.mira_module.as_deref().unwrap_or("").to_string());
-        columns[12].push(row.runid.as_deref().unwrap_or("").to_string());
-        columns[13].push(row.instrument.as_deref().unwrap_or("").to_string());
+        columns[8].push(row.pass_fail_reason.as_deref().unwrap_or("").to_string());
+        columns[9].push(row.subtype.as_deref().unwrap_or("").to_string());
+        columns[10].push(row.mira_module.as_deref().unwrap_or("").to_string());
+        columns[11].push(row.runid.as_deref().unwrap_or("").to_string());
+        columns[12].push(row.instrument.as_deref().unwrap_or("").to_string());
     }
 
     json!({
