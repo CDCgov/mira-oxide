@@ -237,9 +237,12 @@ fn irma_summary_to_plotly_json(summary: &[IRMASummary]) -> String {
                 .map_or(String::new(), |v| format!("{v:.2}")),
         );
         columns[6].push(row.median_coverage.map_or(String::new(), |v| v.to_string()));
-        columns[7].push(row.count_minor_snv.map_or(String::new(), |v| v.to_string()));
+        columns[7].push(
+            row.count_minor_snv_at_or_over_5_pct
+                .map_or(String::new(), |v| v.to_string()),
+        );
         columns[8].push(
-            row.count_minor_indel
+            row.count_minor_indel_at_or_over_20_pct
                 .map_or(String::new(), |v| v.to_string()),
         );
         columns[9].push(row.pass_fail_reason.as_deref().unwrap_or("").to_string());

@@ -83,8 +83,8 @@ pub struct IRMASummary {
     pub reference: Option<String>,
     pub percent_reference_coverage: Option<f64>,
     pub median_coverage: Option<i32>,
-    pub count_minor_snv: Option<i32>,
-    pub count_minor_indel: Option<i32>,
+    pub count_minor_snv_at_or_over_5_pct: Option<i32>,
+    pub count_minor_indel_at_or_over_20_pct: Option<i32>,
     pub spike_percent_coverage: Option<f64>,
     pub spike_median_coverage: Option<i32>,
     pub pass_fail_reason: Option<String>,
@@ -1015,8 +1015,8 @@ pub fn create_irma_summary_vec(
                     reads_mapped: Some(entry.reads_mapped),
                     percent_reference_coverage: None,
                     median_coverage: None,
-                    count_minor_snv: Some(0),
-                    count_minor_indel: Some(0),
+                    count_minor_snv_at_or_over_5_pct: Some(0),
+                    count_minor_indel_at_or_over_20_pct: Some(0),
                     spike_percent_coverage: None,
                     spike_median_coverage: None,
                     pass_fail_reason: None,
@@ -1037,8 +1037,8 @@ pub fn create_irma_summary_vec(
                 reads_mapped: Some(0),
                 percent_reference_coverage: Some(0.0),
                 median_coverage: Some(0),
-                count_minor_snv: Some(0),
-                count_minor_indel: Some(0),
+                count_minor_snv_at_or_over_5_pct: Some(0),
+                count_minor_indel_at_or_over_20_pct: Some(0),
                 spike_percent_coverage: None,
                 spike_median_coverage: None,
                 pass_fail_reason: Some("Fail".to_owned()),
@@ -1079,7 +1079,7 @@ pub fn create_irma_summary_vec(
             if sample.sample_id == entry.sample_id.clone()
                 && sample.reference == Some(entry.reference.clone())
             {
-                sample.count_minor_snv = Some(entry.minor_variant_count);
+                sample.count_minor_snv_at_or_over_5_pct = Some(entry.minor_variant_count);
             }
         }
 
@@ -1087,7 +1087,7 @@ pub fn create_irma_summary_vec(
             if sample.sample_id == entry.sample_id.clone()
                 && sample.reference == Some(entry.reference.clone())
             {
-                sample.count_minor_indel = Some(entry.minor_variant_count);
+                sample.count_minor_indel_at_or_over_20_pct = Some(entry.minor_variant_count);
             }
         }
 
@@ -1152,7 +1152,7 @@ impl IRMASummary {
             }
         }
 
-        if let Some(minor_snv) = self.count_minor_snv
+        if let Some(minor_snv) = self.count_minor_snv_at_or_over_5_pct
             && minor_snv > qc_values.minor_vars.try_into().unwrap()
         {
             let new_entry = format!(

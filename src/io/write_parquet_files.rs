@@ -476,8 +476,12 @@ pub fn write_irma_summary_to_parquet(
     let percent_reference_coverage_vec =
         extract_field(irma_summary_data, |item| item.percent_reference_coverage);
     let median_coverage_vec = extract_field(irma_summary_data, |item| item.median_coverage);
-    let count_minor_snv_vec = extract_field(irma_summary_data, |item| item.count_minor_snv);
-    let count_minor_indel_vec = extract_field(irma_summary_data, |item| item.count_minor_indel);
+    let count_minor_snv_vec = extract_field(irma_summary_data, |item| {
+        item.count_minor_snv_at_or_over_5_pct
+    });
+    let count_minor_indel_vec = extract_field(irma_summary_data, |item| {
+        item.count_minor_indel_at_or_over_20_pct
+    });
     let spike_percent_coverage_vec =
         extract_field(irma_summary_data, |item| item.spike_percent_coverage);
     let spike_median_coverage_vec =
