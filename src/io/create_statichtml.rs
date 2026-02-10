@@ -1,6 +1,6 @@
 #![allow(clippy::format_push_string, clippy::too_many_lines)]
 use super::coverage_json_per_sample::SampleCoverageJson;
-use super::data_ingest::{AllelesData, IndelsData};
+use super::data_ingest::{MinorVariantsData, IndelsData};
 use super::reads_to_sankey_json::SampleSankeyJson;
 use crate::utils::data_processing::{DaisVarsData, IRMASummary};
 use glob::glob;
@@ -280,7 +280,7 @@ fn dais_vars_to_plotly_json(vars: &[DaisVarsData]) -> String {
     .to_string()
 }
 
-fn alleles_to_plotly_json(data: &[AllelesData], virus: &str) -> String {
+fn alleles_to_plotly_json(data: &[MinorVariantsData], virus: &str) -> String {
     let headers = if virus == "sc2-spike" {
         [
             "Sample",
@@ -433,7 +433,7 @@ pub fn generate_html_report(
     output_path: &Path,
     irma_summary: &[IRMASummary],
     dais_vars_data: &[DaisVarsData],
-    minor_variants: &[AllelesData],
+    minor_variants: &[MinorVariantsData],
     indels: &[IndelsData],
     barcode_distribution_json: &serde_json::Value,
     pass_fail_heatmap_json: &serde_json::Value,

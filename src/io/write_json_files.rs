@@ -8,7 +8,7 @@ use crate::utils::data_processing::{
 };
 use std::collections::HashSet;
 
-use super::data_ingest::{AlleleDataCollection, CoverageData, IndelsData, ReadsData};
+use super::data_ingest::{CoverageData, IndelsData, MinorVariantDataCollection, ReadsData};
 
 //////////////// Function to collection and write out all CSV files ///////////////
 /////////////// Structs ///////////////
@@ -192,7 +192,7 @@ pub fn write_out_all_json_files(
     coverage_data: &[CoverageData],
     read_data: &[ReadsData],
     vtype_data: &[ProcessedRecord],
-    allele_data: &AlleleDataCollection,
+    minor_variants_data: &MinorVariantDataCollection,
     indel_data: &[IndelsData],
     dais_vars_data: &[DaisVarsData],
     neg_control_list: &[String],
@@ -266,8 +266,8 @@ pub fn write_out_all_json_files(
         &vtype_columns,
     )?;
 
-    // Writing out allele
-    let allele_columns = if virus == "sc2-spike" {
+    // Writing out minor variants
+    let minor_vars_columns = if virus == "sc2-spike" {
         vec![
             "sample",
             "reference",
@@ -296,7 +296,7 @@ pub fn write_out_all_json_files(
             "instrument",
         ]
     };
-    let allele_struct_values = if virus == "sc2-spike" {
+    let minor_vars_struct_values = if virus == "sc2-spike" {
         vec![
             "Sample",
             "Reference_Name",
@@ -326,11 +326,12 @@ pub fn write_out_all_json_files(
         ]
     };
 
+    //TODO: This will need to be changed in MIRA to catch minor_variants.json instead of alleles.json
     write_structs_to_split_json_file(
-        &format!("{}/alleles.json", output_path.display()),
-        &allele_data.all_alleles,
-        &allele_columns,
-        &allele_struct_values,
+        &format!("{}/minor_variants.json", output_path.display()),
+        &minor_variants_data.all_minor_variants,
+        &minor_vars_columns,
+        &minor_vars_struct_values,
     )?;
 
     // Writing out indel

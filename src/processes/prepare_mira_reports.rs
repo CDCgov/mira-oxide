@@ -19,10 +19,10 @@ use crate::utils::data_processing::{
 use crate::{
     io::{
         data_ingest::{
-            DaisSeqData, QCConfig, QCSettings, allele_data_collection,
-            amended_consensus_data_collection, coverage_data_collection, create_reader,
-            dais_ref_seq_data_collection, dais_sequence_data_collection, get_reference_lens,
-            indels_data_collection, read_csv, read_yaml, reads_data_collection,
+            DaisSeqData, QCConfig, QCSettings, amended_consensus_data_collection,
+            coverage_data_collection, create_reader, dais_ref_seq_data_collection,
+            dais_sequence_data_collection, get_reference_lens, indels_data_collection,
+            minor_variant_data_collection, read_csv, read_yaml, reads_data_collection,
             run_info_collection,
         },
         write_csv_files::write_out_all_csv_mira_reports,
@@ -170,7 +170,8 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
         coverage_data_collection(&args.irma_path, &args.platform, &args.runid, &args.virus)?;
     let read_data = reads_data_collection(&args.irma_path, &args.platform, &args.runid)?;
     let vtype_data = create_vtype_data(&read_data);
-    let allele_data = allele_data_collection(&args.irma_path, &args.platform, &args.runid)?;
+    let minor_variant_data =
+        minor_variant_data_collection(&args.irma_path, &args.platform, &args.runid)?;
     let indel_data = indels_data_collection(&args.irma_path, &args.platform, &args.runid)?;
     let run_info = run_info_collection(&args.irma_path, &args.platform, &args.runid)?;
     let seq_data = amended_consensus_data_collection(&args.irma_path, &args.virus)?;
@@ -255,8 +256,7 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
         &sample_list,
         &melted_reads_vec,
         &calculated_cov_vec,
-        &allele_data.filtered_alleles,
-        &indel_data,
+        &minor_variant_data.filtered_minor_variants,
         &subtype_data,
         &analysis_metadata,
         Some(&calculated_position_cov_vec),
@@ -353,7 +353,7 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
         &args.output_path,
         &coverage_data,
         &read_data,
-        &allele_data,
+        &minor_variant_data,
         &indel_data,
         &dais_vars_data,
         &irma_summary,
@@ -370,7 +370,7 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
         &coverage_data,
         &read_data,
         &vtype_data,
-        &allele_data,
+        &minor_variant_data,
         &indel_data,
         &dais_vars_data,
         &neg_control_list,
@@ -399,14 +399,17 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
                 args.runid
             ),
         )?;
+        /* TODO: fix this so that all alleles parq made
         write_alleles_to_parquet(
-            &allele_data.all_alleles,
+            &minor_variant_data.all_minor_variants,
             &format!(
                 "{}/mira_{}_all_alleles.parq",
                 &args.output_path.display(),
                 args.runid
             ),
         )?;
+         */
+
         write_indels_to_parquet(
             &indel_data,
             &format!(
@@ -416,7 +419,7 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
             ),
         )?;
         write_minor_vars_to_parquet(
-            &allele_data.filtered_alleles,
+            &minor_variant_data.all_minor_variants,
             &format!(
                 "{}/mira_{}_minor_variants.parq",
                 &args.output_path.display(),
@@ -507,7 +510,7 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
         &args.output_path,
         &irma_summary,
         &dais_vars_data,
-        &allele_data.all_alleles,
+        &minor_variant_data.all_minor_variants,
         &indel_data,
         &barcode_distribution_json,
         &pass_fail_heatmap_json,

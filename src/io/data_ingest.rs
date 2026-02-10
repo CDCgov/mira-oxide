@@ -116,7 +116,7 @@ pub struct ReadsData {
 
 /// Alleles struct
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct AllelesData {
+pub struct MinorVariantsData {
     #[serde(rename = "Sample")]
     pub sample_id: Option<String>,
     #[serde(rename = "Reference_Name")]
@@ -143,11 +143,11 @@ pub struct AllelesData {
     pub instrument: Option<String>,
 }
 
-/// Struct to hold filtered and unfiltered allele data
+/// Struct to hold filtered and unfiltered minor variants data
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct AlleleDataCollection {
-    pub filtered_alleles: Vec<AllelesData>,
-    pub all_alleles: Vec<AllelesData>,
+pub struct MinorVariantDataCollection {
+    pub filtered_minor_variants: Vec<MinorVariantsData>,
+    pub all_minor_variants: Vec<MinorVariantsData>,
 }
 
 /// Indel struct
@@ -290,7 +290,7 @@ impl GetSampleId for ReadsData {
 }
 
 // Implement the trait for AllelesData
-impl GetSampleId for AllelesData {
+impl GetSampleId for MinorVariantsData {
     fn set_sample_id(&mut self, sample_id: String) {
         self.sample_id = Some(sample_id);
     }
@@ -507,20 +507,20 @@ pub fn reads_data_collection(
     }
     Ok(reads_data)
 }
-/// Collecting allele data created by IRMA and save to two vectors of `AllelesData`
-/// One vector contains filtered alleles (frequency >= 0.05), and the other contains all alleles.
-pub fn allele_data_collection(
+/// Collecting minor vairant data created by IRMA and save to two vectors of `AllelesData`
+/// One vector contains filtered minor variants (frequency >= 0.05), and the other contains all minor variants.
+pub fn minor_variant_data_collection(
     irma_path: &Path,
     platform: &str,
     runid: &str,
-) -> Result<AlleleDataCollection, Box<dyn std::error::Error>> {
+) -> Result<MinorVariantDataCollection, Box<dyn std::error::Error>> {
     let pattern = format!(
         "{}/*/IRMA/*/tables/*variants.txt",
         irma_path.to_string_lossy()
     );
 
-    let mut filtered_alleles: Vec<AllelesData> = Vec::new();
-    let mut all_alleles: Vec<AllelesData> = Vec::new();
+    let mut filtered_minor_variants: Vec<MinorVariantsData> = Vec::new();
+    let mut all_minor_variants: Vec<MinorVariantsData> = Vec::new();
 
     // Iterate over all files matching the pattern and get the sample name from file
     for entry in glob(&pattern).expect("Failed to read glob pattern") {
@@ -531,7 +531,8 @@ pub fn allele_data_collection(
                 let reader = BufReader::new(file);
 
                 // Read the data from the file and include the sample name
-                let mut records: Vec<AllelesData> = process_txt_with_sample(reader, true, &sample)?;
+                let mut records: Vec<MinorVariantsData> =
+                    process_txt_with_sample(reader, true, &sample)?;
 
                 // Add platform and runid to each record
                 for record in &mut records {
@@ -546,18 +547,18 @@ pub fn allele_data_collection(
                 // Separate records into filtered and unfiltered vectors
                 for record in records {
                     if record.minority_frequency >= 0.05 {
-                        filtered_alleles.push(record.clone());
+                        filtered_minor_variants.push(record.clone());
                     }
-                    all_alleles.push(record);
+                    all_minor_variants.push(record);
                 }
             }
             Err(e) => println!("Error reading file: {e}"),
         }
     }
 
-    Ok(AlleleDataCollection {
-        filtered_alleles,
-        all_alleles,
+    Ok(MinorVariantDataCollection {
+        filtered_minor_variants,
+        all_minor_variants,
     })
 }
 

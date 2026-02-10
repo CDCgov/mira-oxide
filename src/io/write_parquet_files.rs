@@ -11,7 +11,7 @@ use arrow::{
 use parquet::arrow::ArrowWriter;
 use std::{error::Error, fs::File, sync::Arc};
 
-use super::data_ingest::{AllelesData, CoverageData, IndelsData, RunInfo};
+use super::data_ingest::{CoverageData, IndelsData, MinorVariantsData, RunInfo};
 
 /////////////// Functions to write parquet files out ///////////////
 
@@ -220,8 +220,9 @@ pub fn write_reads_to_parquet(
 }
 
 /// Write the alleles data to parquet file.
+/// TODO: fix the columns for this
 pub fn write_alleles_to_parquet(
-    alleles_data: &[AllelesData],
+    alleles_data: &[MinorVariantsData],
     output_file: &str,
 ) -> Result<(), Box<dyn Error>> {
     // Convert values in struct to vector of values
@@ -380,7 +381,7 @@ pub fn write_indels_to_parquet(
 
 /// Write the dais variant data to parquet file. TODO FIX
 pub fn write_minor_vars_to_parquet(
-    filtered_alleles_data: &[AllelesData],
+    filtered_alleles_data: &[MinorVariantsData],
     output_file: &str,
 ) -> Result<(), Box<dyn Error>> {
     // Convert values in struct to vector of values

@@ -13,7 +13,7 @@ use crate::processes::prepare_mira_reports::SamplesheetI;
 use crate::processes::prepare_mira_reports::SamplesheetO;
 
 use crate::io::data_ingest::{
-    AllelesData, CoverageData, DaisSeqData, IndelsData, QCSettings, ReadsData, SeqData,
+    CoverageData, DaisSeqData, IndelsData, MinorVariantsData, QCSettings, ReadsData, SeqData,
 };
 
 /// vtype struct
@@ -899,39 +899,14 @@ pub fn process_position_coverage_data(
     Ok(processed_coverage)
 }
 
-/// Count minority alleles for each unique `sample_id` and reference - used in IRMA summary below
+/// Count filtered minor variants for each unique `sample_id` and reference - used in IRMA summary below
 #[must_use]
-pub fn count_minority_alleles(data: &[AllelesData]) -> Vec<VariantCountData> {
+pub fn count_minor_variants(data: &[MinorVariantsData]) -> Vec<VariantCountData> {
     let mut counts: HashMap<(Option<String>, String), i32> = HashMap::new();
 
     for entry in data {
         let key = (entry.sample_id.clone(), entry.reference.clone());
         *counts.entry(key).or_insert(0) += 1;
-    }
-
-    let mut result = Vec::new();
-    for ((sample_id, reference), minor_variant_count) in counts {
-        result.push(VariantCountData {
-            sample_id,
-            reference,
-            minor_variant_count,
-        });
-    }
-
-    result
-}
-
-/// Count minority alleles for each unique `sample_id` and reference - used in IRMA summary below
-#[must_use]
-pub fn count_minority_indels(data: &[IndelsData]) -> Vec<VariantCountData> {
-    let mut counts: HashMap<(Option<String>, String), i32> = HashMap::new();
-
-    for entry in data {
-        //Alleles were already filtered, but have to filter indels for >= 0.2 freq here.
-        if entry.frequency >= 0.2 {
-            let key = (entry.sample_id.clone(), entry.reference_name.clone());
-            *counts.entry(key).or_insert(0) += 1;
-        }
     }
 
     let mut result = Vec::new();
@@ -990,14 +965,13 @@ pub fn create_irma_summary_vec(
     sample_list: &[String],
     reads_count_vec: &[MeltedRecord],
     calc_cov_vec: &[ProcessedCoverage],
-    alleles_vec: &[AllelesData],
-    indels_vec: &[IndelsData],
+    filtered_minor_vars_vec: &[MinorVariantsData],
     subtype_vec: &[Subtype],
     metadata: &Metadata,
     pos_calc_cov_vec: Option<&[ProcessedCoverage]>,
 ) -> Result<Vec<IRMASummary>, Box<dyn Error>> {
     let mut irma_summary: Vec<IRMASummary> = Vec::new();
-    let allele_count_data = count_minority_alleles(alleles_vec);
+    let filtered_minor_vars_count = count_minor_variants(filtered_minor_vars_vec);
 
     // Populate irma_summary with initial data from reads_count_vec
     for sample in sample_list {
@@ -1071,7 +1045,7 @@ pub fn create_irma_summary_vec(
             }
         }
 
-        for entry in &allele_count_data {
+        for entry in &filtered_minor_vars_count {
             if sample.sample_id == entry.sample_id.clone()
                 && sample.reference == Some(entry.reference.clone())
             {
