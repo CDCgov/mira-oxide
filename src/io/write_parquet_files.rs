@@ -381,25 +381,22 @@ pub fn write_indels_to_parquet(
 
 /// Write the dais variant data to parquet file. TODO FIX
 pub fn write_minor_vars_to_parquet(
-    filtered_alleles_data: &[MinorVariantsData],
+    minor_vars_data: &[MinorVariantsData],
     output_file: &str,
 ) -> Result<(), Box<dyn Error>> {
     // Convert values in struct to vector of values
     let sample_ids_vec: Vec<Option<String>> =
-        extract_field(filtered_alleles_data, |item| item.sample_id.clone());
-    let reference_vec = extract_field(filtered_alleles_data, |item| item.reference.clone());
-    let sample_position_vec = extract_field(filtered_alleles_data, |item| item.sample_position);
-    let coverage_vec = extract_field(filtered_alleles_data, |item| item.coverage);
-    let consensus_allele_vec =
-        extract_field(filtered_alleles_data, |item| item.consensus_allele.clone());
-    let minority_allele_vec =
-        extract_field(filtered_alleles_data, |item| item.minority_allele.clone());
-    let consensus_count_vec = extract_field(filtered_alleles_data, |item| item.consensus_count);
-    let minority_count_vec = extract_field(filtered_alleles_data, |item| item.minority_count);
-    let minority_frequency_vec =
-        extract_field(filtered_alleles_data, |item| item.minority_frequency);
-    let runid_vec = extract_field(filtered_alleles_data, |item| item.run_id.clone());
-    let instrument_vec = extract_field(filtered_alleles_data, |item| item.instrument.clone());
+        extract_field(minor_vars_data, |item| item.sample_id.clone());
+    let reference_vec = extract_field(minor_vars_data, |item| item.reference.clone());
+    let sample_position_vec = extract_field(minor_vars_data, |item| item.sample_position);
+    let coverage_vec = extract_field(minor_vars_data, |item| item.coverage);
+    let consensus_allele_vec = extract_field(minor_vars_data, |item| item.consensus_allele.clone());
+    let minority_allele_vec = extract_field(minor_vars_data, |item| item.minority_allele.clone());
+    let consensus_count_vec = extract_field(minor_vars_data, |item| item.consensus_count);
+    let minority_count_vec = extract_field(minor_vars_data, |item| item.minority_count);
+    let minority_frequency_vec = extract_field(minor_vars_data, |item| item.minority_frequency);
+    let runid_vec = extract_field(minor_vars_data, |item| item.run_id.clone());
+    let instrument_vec = extract_field(minor_vars_data, |item| item.instrument.clone());
 
     // Convert the vectors into Arrow columns
     let sample_array: ArrayRef = Arc::new(StringArray::from(sample_ids_vec));
