@@ -114,7 +114,7 @@ pub struct ReadsData {
     pub percent_mapping: Option<f32>,
 }
 
-/// Alleles struct
+/// Minor Variant struct
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct MinorVariantsData {
     #[serde(rename = "Sample")]
@@ -183,6 +183,41 @@ pub struct IndelsData {
     pub paired_ub: String,
     #[serde(rename = "QualityUB")]
     pub quality_ub: Option<String>,
+    #[serde(rename = "Run_ID")]
+    pub run_id: Option<String>,
+    #[serde(rename = "Instrument")]
+    pub instrument: Option<String>,
+}
+
+/// Alleles struct
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct AllAllelesData {
+    #[serde(rename = "Sample")]
+    pub sample_id: Option<String>,
+    #[serde(rename = "Reference_Name")]
+    pub reference: String,
+    #[serde(rename = "Position")]
+    pub reference_position: i32,
+    #[serde(rename = "Allele")]
+    pub allele: i32,
+    #[serde(rename = "Count")]
+    pub allele_count: i32,
+    #[serde(rename = "Total")]
+    pub total_count: i32,
+    #[serde(rename = "Frequency")]
+    pub allele_frequency: f64,
+    #[serde(rename = "Average_Quality")]
+    pub average_quality: f64,
+    #[serde(rename = "ConfidenceNotMacErr")]
+    pub confidence_not_machine_error: f64,
+    #[serde(rename = "PairedUB")]
+    pub paired_ub: f64,
+    #[serde(rename = "QualityUB")]
+    pub quality_ub: f64,
+    #[serde(rename = "Allele_Type")]
+    pub allele_type: String,
+    #[serde(rename = "HMM_Position")]
+    pub reference_upstream_position: Option<i32>,
     #[serde(rename = "Run_ID")]
     pub run_id: Option<String>,
     #[serde(rename = "Instrument")]
