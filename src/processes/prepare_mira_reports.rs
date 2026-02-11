@@ -3,6 +3,7 @@ use crate::io::coverage_json_per_sample::create_coverage_plot;
 use crate::io::coverage_to_heatmap::coverage_to_heatmap_json;
 use crate::io::create_passfail_heatmap::create_passfail_heatmap;
 use crate::io::create_statichtml::generate_html_report;
+use crate::io::data_ingest::all_alleles_data_collection;
 use crate::io::reads_to_piechart::create_barcode_distribution_figure;
 use crate::io::reads_to_sankey_json::reads_to_sankey_json;
 use crate::io::write_fasta_files::write_out_nextclade_fasta_files;
@@ -399,17 +400,6 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
                 args.runid
             ),
         )?;
-        /* TODO: fix this so that all alleles parq made
-        write_alleles_to_parquet(
-            &minor_variant_data.all_minor_variants,
-            &format!(
-                "{}/mira_{}_all_alleles.parq",
-                &args.output_path.display(),
-                args.runid
-            ),
-        )?;
-         */
-
         write_indels_to_parquet(
             &indel_data,
             &format!(
@@ -469,6 +459,19 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
             &args.runid,
             &args.platform,
         )?;
+        let all_alleles_data =
+            all_alleles_data_collection(&args.irma_path, &args.platform, &args.runid)?;
+        //println!("{all_alleles_data:?}");
+        /* TODO: fix this so that all alleles parq made
+        write_alleles_to_parquet(
+            &minor_variant_data.all_minor_variants,
+            &format!(
+                "{}/mira_{}_all_alleles.parq",
+                &args.output_path.display(),
+                args.runid
+            ),
+        )?;
+         */
     }
 
     //////////////////////////////// Create JSONS for Dashboard ////////////////////////////////

@@ -13,7 +13,7 @@ use crate::processes::prepare_mira_reports::SamplesheetI;
 use crate::processes::prepare_mira_reports::SamplesheetO;
 
 use crate::io::data_ingest::{
-    CoverageData, DaisSeqData, IndelsData, MinorVariantsData, QCSettings, ReadsData, SeqData,
+    CoverageData, DaisSeqData, MinorVariantsData, QCSettings, ReadsData, SeqData,
 };
 
 /// vtype struct
