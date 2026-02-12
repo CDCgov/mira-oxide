@@ -1,4 +1,4 @@
-use crate::io::data_ingest::ReadsData;
+use crate::io::data_ingest::{AllAllelesData, ReadsData};
 use crate::processes::prepare_mira_reports::Samplesheet;
 use crate::processes::summary_report_update::UpdatedIRMASummary;
 use crate::utils::data_processing::{AASequences, IRMASummary, NTSequences, extract_field};
@@ -222,49 +222,60 @@ pub fn write_reads_to_parquet(
 /// Write the alleles data to parquet file.
 /// TODO: fix the columns for this
 pub fn write_alleles_to_parquet(
-    alleles_data: &[MinorVariantsData],
+    alleles_data: &[AllAllelesData],
     output_file: &str,
 ) -> Result<(), Box<dyn Error>> {
     // Convert values in struct to vector of values
     let sample_ids_vec: Vec<Option<String>> =
         extract_field(alleles_data, |item| item.sample_id.clone());
     let reference_vec = extract_field(alleles_data, |item| item.reference.clone());
-    let sample_position_vec = extract_field(alleles_data, |item| item.sample_position);
-    let coverage_vec = extract_field(alleles_data, |item| item.coverage);
-    let consensus_allele_vec = extract_field(alleles_data, |item| item.consensus_allele.clone());
-    let minority_allele_vec = extract_field(alleles_data, |item| item.minority_allele.clone());
-    let consensus_count_vec = extract_field(alleles_data, |item| item.consensus_count);
-    let minority_count_vec = extract_field(alleles_data, |item| item.minority_count);
-    let minority_frequency_vec = extract_field(alleles_data, |item| item.minority_frequency);
+    let position_vec = extract_field(alleles_data, |item| item.position);
+    let allele_vec = extract_field(alleles_data, |item| item.allele.clone());
+    let allele_count_vec = extract_field(alleles_data, |item| item.allele_count.clone());
+    let total_count_vec = extract_field(alleles_data, |item| item.total_count.clone());
+    let allele_frequency_vec = extract_field(alleles_data, |item| item.allele_frequency);
+    let average_quality_vec = extract_field(alleles_data, |item| item.average_quality.clone());
+    let confidence_not_machine_error_vec = extract_field(alleles_data, |item| {
+        item.confidence_not_machine_error.clone()
+    });
+    let allele_type_vec = extract_field(alleles_data, |item| item.allele_type.clone());
     let runid_vec = extract_field(alleles_data, |item| item.run_id.clone());
     let instrument_vec = extract_field(alleles_data, |item| item.instrument.clone());
+    let reference_upstream_position_vec =
+        extract_field(alleles_data, |item| item.reference_upstream_position);
 
     // Convert the vectors into Arrow columns
     let sample_array: ArrayRef = Arc::new(StringArray::from(sample_ids_vec));
     let reference_array: ArrayRef = Arc::new(StringArray::from(reference_vec));
-    let sample_position_array: ArrayRef = Arc::new(Int32Array::from(sample_position_vec));
-    let coverage_array: ArrayRef = Arc::new(Int32Array::from(coverage_vec));
-    let consensus_allele_array: ArrayRef = Arc::new(StringArray::from(consensus_allele_vec));
-    let minority_allele_array: ArrayRef = Arc::new(StringArray::from(minority_allele_vec));
-    let consensus_count_array: ArrayRef = Arc::new(Int32Array::from(consensus_count_vec));
-    let minority_count_array: ArrayRef = Arc::new(Int32Array::from(minority_count_vec));
-    let minority_frequency_array: ArrayRef = Arc::new(Float64Array::from(minority_frequency_vec));
+    let position_array: ArrayRef = Arc::new(Int32Array::from(position_vec));
+    let allele_array: ArrayRef = Arc::new(StringArray::from(allele_vec));
+    let allele_count_array: ArrayRef = Arc::new(Int32Array::from(allele_count_vec));
+    let total_count_array: ArrayRef = Arc::new(Int32Array::from(total_count_vec));
+    let allele_frequency_array: ArrayRef = Arc::new(Float64Array::from(allele_frequency_vec));
+    let average_quality_array: ArrayRef = Arc::new(StringArray::from(average_quality_vec));
+    let confidence_not_machine_error_array: ArrayRef =
+        Arc::new(StringArray::from(confidence_not_machine_error_vec));
+    let allele_type_array: ArrayRef = Arc::new(StringArray::from(allele_type_vec));
     let runid_array: ArrayRef = Arc::new(StringArray::from(runid_vec));
     let instrument_array: ArrayRef = Arc::new(StringArray::from(instrument_vec));
+    let reference_upstream_position_array: ArrayRef =
+        Arc::new(Int32Array::from(reference_upstream_position_vec));
 
     // Define the schema for the Arrow IPC file
     let fields = vec![
         Field::new("sample_id", DataType::Utf8, true),
         Field::new("reference", DataType::Utf8, true),
-        Field::new("sample_position", DataType::Int32, true),
-        Field::new("coverage", DataType::Int32, true),
-        Field::new("consensus_allele", DataType::Utf8, true),
-        Field::new("minority_allele", DataType::Utf8, true),
-        Field::new("consensus_count", DataType::Int32, true),
-        Field::new("minority_count", DataType::Int32, true),
-        Field::new("minority_frequency", DataType::Float64, true),
+        Field::new("position", DataType::Int32, true),
+        Field::new("allele", DataType::Utf8, true),
+        Field::new("allele_count", DataType::Int32, true),
+        Field::new("total_count", DataType::Int32, true),
+        Field::new("allele_frequency", DataType::Float64, true),
+        Field::new("average_quality", DataType::Utf8, true),
+        Field::new("confidence_not_machine_error", DataType::Utf8, true),
+        Field::new("allele_type", DataType::Utf8, true),
         Field::new("runid", DataType::Utf8, true),
         Field::new("machine", DataType::Utf8, true),
+        Field::new("reference_upstream_position", DataType::Int32, true),
     ];
     let schema = Arc::new(Schema::new(fields));
 
@@ -274,15 +285,17 @@ pub fn write_alleles_to_parquet(
         vec![
             sample_array,
             reference_array,
-            sample_position_array,
-            coverage_array,
-            consensus_allele_array,
-            minority_allele_array,
-            consensus_count_array,
-            minority_count_array,
-            minority_frequency_array,
+            position_array,
+            allele_array,
+            allele_count_array,
+            total_count_array,
+            allele_frequency_array,
+            average_quality_array,
+            confidence_not_machine_error_array,
+            allele_type_array,
             runid_array,
             instrument_array,
+            reference_upstream_position_array,
         ],
     )?;
 

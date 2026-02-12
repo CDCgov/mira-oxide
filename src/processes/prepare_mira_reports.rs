@@ -459,19 +459,19 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
             &args.runid,
             &args.platform,
         )?;
+
+        // Only reading in allAlleles.txt if parquet files are being made
         let all_alleles_data =
             all_alleles_data_collection(&args.irma_path, &args.platform, &args.runid)?;
-        //println!("{all_alleles_data:?}");
-        /* TODO: fix this so that all alleles parq made
+
         write_alleles_to_parquet(
-            &minor_variant_data.all_minor_variants,
+            &all_alleles_data,
             &format!(
                 "{}/mira_{}_all_alleles.parq",
                 &args.output_path.display(),
                 args.runid
             ),
         )?;
-         */
     }
 
     //////////////////////////////// Create JSONS for Dashboard ////////////////////////////////

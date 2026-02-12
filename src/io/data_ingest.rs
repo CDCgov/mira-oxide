@@ -197,7 +197,7 @@ pub struct AllAllelesData {
     #[serde(rename = "Reference_Name")]
     pub reference: String,
     #[serde(rename = "Position")]
-    pub reference_position: i32,
+    pub position: i32,
     #[serde(rename = "Allele")]
     pub allele: String,
     #[serde(rename = "Count")]
