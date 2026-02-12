@@ -15,7 +15,7 @@ use super::data_ingest::{CoverageData, IndelsData, MinorVariantsData, RunInfo};
 
 /////////////// Functions to write parquet files out ///////////////
 
-pub fn extract_string_fields_as_int<V, T, F>(data: V, extractor: F) -> Vec<i32>
+pub fn extract_string_fields_as_int<V, T, F>(data: V, extractor: F) -> Vec<Option<i32>>
 where
     V: AsRef<[T]>,
     F: Fn(&T) -> &str,
@@ -24,10 +24,12 @@ where
         .iter()
         .map(|item| {
             let field = extractor(item);
-            if field.is_empty() {
-                0
+            let trimmed = field.trim();
+
+            if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("NA") {
+                None
             } else {
-                field.parse::<i32>().unwrap_or(0)
+                trimmed.parse::<i32>().ok()
             }
         })
         .collect()
@@ -44,20 +46,20 @@ where
     data.as_ref()
         .iter()
         .map(|item| {
-            if let Some(field) = extractor(item) {
-                if field.is_empty() {
-                    Some(0)
+            extractor(item).and_then(|field| {
+                let trimmed = field.trim();
+
+                if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("NA") {
+                    None
                 } else {
-                    field.parse::<i32>().ok()
+                    trimmed.parse::<i32>().ok()
                 }
-            } else {
-                None
-            }
+            })
         })
         .collect()
 }
 
-pub fn extract_string_fields_as_float<V, T, F>(data: V, extractor: F) -> Vec<f32>
+pub fn extract_string_fields_as_float32<V, T, F>(data: V, extractor: F) -> Vec<Option<f32>>
 where
     V: AsRef<[T]>,
     F: Fn(&T) -> Option<String>,
@@ -65,11 +67,37 @@ where
     data.as_ref()
         .iter()
         .map(|item| {
-            if let Some(field) = extractor(item) {
-                field.parse::<f32>().unwrap_or(0.0)
-            } else {
-                0.0
+            extractor(item).and_then(|field| {
+                let trimmed = field.trim();
+
+                if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("NA") {
+                    None
+                } else {
+                    trimmed.parse::<f32>().ok()
+                }
+            })
+        })
+        .collect()
+}
+
+pub fn extract_string_fields_as_float64<V, T, F>(data: V, extractor: F) -> Vec<Option<f64>>
+where
+    V: AsRef<[T]>,
+    F: Fn(&T) -> Option<String>,
+{
+    data.as_ref()
+        .iter()
+        .map(|item| match extractor(item) {
+            Some(field) => {
+                let trimmed = field.trim();
+
+                if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("NA") {
+                    None
+                } else {
+                    trimmed.parse::<f64>().ok()
+                }
             }
+            None => None,
         })
         .collect()
 }
@@ -162,9 +190,9 @@ pub fn write_reads_to_parquet(
         extract_field(reads_data, |item| item.sample_id.clone());
     let record_vec = extract_field(reads_data, |item| item.record.clone());
     let reads_vec = extract_field(reads_data, |item| item.reads);
-    let patterns_vec = extract_string_fields_as_float(reads_data, |item| item.patterns.clone());
+    let patterns_vec = extract_string_fields_as_float32(reads_data, |item| item.patterns.clone());
     let pairs_and_windows_vec =
-        extract_string_fields_as_float(reads_data, |item| item.pairs_and_windows.clone());
+        extract_string_fields_as_float32(reads_data, |item| item.pairs_and_windows.clone());
     let stages_vec =
         extract_string_fields_as_int(reads_data, |item| item.stage.as_deref().unwrap_or(""));
     let runid_vec = extract_field(reads_data, |item| item.run_id.clone());
@@ -231,12 +259,13 @@ pub fn write_alleles_to_parquet(
     let reference_vec = extract_field(alleles_data, |item| item.reference.clone());
     let position_vec = extract_field(alleles_data, |item| item.position);
     let allele_vec = extract_field(alleles_data, |item| item.allele.clone());
-    let allele_count_vec = extract_field(alleles_data, |item| item.allele_count.clone());
-    let total_count_vec = extract_field(alleles_data, |item| item.total_count.clone());
+    let allele_count_vec = extract_field(alleles_data, |item| item.allele_count);
+    let total_count_vec = extract_field(alleles_data, |item| item.total_count);
     let allele_frequency_vec = extract_field(alleles_data, |item| item.allele_frequency);
-    let average_quality_vec = extract_field(alleles_data, |item| item.average_quality.clone());
-    let confidence_not_machine_error_vec = extract_field(alleles_data, |item| {
-        item.confidence_not_machine_error.clone()
+    let average_quality_vec =
+        extract_string_fields_as_float64(alleles_data, |item| Some(item.average_quality.clone()));
+    let confidence_not_machine_error_vec = extract_string_fields_as_float64(alleles_data, |item| {
+        Some(item.confidence_not_machine_error.clone())
     });
     let allele_type_vec = extract_field(alleles_data, |item| item.allele_type.clone());
     let runid_vec = extract_field(alleles_data, |item| item.run_id.clone());
@@ -252,14 +281,16 @@ pub fn write_alleles_to_parquet(
     let allele_count_array: ArrayRef = Arc::new(Int32Array::from(allele_count_vec));
     let total_count_array: ArrayRef = Arc::new(Int32Array::from(total_count_vec));
     let allele_frequency_array: ArrayRef = Arc::new(Float64Array::from(allele_frequency_vec));
-    let average_quality_array: ArrayRef = Arc::new(StringArray::from(average_quality_vec));
+    let average_quality_array: ArrayRef = Arc::new(Float64Array::from(average_quality_vec));
     let confidence_not_machine_error_array: ArrayRef =
-        Arc::new(StringArray::from(confidence_not_machine_error_vec));
+        Arc::new(Float64Array::from(confidence_not_machine_error_vec));
     let allele_type_array: ArrayRef = Arc::new(StringArray::from(allele_type_vec));
     let runid_array: ArrayRef = Arc::new(StringArray::from(runid_vec));
     let instrument_array: ArrayRef = Arc::new(StringArray::from(instrument_vec));
     let reference_upstream_position_array: ArrayRef =
         Arc::new(Int32Array::from(reference_upstream_position_vec));
+
+    print!("{:?}", average_quality_array);
 
     // Define the schema for the Arrow IPC file
     let fields = vec![
@@ -270,8 +301,8 @@ pub fn write_alleles_to_parquet(
         Field::new("allele_count", DataType::Int32, true),
         Field::new("total_count", DataType::Int32, true),
         Field::new("allele_frequency", DataType::Float64, true),
-        Field::new("average_quality", DataType::Utf8, true),
-        Field::new("confidence_not_machine_error", DataType::Utf8, true),
+        Field::new("average_quality", DataType::Float64, true),
+        Field::new("confidence_not_machine_error", DataType::Float64, true),
         Field::new("allele_type", DataType::Utf8, true),
         Field::new("runid", DataType::Utf8, true),
         Field::new("machine", DataType::Utf8, true),
