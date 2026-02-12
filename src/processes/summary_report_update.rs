@@ -52,7 +52,6 @@ pub struct UpdatedIRMASummary {
     pub percent_reference_coverage: Option<f64>,
     pub median_coverage: Option<i32>,
     pub count_minor_snv_at_or_over_5_pct: Option<i32>,
-    pub count_minor_indel_at_or_over_20_pct: Option<i32>,
     pub spike_percent_coverage: Option<f64>,
     pub spike_median_coverage: Option<i32>,
     pub pass_fail_reason: Option<String>,
@@ -102,19 +101,29 @@ pub fn summary_report_update_process(args: &SummaryUpdateArgs) -> Result<(), Box
         if let Some(nc) = nextclade_map.get(sample_id) {
             match args.virus.as_str() {
                 "flu" => {
-                    summary.nextclade_field_1 = nc.clade.clone();
-                    summary.nextclade_field_2 = nc.short_clade.clone();
-                    summary.nextclade_field_3 = nc.subclade.clone();
+                    let has_ha = summary.reference.as_ref().is_some_and(|r| r.contains("HA"));
 
-                    // If short_clade is missing → "na"
-                    if summary
-                        .nextclade_field_2
-                        .as_ref()
-                        .is_none_or(|s| s.trim().is_empty())
-                    {
+                    if has_ha {
+                        summary.nextclade_field_1 = nc.clade.clone();
+                        summary.nextclade_field_2 = nc.short_clade.clone();
+                        summary.nextclade_field_3 = nc.subclade.clone();
+
+                        // If short_clade is missing → "na"
+                        if summary
+                            .nextclade_field_2
+                            .as_ref()
+                            .is_none_or(|s| s.trim().is_empty())
+                        {
+                            summary.nextclade_field_2 = Some("na".to_string());
+                        }
+                    } else {
+                        // Non-HA flu segments → force "na"
+                        summary.nextclade_field_1 = Some("na".to_string());
                         summary.nextclade_field_2 = Some("na".to_string());
+                        summary.nextclade_field_3 = Some("na".to_string());
                     }
                 }
+
                 "sc2-wgs" => {
                     summary.nextclade_field_1 = nc.clade.clone();
                     summary.nextclade_field_2 = nc.clade_who.clone();
