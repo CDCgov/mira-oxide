@@ -8,7 +8,9 @@ use crate::{
     utils::data_processing::{AASequences, DaisVarsData, IRMASummary, NTSequences},
 };
 
-use super::data_ingest::{AlleleDataCollection, CoverageData, IndelsData, ReadsData, RunInfo};
+use super::data_ingest::{
+    CoverageData, IndelsData, MinorVariantDataCollection, ReadsData, RunInfo,
+};
 
 //////////////// Function to write CSV ///////////////
 pub fn write_structs_to_csv_file<T: Serialize>(
@@ -51,7 +53,7 @@ pub fn write_out_all_csv_mira_reports(
     output_path: &Path,
     coverage_data: &[CoverageData],
     read_data: &[ReadsData],
-    allele_data: &AlleleDataCollection,
+    minor_variant_data: &MinorVariantDataCollection,
     indel_data: &[IndelsData],
     dais_vars: &[DaisVarsData],
     irma_summary: &[IRMASummary],
@@ -124,8 +126,8 @@ pub fn write_out_all_csv_mira_reports(
         &reads_struct_values,
     )?;
 
-    // Writing out allele data
-    let allele_columns = if virus == "sc2-spike" {
+    // Writing out minor variants data
+    let minor_variants_columns = if virus == "sc2-spike" {
         vec![
             "sample",
             "reference",
@@ -155,7 +157,7 @@ pub fn write_out_all_csv_mira_reports(
         ]
     };
 
-    let allele_struct_values = if virus == "sc2-spike" {
+    let minor_vars_struct_values = if virus == "sc2-spike" {
         vec![
             "Sample",
             "Reference_Name",
@@ -186,10 +188,10 @@ pub fn write_out_all_csv_mira_reports(
     };
 
     write_structs_to_csv_file(
-        &format!("{}/mira_{runid}_all_alleles.csv", output_path.display()),
-        &allele_data.all_alleles,
-        &allele_columns,
-        &allele_struct_values,
+        &format!("{}/mira_{runid}_minor_variants.csv", output_path.display()),
+        &minor_variant_data.all_minor_variants,
+        &minor_variants_columns,
+        &minor_vars_struct_values,
     )?;
 
     // Writing out indel
@@ -226,61 +228,6 @@ pub fn write_out_all_csv_mira_reports(
         &indels_struct_values,
     )?;
 
-    let minor_variant_columns = vec![
-        "sample",
-        "reference",
-        "sample_upstream_position",
-        "depth",
-        "consensus_allele",
-        "minority_allele",
-        "consensus_count",
-        "minority_count",
-        "minority_frequency",
-        "run_id",
-        "instrument",
-    ];
-
-    //Write out variants.csv - filtered by snv > 0.05
-    let minor_variant_struct_values = if virus == "sc2-spike" {
-        vec![
-            "Sample",
-            "Reference_Name",
-            "HMM_Position",
-            "Total",
-            "Consensus_Allele",
-            "Minority_Allele",
-            "Consensus_Count",
-            "Minority_Count",
-            "Minority_Frequency",
-            "Run_ID",
-            "Instrument",
-        ]
-    } else {
-        vec![
-            "Sample",
-            "Reference_Name",
-            "Position",
-            "Total",
-            "Consensus_Allele",
-            "Minority_Allele",
-            "Consensus_Count",
-            "Minority_Count",
-            "Minority_Frequency",
-            "Run_ID",
-            "Instrument",
-        ]
-    };
-
-    write_structs_to_csv_file(
-        &format!(
-            "{}/mira_{runid}_filtered_variants.csv",
-            output_path.display()
-        ),
-        &allele_data.filtered_alleles,
-        &minor_variant_columns,
-        &minor_variant_struct_values,
-    )?;
-
     // write out the aavars.csv
     let aavars_columns = vec![
         "sample_id",
@@ -307,8 +254,7 @@ pub fn write_out_all_csv_mira_reports(
             "reference",
             "percent_reference_coverage",
             "median_coverage",
-            "count_minor_snv",
-            "count_minor_indel",
+            "count_minor_snv_at_or_over_5_pct",
             "spike_percent_coverage",
             "spike_median_coverage",
             "pass_fail_reason",
@@ -326,8 +272,7 @@ pub fn write_out_all_csv_mira_reports(
             "reference",
             "percent_reference_coverage",
             "median_coverage",
-            "count_minor_snv",
-            "count_minor_indel",
+            "count_minor_snv_at_or_over_5_pct",
             "pass_fail_reason",
             "subtype",
             "mira_module",
@@ -428,8 +373,7 @@ pub fn write_out_updated_summary_csv(
             "reference",
             "percent_reference_coverage",
             "median_coverage",
-            "count_minor_snv",
-            "count_minor_indel",
+            "count_minor_snv_at_or_over_5_pct",
             "spike_percent_coverage",
             "spike_median_coverage",
             "pass_fail_reason",
@@ -450,8 +394,7 @@ pub fn write_out_updated_summary_csv(
             "reference",
             "percent_reference_coverage",
             "median_coverage",
-            "count_minor_snv",
-            "count_minor_indel",
+            "count_minor_snv_at_or_over_5_pct",
             "pass_fail_reason",
             "subtype",
             "mira_module",
@@ -470,8 +413,7 @@ pub fn write_out_updated_summary_csv(
             "reference",
             "percent_reference_coverage",
             "median_coverage",
-            "count_minor_snv",
-            "count_minor_indel",
+            "count_minor_snv_at_or_over_5_pct",
             "pass_fail_reason",
             "subtype",
             "mira_module",
@@ -491,8 +433,7 @@ pub fn write_out_updated_summary_csv(
             "reference",
             "percent_reference_coverage",
             "median_coverage",
-            "count_minor_snv",
-            "count_minor_indel",
+            "count_minor_snv_at_or_over_5_pct",
             "spike_percent_coverage",
             "spike_median_coverage",
             "pass_fail_reason",
@@ -513,8 +454,7 @@ pub fn write_out_updated_summary_csv(
             "reference",
             "percent_reference_coverage",
             "median_coverage",
-            "count_minor_snv",
-            "count_minor_indel",
+            "count_minor_snv_at_or_over_5_pct",
             "pass_fail_reason",
             "subtype",
             "mira_module",
@@ -533,8 +473,7 @@ pub fn write_out_updated_summary_csv(
             "reference",
             "percent_reference_coverage",
             "median_coverage",
-            "count_minor_snv",
-            "count_minor_indel",
+            "count_minor_snv_at_or_over_5_pct",
             "pass_fail_reason",
             "subtype",
             "mira_module",

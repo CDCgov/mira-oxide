@@ -114,9 +114,9 @@ pub struct ReadsData {
     pub percent_mapping: Option<f32>,
 }
 
-/// Alleles struct
+/// Minor Variant struct
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct AllelesData {
+pub struct MinorVariantsData {
     #[serde(rename = "Sample")]
     pub sample_id: Option<String>,
     #[serde(rename = "Reference_Name")]
@@ -143,11 +143,11 @@ pub struct AllelesData {
     pub instrument: Option<String>,
 }
 
-/// Struct to hold filtered and unfiltered allele data
+/// Struct to hold filtered and unfiltered minor variants data
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct AlleleDataCollection {
-    pub filtered_alleles: Vec<AllelesData>,
-    pub all_alleles: Vec<AllelesData>,
+pub struct MinorVariantDataCollection {
+    pub filtered_minor_variants: Vec<MinorVariantsData>,
+    pub all_minor_variants: Vec<MinorVariantsData>,
 }
 
 /// Indel struct
@@ -183,6 +183,41 @@ pub struct IndelsData {
     pub paired_ub: String,
     #[serde(rename = "QualityUB")]
     pub quality_ub: Option<String>,
+    #[serde(rename = "Run_ID")]
+    pub run_id: Option<String>,
+    #[serde(rename = "Instrument")]
+    pub instrument: Option<String>,
+}
+
+/// Alleles struct
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct AllAllelesData {
+    #[serde(rename = "Sample")]
+    pub sample_id: Option<String>,
+    #[serde(rename = "Reference_Name")]
+    pub reference: String,
+    #[serde(rename = "Position")]
+    pub position: i32,
+    #[serde(rename = "Allele")]
+    pub allele: String,
+    #[serde(rename = "Count")]
+    pub allele_count: i32,
+    #[serde(rename = "Total")]
+    pub total_count: i32,
+    #[serde(rename = "Frequency")]
+    pub allele_frequency: f64,
+    #[serde(rename = "Average_Quality")]
+    pub average_quality: String,
+    #[serde(rename = "ConfidenceNotMacErr")]
+    pub confidence_not_machine_error: String,
+    #[serde(rename = "PairedUB")]
+    pub paired_ub: f64,
+    #[serde(rename = "QualityUB")]
+    pub quality_ub: f64,
+    #[serde(rename = "Allele_Type")]
+    pub allele_type: String,
+    #[serde(rename = "HMM_Position")]
+    pub reference_upstream_position: Option<i32>,
     #[serde(rename = "Run_ID")]
     pub run_id: Option<String>,
     #[serde(rename = "Instrument")]
@@ -290,7 +325,7 @@ impl GetSampleId for ReadsData {
 }
 
 // Implement the trait for AllelesData
-impl GetSampleId for AllelesData {
+impl GetSampleId for MinorVariantsData {
     fn set_sample_id(&mut self, sample_id: String) {
         self.sample_id = Some(sample_id);
     }
@@ -298,6 +333,13 @@ impl GetSampleId for AllelesData {
 
 // Implement the trait for IndelsData
 impl GetSampleId for IndelsData {
+    fn set_sample_id(&mut self, sample_id: String) {
+        self.sample_id = Some(sample_id);
+    }
+}
+
+// Implement the trait for IndelsData
+impl GetSampleId for AllAllelesData {
     fn set_sample_id(&mut self, sample_id: String) {
         self.sample_id = Some(sample_id);
     }
@@ -507,20 +549,20 @@ pub fn reads_data_collection(
     }
     Ok(reads_data)
 }
-/// Collecting allele data created by IRMA and save to two vectors of `AllelesData`
-/// One vector contains filtered alleles (frequency >= 0.05), and the other contains all alleles.
-pub fn allele_data_collection(
+/// Collecting minor vairant data created by IRMA and save to two vectors of `MinorVariantsData`
+/// One vector contains filtered minor variants (frequency >= 0.05), and the other contains all minor variants.
+pub fn minor_variant_data_collection(
     irma_path: &Path,
     platform: &str,
     runid: &str,
-) -> Result<AlleleDataCollection, Box<dyn std::error::Error>> {
+) -> Result<MinorVariantDataCollection, Box<dyn std::error::Error>> {
     let pattern = format!(
         "{}/*/IRMA/*/tables/*variants.txt",
         irma_path.to_string_lossy()
     );
 
-    let mut filtered_alleles: Vec<AllelesData> = Vec::new();
-    let mut all_alleles: Vec<AllelesData> = Vec::new();
+    let mut filtered_minor_variants: Vec<MinorVariantsData> = Vec::new();
+    let mut all_minor_variants: Vec<MinorVariantsData> = Vec::new();
 
     // Iterate over all files matching the pattern and get the sample name from file
     for entry in glob(&pattern).expect("Failed to read glob pattern") {
@@ -531,7 +573,8 @@ pub fn allele_data_collection(
                 let reader = BufReader::new(file);
 
                 // Read the data from the file and include the sample name
-                let mut records: Vec<AllelesData> = process_txt_with_sample(reader, true, &sample)?;
+                let mut records: Vec<MinorVariantsData> =
+                    process_txt_with_sample(reader, true, &sample)?;
 
                 // Add platform and runid to each record
                 for record in &mut records {
@@ -546,18 +589,18 @@ pub fn allele_data_collection(
                 // Separate records into filtered and unfiltered vectors
                 for record in records {
                     if record.minority_frequency >= 0.05 {
-                        filtered_alleles.push(record.clone());
+                        filtered_minor_variants.push(record.clone());
                     }
-                    all_alleles.push(record);
+                    all_minor_variants.push(record);
                 }
             }
             Err(e) => println!("Error reading file: {e}"),
         }
     }
 
-    Ok(AlleleDataCollection {
-        filtered_alleles,
-        all_alleles,
+    Ok(MinorVariantDataCollection {
+        filtered_minor_variants,
+        all_minor_variants,
     })
 }
 
@@ -621,6 +664,47 @@ pub fn indels_data_collection(
         }
     }
     Ok(indels_data)
+}
+
+/// Collecting allele data created by IRMA and save to a vector of `AllAllelesData`
+pub fn all_alleles_data_collection(
+    irma_path: &Path,
+    platform: &str,
+    runid: &str,
+) -> Result<Vec<AllAllelesData>, Box<dyn std::error::Error>> {
+    let pattern = format!(
+        "{}/*/IRMA/*/tables/*allAlleles.txt",
+        irma_path.to_string_lossy()
+    );
+
+    let mut all_alleles: Vec<AllAllelesData> = Vec::new();
+
+    // Iterate over all files matching the pattern and get the sample name from file
+    for entry in glob(&pattern).expect("Failed to read glob pattern") {
+        match entry {
+            Ok(path) => {
+                let sample = extract_sample_name(&path)?;
+                let file = File::open(&path)?;
+                let reader = BufReader::new(file);
+
+                // Read the data from the file and include the sample name
+                let mut records: Vec<AllAllelesData> =
+                    process_txt_with_sample(reader, true, &sample)?;
+
+                // Add platform and runid to each record
+                for record in &mut records {
+                    record.instrument = Some(platform.to_string());
+                    record.run_id = Some(runid.to_string());
+                }
+
+                // Add the records to all_alleles
+                all_alleles.extend(records);
+            }
+            Err(e) => println!("Error reading file: {e}"),
+        }
+    }
+
+    Ok(all_alleles)
 }
 
 /// Read in IRMA amended consensus fasta files to `SeqData` struct
@@ -815,7 +899,7 @@ fn format_timestamp(secs: u64, nanos: u32) -> String {
 
 // Helper function to determine if a year is a leap year
 fn is_leap_year(year: u64) -> bool {
-    (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0)
+    (year.is_multiple_of(4) && !year.is_multiple_of(100)) || year.is_multiple_of(400)
 }
 
 // Helper function to calculate the number of days in a year
@@ -863,7 +947,7 @@ pub fn run_info_collection(
 }
 
 /////////////// Data reading functions for DAIS-ribosome ///////////////
-/// Read tab-delimited data a withouot including sample name
+/// Read tab-delimited data a without including sample name
 pub fn process_txt<R, T>(reader: R, has_headers: bool) -> Result<Vec<T>, Box<dyn std::error::Error>>
 where
     R: Read,

@@ -97,11 +97,7 @@ fn build_records(
                 records.push((sample, reference, reason));
             } else {
                 // Not found: add default record
-                records.push((
-                    sample.clone(),
-                    reference.to_string(),
-                    "No assembly".to_string(),
-                ));
+                records.push((sample.clone(), reference.clone(), "No assembly".to_string()));
             }
         }
     }

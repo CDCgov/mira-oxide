@@ -11,7 +11,7 @@ use std::{
     path::{Path, PathBuf},
 };
 use zoe::{
-    alignment::{ScalarProfile, sw::sw_scalar_alignment},
+    alignment::{ScalarProfile, sw::sw_scalar_align},
     data::{ByteIndexMap, StdGeneticCode, WeightMatrix, nucleotides::GetCodons},
     prelude::{Len, Nucleotides},
 };

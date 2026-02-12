@@ -13,7 +13,7 @@ use crate::processes::prepare_mira_reports::SamplesheetI;
 use crate::processes::prepare_mira_reports::SamplesheetO;
 
 use crate::io::data_ingest::{
-    AllelesData, CoverageData, DaisSeqData, IndelsData, QCSettings, ReadsData, SeqData,
+    CoverageData, DaisSeqData, MinorVariantsData, QCSettings, ReadsData, SeqData,
 };
 
 /// vtype struct
@@ -83,8 +83,7 @@ pub struct IRMASummary {
     pub reference: Option<String>,
     pub percent_reference_coverage: Option<f64>,
     pub median_coverage: Option<i32>,
-    pub count_minor_snv: Option<i32>,
-    pub count_minor_indel: Option<i32>,
+    pub count_minor_snv_at_or_over_5_pct: Option<i32>,
     pub spike_percent_coverage: Option<f64>,
     pub spike_median_coverage: Option<i32>,
     pub pass_fail_reason: Option<String>,
@@ -739,7 +738,7 @@ fn calculate_median(values: &[i32]) -> i32 {
     if len == 0 {
         return 0; // Return 0 for empty input
     }
-    if len % 2 == 0 {
+    if len.is_multiple_of(2) {
         // For even-length arrays, calculate the average of the two middle values
         i32::midpoint(sorted_values[len / 2 - 1], sorted_values[len / 2])
     } else {
@@ -900,39 +899,14 @@ pub fn process_position_coverage_data(
     Ok(processed_coverage)
 }
 
-/// Count minority alleles for each unique `sample_id` and reference - used in IRMA summary below
+/// Count filtered minor variants for each unique `sample_id` and reference - used in IRMA summary below
 #[must_use]
-pub fn count_minority_alleles(data: &[AllelesData]) -> Vec<VariantCountData> {
+pub fn count_minor_variants(data: &[MinorVariantsData]) -> Vec<VariantCountData> {
     let mut counts: HashMap<(Option<String>, String), i32> = HashMap::new();
 
     for entry in data {
         let key = (entry.sample_id.clone(), entry.reference.clone());
         *counts.entry(key).or_insert(0) += 1;
-    }
-
-    let mut result = Vec::new();
-    for ((sample_id, reference), minor_variant_count) in counts {
-        result.push(VariantCountData {
-            sample_id,
-            reference,
-            minor_variant_count,
-        });
-    }
-
-    result
-}
-
-/// Count minority alleles for each unique `sample_id` and reference - used in IRMA summary below
-#[must_use]
-pub fn count_minority_indels(data: &[IndelsData]) -> Vec<VariantCountData> {
-    let mut counts: HashMap<(Option<String>, String), i32> = HashMap::new();
-
-    for entry in data {
-        //Alleles were already filtered, but have to filter indels for >= 0.2 freq here.
-        if entry.frequency >= 0.2 {
-            let key = (entry.sample_id.clone(), entry.reference_name.clone());
-            *counts.entry(key).or_insert(0) += 1;
-        }
     }
 
     let mut result = Vec::new();
@@ -991,15 +965,13 @@ pub fn create_irma_summary_vec(
     sample_list: &[String],
     reads_count_vec: &[MeltedRecord],
     calc_cov_vec: &[ProcessedCoverage],
-    alleles_vec: &[AllelesData],
-    indels_vec: &[IndelsData],
+    filtered_minor_vars_vec: &[MinorVariantsData],
     subtype_vec: &[Subtype],
     metadata: &Metadata,
     pos_calc_cov_vec: Option<&[ProcessedCoverage]>,
 ) -> Result<Vec<IRMASummary>, Box<dyn Error>> {
     let mut irma_summary: Vec<IRMASummary> = Vec::new();
-    let allele_count_data = count_minority_alleles(alleles_vec);
-    let indel_count_data = count_minority_indels(indels_vec);
+    let filtered_minor_vars_count = count_minor_variants(filtered_minor_vars_vec);
 
     // Populate irma_summary with initial data from reads_count_vec
     for sample in sample_list {
@@ -1015,8 +987,7 @@ pub fn create_irma_summary_vec(
                     reads_mapped: Some(entry.reads_mapped),
                     percent_reference_coverage: None,
                     median_coverage: None,
-                    count_minor_snv: Some(0),
-                    count_minor_indel: Some(0),
+                    count_minor_snv_at_or_over_5_pct: Some(0),
                     spike_percent_coverage: None,
                     spike_median_coverage: None,
                     pass_fail_reason: None,
@@ -1037,8 +1008,7 @@ pub fn create_irma_summary_vec(
                 reads_mapped: Some(0),
                 percent_reference_coverage: Some(0.0),
                 median_coverage: Some(0),
-                count_minor_snv: Some(0),
-                count_minor_indel: Some(0),
+                count_minor_snv_at_or_over_5_pct: Some(0),
                 spike_percent_coverage: None,
                 spike_median_coverage: None,
                 pass_fail_reason: Some("Fail".to_owned()),
@@ -1075,19 +1045,11 @@ pub fn create_irma_summary_vec(
             }
         }
 
-        for entry in &allele_count_data {
+        for entry in &filtered_minor_vars_count {
             if sample.sample_id == entry.sample_id.clone()
                 && sample.reference == Some(entry.reference.clone())
             {
-                sample.count_minor_snv = Some(entry.minor_variant_count);
-            }
-        }
-
-        for entry in &indel_count_data {
-            if sample.sample_id == entry.sample_id.clone()
-                && sample.reference == Some(entry.reference.clone())
-            {
-                sample.count_minor_indel = Some(entry.minor_variant_count);
+                sample.count_minor_snv_at_or_over_5_pct = Some(entry.minor_variant_count);
             }
         }
 
@@ -1152,7 +1114,7 @@ impl IRMASummary {
             }
         }
 
-        if let Some(minor_snv) = self.count_minor_snv
+        if let Some(minor_snv) = self.count_minor_snv_at_or_over_5_pct
             && minor_snv > qc_values.minor_vars.try_into().unwrap()
         {
             let new_entry = format!(
@@ -1170,32 +1132,30 @@ impl IRMASummary {
             self.pass_fail_reason = Some("Pass".to_string());
         }
 
-        if let Some(spike_coverage) = self.spike_percent_coverage {
-            if let Some(perc_ref_spike_covered) = qc_values.perc_ref_spike_covered {
-                if spike_coverage < f64::from(perc_ref_spike_covered) {
-                    let new_entry = format!(
-                        "Less than {}% of S gene reference covered",
-                        qc_values.perc_ref_covered
-                    );
-                    if let Some(ref mut pf_reason) = self.pass_fail_reason {
-                        append_with_delim(pf_reason, &new_entry, ';');
-                    } else {
-                        self.pass_fail_reason = Some(new_entry);
-                    }
-                }
+        if let Some(spike_coverage) = self.spike_percent_coverage
+            && let Some(perc_ref_spike_covered) = qc_values.perc_ref_spike_covered
+            && spike_coverage < f64::from(perc_ref_spike_covered)
+        {
+            let new_entry = format!(
+                "Less than {}% of S gene reference covered",
+                qc_values.perc_ref_covered
+            );
+            if let Some(ref mut pf_reason) = self.pass_fail_reason {
+                append_with_delim(pf_reason, &new_entry, ';');
+            } else {
+                self.pass_fail_reason = Some(new_entry);
             }
         }
 
-        if let Some(spike_med_cov) = self.spike_median_coverage {
-            if let Some(spike_med_covered) = qc_values.med_spike_cov {
-                if spike_med_cov < spike_med_covered.try_into().unwrap() {
-                    let new_entry = format!("Median coverage of S gene < {}", qc_values.med_cov);
-                    if let Some(ref mut pf_reason) = self.pass_fail_reason {
-                        append_with_delim(pf_reason, &new_entry, ';');
-                    } else {
-                        self.pass_fail_reason = Some(new_entry);
-                    }
-                }
+        if let Some(spike_med_cov) = self.spike_median_coverage
+            && let Some(spike_med_covered) = qc_values.med_spike_cov
+            && spike_med_cov < spike_med_covered.try_into().unwrap()
+        {
+            let new_entry = format!("Median coverage of S gene < {}", qc_values.med_cov);
+            if let Some(ref mut pf_reason) = self.pass_fail_reason {
+                append_with_delim(pf_reason, &new_entry, ';');
+            } else {
+                self.pass_fail_reason = Some(new_entry);
             }
         }
 
@@ -1230,62 +1190,61 @@ pub fn create_nt_seq_vec(
             let sample_id = parts[1].to_string();
 
             for sample in vtype_vec {
-                if let Some(vtype_sample_id) = &sample.sample_id {
-                    if sample_id == *vtype_sample_id {
-                        //A vs B segemnt identificaiton logic
-                        let segment = if sample.vtype == "A" {
-                            match segment_number {
-                                "1" => Some("PB2"),
-                                "2" => Some("PB1"),
-                                "3" => Some("PA"),
-                                "4" => Some("HA"),
-                                "5" => Some("NP"),
-                                "6" => Some("NA"),
-                                "7" => Some("MP"),
-                                "8" => Some("NS"),
-                                _ => None,
-                            }
-                        } else if sample.vtype == "B" {
-                            match segment_number {
-                                "1" => Some("PB1"),
-                                "2" => Some("PB2"),
-                                "3" => Some("PA"),
-                                "4" => Some("HA"),
-                                "5" => Some("NP"),
-                                "6" => Some("NA"),
-                                "7" => Some("MP"),
-                                "8" => Some("NS"),
-                                _ => None,
-                            }
-                        } else {
-                            None
-                        };
-
-                        let mut assigned_segment = String::new();
-                        if let Some(segment) = segment {
-                            assigned_segment = (*segment).to_string();
+                if let Some(vtype_sample_id) = &sample.sample_id
+                    && sample_id == *vtype_sample_id
+                {
+                    //A vs B segemnt identificaiton logic
+                    let segment = if sample.vtype == "A" {
+                        match segment_number {
+                            "1" => Some("PB2"),
+                            "2" => Some("PB1"),
+                            "3" => Some("PA"),
+                            "4" => Some("HA"),
+                            "5" => Some("NP"),
+                            "6" => Some("NA"),
+                            "7" => Some("MP"),
+                            "8" => Some("NS"),
+                            _ => None,
                         }
+                    } else if sample.vtype == "B" {
+                        match segment_number {
+                            "1" => Some("PB1"),
+                            "2" => Some("PB2"),
+                            "3" => Some("PA"),
+                            "4" => Some("HA"),
+                            "5" => Some("NP"),
+                            "6" => Some("NA"),
+                            "7" => Some("MP"),
+                            "8" => Some("NS"),
+                            _ => None,
+                        }
+                    } else {
+                        None
+                    };
 
-                        for record in irma_summary_vec {
-                            if let Some(record_sample_id) = &record.sample_id {
-                                if sample_id == *record_sample_id
-                                    && record.reference == Some(sample.original_ref.clone())
-                                    && assigned_segment == sample.ref_type
-                                {
-                                    nt_seq_vec.push(NTSequences {
-                                        sample_id: sample_id.clone(),
-                                        sequence: entry.sequence.clone(),
-                                        target_ref: Some(assigned_segment.clone()),
-                                        reference: sample.original_ref.clone(),
-                                        qc_decision: record
-                                            .pass_fail_reason
-                                            .clone()
-                                            .unwrap_or_else(String::new),
-                                        runid: runid.to_owned(),
-                                        instrument: instrument.to_owned(),
-                                    });
-                                }
-                            }
+                    let mut assigned_segment = String::new();
+                    if let Some(segment) = segment {
+                        assigned_segment = (*segment).to_string();
+                    }
+
+                    for record in irma_summary_vec {
+                        if let Some(record_sample_id) = &record.sample_id
+                            && sample_id == *record_sample_id
+                            && record.reference == Some(sample.original_ref.clone())
+                            && assigned_segment == sample.ref_type
+                        {
+                            nt_seq_vec.push(NTSequences {
+                                sample_id: sample_id.clone(),
+                                sequence: entry.sequence.clone(),
+                                target_ref: Some(assigned_segment.clone()),
+                                reference: sample.original_ref.clone(),
+                                qc_decision: record
+                                    .pass_fail_reason
+                                    .clone()
+                                    .unwrap_or_else(String::new),
+                                runid: runid.to_owned(),
+                                instrument: instrument.to_owned(),
+                            });
                         }
                     }
                 }
@@ -1294,21 +1253,18 @@ pub fn create_nt_seq_vec(
     } else {
         for entry in seq_data {
             for record in irma_summary_vec {
-                if let Some(record_sample_id) = &record.sample_id {
-                    if entry.name == *record_sample_id {
-                        nt_seq_vec.push(NTSequences {
-                            sample_id: record_sample_id.clone(),
-                            sequence: entry.sequence.clone(),
-                            target_ref: None,
-                            reference: record.reference.clone().unwrap_or(String::new()),
-                            qc_decision: record
-                                .pass_fail_reason
-                                .clone()
-                                .unwrap_or_else(String::new),
-                            runid: runid.to_owned(),
-                            instrument: instrument.to_owned(),
-                        });
-                    }
+                if let Some(record_sample_id) = &record.sample_id
+                    && entry.name == *record_sample_id
+                {
+                    nt_seq_vec.push(NTSequences {
+                        sample_id: record_sample_id.clone(),
+                        sequence: entry.sequence.clone(),
+                        target_ref: None,
+                        reference: record.reference.clone().unwrap_or(String::new()),
+                        qc_decision: record.pass_fail_reason.clone().unwrap_or_else(String::new),
+                        runid: runid.to_owned(),
+                        instrument: instrument.to_owned(),
+                    });
                 }
             }
         }

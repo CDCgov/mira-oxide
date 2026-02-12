@@ -1,6 +1,6 @@
 #![allow(clippy::format_push_string, clippy::too_many_lines)]
 use super::coverage_json_per_sample::SampleCoverageJson;
-use super::data_ingest::{AllelesData, IndelsData};
+use super::data_ingest::{MinorVariantsData, IndelsData};
 use super::reads_to_sankey_json::SampleSankeyJson;
 use crate::utils::data_processing::{DaisVarsData, IRMASummary};
 use glob::glob;
@@ -237,16 +237,15 @@ fn irma_summary_to_plotly_json(summary: &[IRMASummary]) -> String {
                 .map_or(String::new(), |v| format!("{v:.2}")),
         );
         columns[6].push(row.median_coverage.map_or(String::new(), |v| v.to_string()));
-        columns[7].push(row.count_minor_snv.map_or(String::new(), |v| v.to_string()));
-        columns[8].push(
-            row.count_minor_indel
+        columns[7].push(
+            row.count_minor_snv_at_or_over_5_pct
                 .map_or(String::new(), |v| v.to_string()),
         );
-        columns[9].push(row.pass_fail_reason.as_deref().unwrap_or("").to_string());
-        columns[10].push(row.subtype.as_deref().unwrap_or("").to_string());
-        columns[11].push(row.mira_module.as_deref().unwrap_or("").to_string());
-        columns[12].push(row.runid.as_deref().unwrap_or("").to_string());
-        columns[13].push(row.instrument.as_deref().unwrap_or("").to_string());
+        columns[8].push(row.pass_fail_reason.as_deref().unwrap_or("").to_string());
+        columns[9].push(row.subtype.as_deref().unwrap_or("").to_string());
+        columns[10].push(row.mira_module.as_deref().unwrap_or("").to_string());
+        columns[11].push(row.runid.as_deref().unwrap_or("").to_string());
+        columns[12].push(row.instrument.as_deref().unwrap_or("").to_string());
     }
 
     json!({
@@ -268,10 +267,10 @@ fn dais_vars_to_plotly_json(vars: &[DaisVarsData]) -> String {
 
     for row in vars {
         columns[0].push(row.sample_id.as_deref().unwrap_or("").to_string());
-        columns[1].push(row.reference_id.to_string());
-        columns[2].push(row.protein.to_string());
+        columns[1].push(row.reference_id.clone());
+        columns[2].push(row.protein.clone());
         columns[3].push(row.aa_variant_count.to_string());
-        columns[4].push(row.aa_variants.to_string());
+        columns[4].push(row.aa_variants.clone());
     }
 
     serde_json::json!({
@@ -281,7 +280,7 @@ fn dais_vars_to_plotly_json(vars: &[DaisVarsData]) -> String {
     .to_string()
 }
 
-fn alleles_to_plotly_json(data: &[AllelesData], virus: &str) -> String {
+fn alleles_to_plotly_json(data: &[MinorVariantsData], virus: &str) -> String {
     let headers = if virus == "sc2-spike" {
         [
             "Sample",
@@ -316,14 +315,14 @@ fn alleles_to_plotly_json(data: &[AllelesData], virus: &str) -> String {
     for row in data {
         if virus == "sc2-spike" {
             columns[0].push(row.sample_id.as_deref().unwrap_or("").to_string());
-            columns[1].push(row.reference.to_string());
+            columns[1].push(row.reference.clone());
             columns[2].push(
                 row.reference_position
                     .map_or(String::new(), |v| v.to_string()),
             );
             columns[3].push(row.coverage.to_string());
-            columns[4].push(row.consensus_allele.to_string());
-            columns[5].push(row.minority_allele.to_string());
+            columns[4].push(row.consensus_allele.clone());
+            columns[5].push(row.minority_allele.clone());
             columns[6].push(row.consensus_count.to_string());
             columns[7].push(row.minority_count.to_string());
             columns[8].push(format!("{:.4}", row.minority_frequency));
@@ -331,11 +330,11 @@ fn alleles_to_plotly_json(data: &[AllelesData], virus: &str) -> String {
             columns[10].push(row.instrument.as_deref().unwrap_or("").to_string());
         } else {
             columns[0].push(row.sample_id.as_deref().unwrap_or("").to_string());
-            columns[1].push(row.reference.to_string());
+            columns[1].push(row.reference.clone());
             columns[2].push(row.sample_position.to_string());
             columns[3].push(row.coverage.to_string());
-            columns[4].push(row.consensus_allele.to_string());
-            columns[5].push(row.minority_allele.to_string());
+            columns[4].push(row.consensus_allele.clone());
+            columns[5].push(row.minority_allele.clone());
             columns[6].push(row.consensus_count.to_string());
             columns[7].push(row.minority_count.to_string());
             columns[8].push(format!("{:.4}", row.minority_frequency));
@@ -387,7 +386,7 @@ fn indels_to_plotly_json(data: &[IndelsData], virus: &str) -> String {
     for row in data {
         if virus == "sc2-spike" {
             columns[0].push(row.sample_id.as_deref().unwrap_or("").to_string());
-            columns[1].push(row.reference_name.to_string());
+            columns[1].push(row.reference_name.clone());
             columns[2].push(
                 row.reference_upstream_position
                     .as_deref()
@@ -396,7 +395,7 @@ fn indels_to_plotly_json(data: &[IndelsData], virus: &str) -> String {
             );
             columns[3].push(row.insert.as_deref().unwrap_or("").to_string());
             columns[4].push(row.length.map_or(String::new(), |v| v.to_string()));
-            columns[5].push(row.context.to_string());
+            columns[5].push(row.context.clone());
             columns[6].push(row.count.to_string());
             columns[7].push(row.total.to_string());
             columns[8].push(format!("{:.2}", row.frequency));
@@ -404,7 +403,7 @@ fn indels_to_plotly_json(data: &[IndelsData], virus: &str) -> String {
             columns[10].push(row.instrument.as_deref().unwrap_or("").to_string());
         } else {
             columns[0].push(row.sample_id.as_deref().unwrap_or("").to_string());
-            columns[1].push(row.reference_name.to_string());
+            columns[1].push(row.reference_name.clone());
             columns[2].push(
                 row.sample_upstream_position
                     .as_deref()
@@ -413,7 +412,7 @@ fn indels_to_plotly_json(data: &[IndelsData], virus: &str) -> String {
             );
             columns[3].push(row.insert.as_deref().unwrap_or("").to_string());
             columns[4].push(row.length.map_or(String::new(), |v| v.to_string()));
-            columns[5].push(row.context.to_string());
+            columns[5].push(row.context.clone());
             columns[6].push(row.count.to_string());
             columns[7].push(row.total.to_string());
             columns[8].push(format!("{:.2}", row.frequency));
@@ -434,7 +433,7 @@ pub fn generate_html_report(
     output_path: &Path,
     irma_summary: &[IRMASummary],
     dais_vars_data: &[DaisVarsData],
-    minor_variants: &[AllelesData],
+    minor_variants: &[MinorVariantsData],
     indels: &[IndelsData],
     barcode_distribution_json: &serde_json::Value,
     pass_fail_heatmap_json: &serde_json::Value,

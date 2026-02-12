@@ -1,9 +1,11 @@
 pub mod all_sample_hd;
 pub mod all_sample_nt_diffs;
 pub mod check_mira_version;
+pub mod create_nextflow_samplesheet;
 pub mod find_chemistry;
 pub mod plotter;
 pub mod positions_of_interest;
 pub mod prepare_mira_reports;
+pub mod samplesheet_check;
 pub mod summary_report_update;
 pub mod variants_of_interest;

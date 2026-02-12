@@ -8,10 +8,12 @@ use crate::processes::{
     all_sample_hd::{HammingArgs, all_sample_hd_process},
     all_sample_nt_diffs::{NTDiffsArgs, all_sample_nt_diffs_process},
     check_mira_version::{MiraVersionArgs, check_mira_version},
+    create_nextflow_samplesheet::{SamplesheetArgs, create_nextflow_samplesheet},
     find_chemistry::{FindChemArgs, find_chemistry_process},
     plotter::{PlotterArgs, plotter_process},
     positions_of_interest::{PositionsArgs, positions_of_interest_process},
     prepare_mira_reports::{ReportsArgs, prepare_mira_reports_process},
+    samplesheet_check::{SamplesheetCheckArgs, samplesheet_check},
     summary_report_update::{SummaryUpdateArgs, summary_report_update_process},
     variants_of_interest::{VariantsArgs, variants_of_interest_process},
 };
@@ -46,6 +48,10 @@ enum Commands {
     PrepareMiraReports(ReportsArgs),
     /// Summary report update
     SummaryReportUpdate(SummaryUpdateArgs),
+    /// Create Nextflow samplesheet
+    CreateNextflowSamplesheet(SamplesheetArgs),
+    /// Samplesheet Nextflow format validation
+    SamplesheetCheck(SamplesheetCheckArgs),
 }
 
 fn main() {
@@ -81,6 +87,13 @@ fn main() {
         Commands::SummaryReportUpdate(cmd_args) => {
             summary_report_update_process(&cmd_args)
                 .unwrap_or_else(|e| panic!("{module}::SummaryReportUpdate: {e}"));
+        }
+        Commands::CreateNextflowSamplesheet(cmd_args) => {
+            create_nextflow_samplesheet(&cmd_args)
+                .unwrap_or_die(&format!("{module}::CreateNextflowSamplesheet"));
+        }
+        Commands::SamplesheetCheck(cmd_args) => {
+            samplesheet_check(&cmd_args).unwrap_or_die(&format!("{module}::SamplesheetCheck"));
         }
     }
 }

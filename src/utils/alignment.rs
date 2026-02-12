@@ -1,7 +1,11 @@
 use zoe::{
-    alignment::{ScalarProfile, sw::sw_scalar_alignment},
+    alignment::{LocalProfiles, MaybeAligned},
     data::{ByteIndexMap, WeightMatrix},
+    prelude::{ProfileSets, SeqSrc},
 };
+
+// note, in the future, we may want to revise this function to take a pre-built
+// profile, since the outer loop calling this function in variants_of_interest
 
 #[must_use]
 pub fn align_sequences<'a>(query: &'a [u8], reference: &'a [u8]) -> (Vec<u8>, Vec<u8>) {
@@ -10,15 +14,15 @@ pub fn align_sequences<'a>(query: &'a [u8], reference: &'a [u8]) -> (Vec<u8>, Ve
     const GAP_OPEN: i8 = -1;
     const GAP_EXTEND: i8 = 0;
 
-    let profile = ScalarProfile::<6>::new(query, &WEIGHTS, GAP_OPEN, GAP_EXTEND)
+    let profile = LocalProfiles::new_with_w256(query, &WEIGHTS, GAP_OPEN, GAP_EXTEND)
         .expect("Alignment profile failed");
-    let alignment = sw_scalar_alignment(reference, &profile);
+    let alignment = profile.sw_align_from_i8(SeqSrc::Reference(reference));
     let alignment = match alignment {
-        zoe::alignment::MaybeAligned::Some(alignment) => alignment,
-        zoe::alignment::MaybeAligned::Overflowed => {
-            unreachable!("Overflow will not occur in scalar alignments")
+        MaybeAligned::Some(alignment) => alignment,
+        MaybeAligned::Overflowed => {
+            panic!("The alignment score has overflowed the capacity of an i32")
         }
-        zoe::alignment::MaybeAligned::Unmapped => {
+        MaybeAligned::Unmapped => {
             return (Vec::new(), Vec::new());
         }
     };
