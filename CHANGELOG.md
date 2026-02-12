@@ -6,15 +6,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.4.0] - 2025-02-12
 
 - [Amanda Sullivan](https://github.com/mandysulli)
+- [Sam Wiley](https://github.com/samcwiley)
 
 ### `Added`
 - [PR #64](https://github.com/CDCgov/mira-oxide/pull/64) - Added create_nextflow_samplesheet.rs to replace create_nextflow_samplesheet_i.py and create_nextflow_samplesheet+o.py in MIRA-NF. Takes the input samplesheet and fastq files and puts them into the nextflow sampleseet format.
 - [PR #64](https://github.com/CDCgov/mira-oxide/pull/64) - Added added functionality to create_nextflow_samplesheet.rs that tells user when fastq files are missing or empty
+- [PR #64](https://github.com/CDCgov/mira-oxide/pull/64) - Zoe alignment to use simd instead of scalar
 - [PR #65](https://github.com/CDCgov/mira-oxide/pull/65) - replaced alleles.json with minor_variants.json - may break MIRA GUI
 
 ### `Fixed`
-- [PR #64](https://github.com/CDCgov/mira-oxide/pull/64) - Zoe alignment syntax to be compatible with update
 - [PR #65](https://github.com/CDCgov/mira-oxide/pull/65) - reading in the allAlleles.txt files for the all_alleles.parq now - may break schemas
+
+### `Dependencies`
+- [PR #64](https://github.com/CDCgov/mira-oxide/pull/64) - Zoe alignment syntax to be compatible with update
 
 ### `Deprecated`
 - [PR #65](https://github.com/CDCgov/mira-oxide/pull/65) - No longer making alleles.json or all_alleles.csv
