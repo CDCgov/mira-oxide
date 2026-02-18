@@ -127,11 +127,15 @@ jobs:
           VERSION=${REPO}:${{ github.ref_name }}
           LATEST=${REPO}:latest
 
-          docker manifest create $VERSION --amend ${LATEST}-x86_64 --amend ${LATEST}-aarch64 \
-            && docker manifest push $VERSION
+          docker buildx imagetools create \
+            -t $VERSION \
+            ${LATEST}-x86_64 \
+            ${LATEST}-aarch64
 
-          docker manifest create $LATEST --amend ${LATEST}-x86_64 --amend ${LATEST}-aarch64 \
-            && docker manifest push $LATEST
+          docker buildx imagetools create \
+            -t $LATEST \
+            ${LATEST}-x86_64 \
+            ${LATEST}-aarch64
 
   build-mac-artifacts:
     name: Build Mac Artifacts
