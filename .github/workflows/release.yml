@@ -45,7 +45,14 @@ jobs:
   build-release-image-and-linux-artifacts:
     name: Build Linux Artifacts and Images
     needs: [create-release]
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-latest
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
     permissions:
       contents: write
       packages: write
@@ -65,37 +72,70 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ github.repository }}
           tags: |
-            type=raw,value=${{ github.ref_name }}
-            type=raw,value=latest
+            type=raw,value=latest-${{ matrix.arch }}
 
-      - name: Build and push multi-arch Docker images
+      - name: Debug Git ref
+        run: |
+          echo "GITHUB_REF: $GITHUB_REF"
+          echo "GITHUB_REF_NAME: $GITHUB_REF_NAME"
+          echo "GITHUB_SHA: $GITHUB_SHA"
+          echo "GITHUB_REPOSITORY: $GITHUB_REPOSITORY"
+
+      - name: Build and push Docker image
         uses: docker/build-push-action@v6
         with:
           file: Dockerfile
           context: .
           push: true
-          platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
 
-      - name: Prepare Linux Binaries
+      - name: Prepare Linux Binary
         shell: bash
         run: |
-          for arch in x86_64 aarch64; do
-            IMAGE_TAG=$(echo "${{ steps.meta.outputs.tags }}" | grep -- "-$arch$" | head -n 1)
-            docker create --name temp-container $IMAGE_TAG
-            docker cp temp-container:/app/${{ env.RELEASE_BIN }} ./${{ env.RELEASE_BIN }}-$arch
-            docker rm temp-container
-            tar -czf ${{ env.RELEASE_BIN }}-linux-$arch-${{ github.ref_name }}.tar.gz ${{ env.RELEASE_BIN }}-$arch
-          done
+          IMAGE_TAG=$(echo "${{ steps.meta.outputs.tags }}" | grep -- '-${{ matrix.arch }}$' | head -n 1)
+          docker create --name temp-container $IMAGE_TAG \
+          && docker cp temp-container:/app/${RELEASE_BIN} ./${RELEASE_BIN} \
+          && docker rm temp-container \
+          && tar -czf ${RELEASE_BIN}-linux-${{ matrix.arch }}-${{ github.ref_name }}.tar.gz ${RELEASE_BIN}
 
-      - name: Upload Linux Release Assets
+      - name: Upload Linux Release Asset
         shell: bash
         run: |
-          for arch in x86_64 aarch64; do
-            gh release upload "${{ github.ref_name }}" ${{ env.RELEASE_BIN }}-linux-$arch-${{ github.ref_name }}.tar.gz
-          done
+          gh release upload "${{ github.ref_name }}" ${RELEASE_BIN}-linux-${{ matrix.arch }}-${{ github.ref_name }}.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  create-image-manifest:
+    name: Create Image Manifest
+    needs: build-release-image-and-linux-artifacts
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+      contents: read
+    steps:
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create and push manifests
+        shell: bash
+        run: |
+          REPO=$(echo "${{ env.REGISTRY }}/${{ github.repository }}" | tr '[A-Z]' '[a-z]')
+          VERSION=${REPO}:${{ github.ref_name }}
+          LATEST=${REPO}:latest
+
+          docker buildx imagetools create \
+            -t $VERSION \
+            ${LATEST}-x86_64 \
+            ${LATEST}-aarch64
+
+          docker buildx imagetools create \
+            -t $LATEST \
+            ${LATEST}-x86_64 \
+            ${LATEST}-aarch64
 
   build-mac-artifacts:
     name: Build Mac Artifacts
