@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### `Fixed`
 - [PR #65](https://github.com/CDCgov/mira-oxide/pull/65) - reading in the allAlleles.txt files for the all_alleles.parq now - may break schemas
-
+- [PR #67](https://github.com/CDCgov/mira-oxide/pull/67) - updated github actions so that it no longer fails
 ### `Dependencies`
 - [PR #64](https://github.com/CDCgov/mira-oxide/pull/64) - Zoe alignment syntax to be compatible with update
 
