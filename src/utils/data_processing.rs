@@ -8,6 +8,7 @@ use std::{
     io::{self, BufRead},
     path::Path,
 };
+use zoe::prelude::Nucleotides;
 
 use crate::processes::prepare_mira_reports::SamplesheetI;
 use crate::processes::prepare_mira_reports::SamplesheetO;
@@ -1066,17 +1067,58 @@ pub fn create_irma_summary_vec(
     Ok(irma_summary)
 }
 
-/// Combine all vec to create IRMA summary
+/// Helper function to map flu segment to number for mixed sample chcking
+fn get_seg_name(flu_type: &str, segment: &str) -> Option<&'static str> {
+    match (flu_type, segment) {
+        ("A", "2") | ("B", "1") => Some("PB1"),
+        ("A", "1") | ("B", "2") => Some("PB2"),
+        ("A" | "B", "3") => Some("PA"),
+        ("A" | "B", "4") => Some("HA"),
+        ("A" | "B", "5") => Some("NP"),
+        ("A" | "B", "6") => Some("NA"),
+        ("A" | "B", "7") => Some("M"),
+        ("A" | "B", "8") => Some("NS"),
+        _ => None,
+    }
+}
+
+/// Combine all qc info and add to IRMA summary
+#[allow(clippy::too_many_lines)]
 impl IRMASummary {
     pub fn add_pass_fail_qc(
         &mut self,
         dais_vars: &[DaisVarsData],
-        _seq_vec: &[SeqData],
+        seq_vec: &[SeqData],
         qc_values: &QCSettings,
     ) -> Result<Vec<IRMASummary>, Box<dyn Error>> {
         let irma_summary: Vec<IRMASummary> = Vec::new();
 
-        let _premature_stop_codon_vec = String::new();
+        for entry in seq_vec {
+            if let (Some((entry_sample, segment)), Some(sample_id), Some(reference)) = (
+                entry.name.split_once('_'),
+                self.sample_id.as_deref(),
+                self.reference.as_deref(),
+            ) {
+                if entry_sample != sample_id {
+                    continue;
+                }
+
+                let flu_type = match reference.chars().next() {
+                    Some('A') => "A",
+                    Some('B') => "B",
+                    _ => continue,
+                };
+
+                if let Some(seg_name) = get_seg_name(flu_type, segment)
+                    && reference.contains(seg_name)
+                {
+                    let nt_seq1: Nucleotides = entry.sequence.clone().into();
+
+                    println!("{nt_seq1}");
+                }
+            }
+        }
+
         if !qc_values.allow_stop_codons {
             for entry in dais_vars {
                 if self.sample_id == entry.sample_id

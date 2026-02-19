@@ -290,8 +290,6 @@ pub fn write_alleles_to_parquet(
     let reference_upstream_position_array: ArrayRef =
         Arc::new(Int32Array::from(reference_upstream_position_vec));
 
-    print!("{:?}", average_quality_array);
-
     // Define the schema for the Arrow IPC file
     let fields = vec![
         Field::new("sample_id", DataType::Utf8, true),
