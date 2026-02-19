@@ -8,7 +8,7 @@ use std::{
     io::{self, BufRead},
     path::Path,
 };
-use zoe::prelude::Nucleotides;
+use zoe::prelude::{Len, Nucleotides};
 
 use crate::processes::prepare_mira_reports::SamplesheetI;
 use crate::processes::prepare_mira_reports::SamplesheetO;
@@ -1113,8 +1113,19 @@ impl IRMASummary {
                     && reference.contains(seg_name)
                 {
                     let nt_seq1: Nucleotides = entry.sequence.clone().into();
+                    let seq_len = nt_seq1.len();
+                    let mut mix_base_count = 0;
 
-                    println!("{nt_seq1}");
+                    for base in nt_seq1 {
+                        if !matches!(base, b'A' | b'T' | b'C' | b'G' | b'N' | b'-') {
+                            mix_base_count += 1;
+                        }
+                    }
+
+                    println!(
+                        "{:?}:{:?}:{}",
+                        self.sample_id, self.reference, mix_base_count
+                    );
                 }
             }
         }
