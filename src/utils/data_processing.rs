@@ -1083,6 +1083,7 @@ fn get_seg_name(flu_type: &str, segment: &str) -> Option<&'static str> {
 }
 
 /// Combine all qc info and add to IRMA summary
+/// TODO:Come back and adjust non-flu viruses frequencies
 #[allow(clippy::too_many_lines)]
 impl IRMASummary {
     pub fn add_pass_fail_qc(
