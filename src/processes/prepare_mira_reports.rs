@@ -301,7 +301,7 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
     // Add pass fail information to irma summary
     for sample in &mut irma_summary {
         if sample.pass_fail_reason.is_none() {
-            sample.add_pass_fail_qc(&dais_vars_data, &seq_data, &qc_values)?;
+            sample.add_pass_fail_qc(&dais_vars_data, &seq_data, &qc_values, &args.virus)?;
         }
     }
 

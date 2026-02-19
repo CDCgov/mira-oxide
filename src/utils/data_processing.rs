@@ -1090,29 +1090,58 @@ impl IRMASummary {
         dais_vars: &[DaisVarsData],
         seq_vec: &[SeqData],
         qc_values: &QCSettings,
+        virus: &str,
     ) -> Result<Vec<IRMASummary>, Box<dyn Error>> {
         let irma_summary: Vec<IRMASummary> = Vec::new();
 
         // Checking the amended consensus nt seq for too many mixed bases
-        for entry in seq_vec {
-            if let (Some((entry_sample, segment)), Some(sample_id), Some(reference)) = (
-                entry.name.split_once('_'),
-                self.sample_id.as_deref(),
-                self.reference.as_deref(),
-            ) {
-                if entry_sample != sample_id {
-                    continue;
+        if virus == "flu" {
+            for entry in seq_vec {
+                if let (Some((entry_sample, segment)), Some(sample_id), Some(reference)) = (
+                    entry.name.split_once('_'),
+                    self.sample_id.as_deref(),
+                    self.reference.as_deref(),
+                ) {
+                    if entry_sample != sample_id {
+                        continue;
+                    }
+
+                    let flu_type = match reference.chars().next() {
+                        Some('A') => "A",
+                        Some('B') => "B",
+                        _ => continue,
+                    };
+
+                    if let Some(seg_name) = get_seg_name(flu_type, segment)
+                        && reference.contains(seg_name)
+                    {
+                        let nt_seq1: Nucleotides = entry.sequence.clone().into();
+                        let seq_len = nt_seq1.len();
+                        let mut mix_base_count = 0;
+
+                        for base in nt_seq1 {
+                            if !matches!(base, b'A' | b'T' | b'C' | b'G' | b'N' | b'-') {
+                                mix_base_count += 1;
+                            }
+                        }
+
+                        let freq_mixture = if seq_len > 0 {
+                            100.0 * (f64::from(mix_base_count) / seq_len as f64)
+                        } else {
+                            0.0
+                        };
+
+                        if freq_mixture > 0.33 && mix_base_count > 5 {
+                            self.pass_fail_reason = "Overabundance of Mixed Bases in Consensus"
+                                .to_string()
+                                .into();
+                        }
+                    }
                 }
-
-                let flu_type = match reference.chars().next() {
-                    Some('A') => "A",
-                    Some('B') => "B",
-                    _ => continue,
-                };
-
-                if let Some(seg_name) = get_seg_name(flu_type, segment)
-                    && reference.contains(seg_name)
-                {
+            }
+        } else {
+            for entry in seq_vec {
+                if self.sample_id == Some(entry.name.clone()) {
                     let nt_seq1: Nucleotides = entry.sequence.clone().into();
                     let seq_len = nt_seq1.len();
                     let mut mix_base_count = 0;
