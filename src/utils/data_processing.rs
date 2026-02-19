@@ -1093,6 +1093,7 @@ impl IRMASummary {
     ) -> Result<Vec<IRMASummary>, Box<dyn Error>> {
         let irma_summary: Vec<IRMASummary> = Vec::new();
 
+        // Checking the amended consensus nt seq for too many mixed bases
         for entry in seq_vec {
             if let (Some((entry_sample, segment)), Some(sample_id), Some(reference)) = (
                 entry.name.split_once('_'),
@@ -1122,10 +1123,17 @@ impl IRMASummary {
                         }
                     }
 
-                    println!(
-                        "{:?}:{:?}:{}",
-                        self.sample_id, self.reference, mix_base_count
-                    );
+                    let freq_mixture = if seq_len > 0 {
+                        100.0 * (f64::from(mix_base_count) / seq_len as f64)
+                    } else {
+                        0.0
+                    };
+
+                    if freq_mixture > 0.33 && mix_base_count > 5 {
+                        self.pass_fail_reason = "Overabundance of Mixed Bases in Consensus"
+                            .to_string()
+                            .into();
+                    }
                 }
             }
         }
