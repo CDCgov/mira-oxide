@@ -3,6 +3,14 @@
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.1] - 2025-02-26
+
+- [Amanda Sullivan](https://github.com/mandysulli)
+
+
+### `Fixed`
+- [PR #68](https://github.com/CDCgov/mira-oxide/pull/68) - Remove indel count collumn from statichtml since we no longer make that value
+
 ## [1.4.0] - 2025-02-12
 
 - [Amanda Sullivan](https://github.com/mandysulli)
