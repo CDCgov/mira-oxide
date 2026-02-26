@@ -1,6 +1,6 @@
 #![allow(clippy::format_push_string, clippy::too_many_lines)]
 use super::coverage_json_per_sample::SampleCoverageJson;
-use super::data_ingest::{MinorVariantsData, IndelsData};
+use super::data_ingest::{IndelsData, MinorVariantsData};
 use super::reads_to_sankey_json::SampleSankeyJson;
 use crate::utils::data_processing::{DaisVarsData, IRMASummary};
 use glob::glob;
@@ -217,7 +217,6 @@ fn irma_summary_to_plotly_json(summary: &[IRMASummary]) -> String {
         "% Reference Covered",
         "Median Coverage",
         "Count of Minor SNVs >= 0.05",
-        "Count of Minor Indels >= 0.05",
         "Pass/Fail Reason",
         "Subtype",
         "MIRA module",
