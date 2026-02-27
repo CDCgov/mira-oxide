@@ -40,6 +40,9 @@ RUN cat /etc/ssl/certs/ca.crt >> /etc/ssl/certs/ca-certificates.crt
 
 RUN apk update && apk add --no-cache bash
 
+## Add aws-cli for amd platform
+RUN apk add --no-cache aws-cli && mkdir -p /home/ec2-user/miniconda/bin && ln -sf /usr/bin/aws /home/ec2-user/miniconda/bin/aws
+
 # Set workdir
 WORKDIR /app
 
