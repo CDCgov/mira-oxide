@@ -245,7 +245,7 @@ pub fn write_out_all_csv_mira_reports(
     )?;
 
     // write out the mira_{runid}_summary.csv
-    let summary_columns: Vec<&str> = if virus == "sc2-wgs" {
+    let summary_struct_values: Vec<&str> = if virus == "sc2-wgs" {
         vec![
             "sample_id",
             "total_reads",
@@ -281,11 +281,47 @@ pub fn write_out_all_csv_mira_reports(
         ]
     };
 
+    let summary_columns: Vec<&str> = if virus == "sc2-wgs" {
+        vec![
+            "sample_id",
+            "total_reads",
+            "pass_qc",
+            "reads_mapped",
+            "reference",
+            "percent_reference_coverage",
+            "median_coverage",
+            "count_minor_snv_at_or_over_5_pct",
+            "spike_percent_coverage",
+            "spike_median_coverage",
+            "pass_fail_reason",
+            "subtype",
+            "mira_version;module;irma_config",
+            "runid",
+            "instrument",
+        ]
+    } else {
+        vec![
+            "sample_id",
+            "total_reads",
+            "pass_qc",
+            "reads_mapped",
+            "reference",
+            "percent_reference_coverage",
+            "median_coverage",
+            "count_minor_snv_at_or_over_5_pct",
+            "pass_fail_reason",
+            "subtype",
+            "mira_version;module;irma_config",
+            "runid",
+            "instrument",
+        ]
+    };
+
     write_structs_to_csv_file(
         &format!("{}/mira_{runid}_summary.csv", output_path.display()),
         irma_summary,
         &summary_columns,
-        &summary_columns,
+        &summary_struct_values,
     )?;
 
     // write out the amended_consensus
@@ -378,7 +414,7 @@ pub fn write_out_updated_summary_csv(
             "spike_median_coverage",
             "pass_fail_reason",
             "subtype",
-            "mira_module",
+            "mira_version;module;irma_config",
             "runid",
             "instrument",
             "nextclade_field_1",
@@ -398,7 +434,7 @@ pub fn write_out_updated_summary_csv(
             "count_minor_snv_at_or_over_5_pct",
             "pass_fail_reason",
             "subtype",
-            "mira_module",
+            "mira_version;module;irma_config",
             "runid",
             "instrument",
             "nextclade_field_1",
@@ -418,7 +454,7 @@ pub fn write_out_updated_summary_csv(
             "count_minor_snv_at_or_over_5_pct",
             "pass_fail_reason",
             "subtype",
-            "mira_module",
+            "mira_version;module;irma_config",
             "runid",
             "instrument",
             "nextclade_field_1",
@@ -440,7 +476,7 @@ pub fn write_out_updated_summary_csv(
             "spike_median_coverage",
             "pass_fail_reason",
             "subtype",
-            "mira_module",
+            "mira_version;module;irma_config",
             "runid",
             "instrument",
             "clade",
@@ -460,7 +496,7 @@ pub fn write_out_updated_summary_csv(
             "count_minor_snv_at_or_over_5_pct",
             "pass_fail_reason",
             "subtype",
-            "mira_module",
+            "mira_version;module;irma_config",
             "runid",
             "instrument",
             "clade",
@@ -480,7 +516,7 @@ pub fn write_out_updated_summary_csv(
             "count_minor_snv_at_or_over_5_pct",
             "pass_fail_reason",
             "subtype",
-            "mira_module",
+            "mira_version;module;irma_config",
             "runid",
             "instrument",
             "clade",

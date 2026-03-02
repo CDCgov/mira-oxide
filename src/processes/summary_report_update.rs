@@ -58,6 +58,7 @@ pub struct UpdatedIRMASummary {
     pub spike_median_coverage: Option<i32>,
     pub pass_fail_reason: Option<String>,
     pub subtype: Option<String>,
+    #[serde(rename = "mira_version;module;irma_config")]
     pub mira_module: Option<String>,
     pub runid: Option<String>,
     pub instrument: Option<String>,

@@ -556,7 +556,7 @@ pub fn write_irma_summary_to_parquet(
         Field::new("median_coverage", DataType::Int32, true),
         Field::new("count_minor_snv_at_or_over_5_pct", DataType::Int32, true),
         Field::new("pass_fail_reason", DataType::Utf8, true),
-        Field::new("mira_module", DataType::Utf8, true),
+        Field::new("mira_version;module;irma_config", DataType::Utf8, true),
         Field::new("runid", DataType::Utf8, true),
         Field::new("instrument", DataType::Utf8, true),
         Field::new("subtype", DataType::Utf8, true),
@@ -947,7 +947,7 @@ pub fn write_updated_irma_summary_to_parquet(
     // Common trailing fields
     fields.extend([
         Field::new("pass_fail_reason", DataType::Utf8, true),
-        Field::new("mira_module", DataType::Utf8, true),
+        Field::new("mira_version;module;irma_config", DataType::Utf8, true),
         Field::new("runid", DataType::Utf8, true),
         Field::new("instrument", DataType::Utf8, true),
         Field::new("subtype", DataType::Utf8, true),
