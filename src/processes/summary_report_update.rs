@@ -12,44 +12,34 @@ use crate::io::{
 
 #[derive(Debug, Parser)]
 #[command(
-    about = "Package for adding the nextclade clade results back into the summary.csv and sumary.parq files created by MIRA"
+    about = "Package for adding the nextclade clade results back into the summary.csv and summary.parq files created by MIRA"
 )]
 pub struct SummaryUpdateArgs {
     #[arg(short = 'i', long)]
-    /// The file path to the samples folders with nextclade outputs.
     nextclade_path: PathBuf,
 
     #[arg(short = 'o', long)]
-    /// The file path where the `summary_report_updates` outputs will be saved.
     output_path: PathBuf,
 
     #[arg(short = 's', long)]
-    /// The filepath to the input summary csv
     summary_csv: PathBuf,
 
     #[arg(short = 'v', long)]
-    /// The virus the the data was generated from.
-    /// Options: flu, sc2-wgs, sc2-spike or rsv
     virus: String,
 
     #[arg(short = 'r', long)]
-    /// The run id. Used to create custom file names associated with `run_id`.
     runid: String,
 
     #[arg(short = 'n', long)]
-    /// The nextclade version used.
     nextclade_version: String,
 
     #[arg(short = 'd', long)]
-    /// The nextclade dataset used.
     nextclade_dataset: String,
 
     #[arg(short = 't', long)]
-    /// The nextclade tag used.
     nextclade_tag: String,
 
     #[arg(short = 'f', long)]
-    /// (Optional) A flag to indicate whether to create parquet files.
     parq: bool,
 }
 
@@ -78,7 +68,6 @@ pub struct UpdatedIRMASummary {
 }
 
 fn normalize_nextclade_field(field: &mut Option<String>) {
-    // replace "na" (any case) with empty string
     if let Some(val) = field.as_ref()
         && val.eq_ignore_ascii_case("na")
     {
@@ -93,23 +82,17 @@ pub fn summary_report_update_process(args: &SummaryUpdateArgs) -> Result<(), Box
     let nextclade_data = nextclade_data_collection(&args.nextclade_path, &args.virus)?;
     println!("Finished ingesting data.");
 
-    // Build metadata string once
     let nextclade_info_value = format!(
         "{};{};{}",
         args.nextclade_version, args.nextclade_dataset, args.nextclade_tag
     );
 
-    // Build lookup table: sample_id -> NextcladeData
     let nextclade_map: HashMap<String, NextcladeData> = nextclade_data
         .into_iter()
         .filter_map(|n| n.sample_id.clone().map(|id| (id, n)))
         .collect();
 
-    // Merge nextclade data into summary
     for summary in &mut summary_data {
-        // Add nextclade metadata to every row
-        summary.nextclade_info = Some(nextclade_info_value.clone());
-
         let Some(sample_id) = &summary.sample_id else {
             continue;
         };
@@ -124,7 +107,6 @@ pub fn summary_report_update_process(args: &SummaryUpdateArgs) -> Result<(), Box
                         summary.nextclade_field_2 = nc.short_clade.clone();
                         summary.nextclade_field_3 = nc.subclade.clone();
 
-                        // If short_clade is missing → "na"
                         if summary
                             .nextclade_field_2
                             .as_ref()
@@ -133,7 +115,6 @@ pub fn summary_report_update_process(args: &SummaryUpdateArgs) -> Result<(), Box
                             summary.nextclade_field_2 = Some("na".to_string());
                         }
                     } else {
-                        // Non-HA flu segments → force "na"
                         summary.nextclade_field_1 = Some("na".to_string());
                         summary.nextclade_field_2 = Some("na".to_string());
                         summary.nextclade_field_3 = Some("na".to_string());
@@ -154,10 +135,21 @@ pub fn summary_report_update_process(args: &SummaryUpdateArgs) -> Result<(), Box
             }
         }
 
-        // NIf there is no nextclade results for a sample, set fields to "Undetermined"
+        // Normalize fields
         normalize_nextclade_field(&mut summary.nextclade_field_1);
         normalize_nextclade_field(&mut summary.nextclade_field_2);
         normalize_nextclade_field(&mut summary.nextclade_field_3);
+
+        // Only print nextclade_info if nextclade_field_1 is not empty
+        if summary
+            .nextclade_field_1
+            .as_ref()
+            .is_some_and(|s| !s.trim().is_empty())
+        {
+            summary.nextclade_info = Some(nextclade_info_value.clone());
+        } else {
+            summary.nextclade_info = Some("".to_string());
+        }
     }
 
     write_out_updated_summary_csv(&summary_data, &args.virus, &args.runid, &args.output_path)?;
