@@ -1,7 +1,7 @@
 #![allow(dead_code, unused_imports)]
 use std::{collections::HashMap, error::Error, path::PathBuf};
 
-use clap::Parser;
+use clap::{Parser, ValueHint};
 use serde::{Deserialize, Serialize};
 
 use crate::io::{
@@ -33,14 +33,37 @@ pub struct SummaryUpdateArgs {
     #[arg(short = 'n', long)]
     nextclade_version: String,
 
-    #[arg(short = 'd', long)]
-    nextclade_dataset: String,
-
-    #[arg(short = 't', long)]
-    nextclade_tag: String,
+    /// One or more tuples: dataset,tag,path
+    #[arg(short = 'm', long, value_parser, num_args = 1..)]
+    nextclade_metadata: Vec<NextcladeMetadata>,
 
     #[arg(short = 'f', long)]
     parq: bool,
+}
+
+/// Represents a single nextclade result (dataset, tag, TSV path)
+#[derive(Debug, Clone)]
+pub struct NextcladeMetadata {
+    pub dataset: String,
+    pub tag: String,
+    pub path: PathBuf,
+}
+
+impl std::str::FromStr for NextcladeMetadata {
+    type Err = String;
+
+    /// Parse from a string like "dataset,tag,/path/to/file.tsv"
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let parts: Vec<&str> = s.splitn(3, ',').collect();
+        if parts.len() != 3 {
+            return Err(format!("Expected 3 values separated by commas, got '{s}'"));
+        }
+        Ok(Self {
+            dataset: parts[0].to_string(),
+            tag: parts[1].to_string(),
+            path: PathBuf::from(parts[2]),
+        })
+    }
 }
 
 /// Summary struct
@@ -80,17 +103,21 @@ pub fn summary_report_update_process(args: &SummaryUpdateArgs) -> Result<(), Box
     println!("Starting data ingestion...");
     let summary_path = create_reader(&args.summary_csv)?;
     let mut summary_data: Vec<UpdatedIRMASummary> = read_csv(summary_path, true)?;
-    let nextclade_data = nextclade_data_collection(&args.nextclade_path, &args.virus)?;
-    println!("Finished ingesting data.");
 
-    let nextclade_info_value = format!(
-        "{};{};{}",
-        args.nextclade_version, args.nextclade_dataset, args.nextclade_tag
-    );
+    let nextclade_data: Vec<NextcladeData> =
+        nextclade_data_collection(&args.nextclade_path, &args.virus)?;
+
+    println!("Finished ingesting data.");
 
     let nextclade_map: HashMap<String, NextcladeData> = nextclade_data
         .into_iter()
         .filter_map(|n| n.sample_id.clone().map(|id| (id, n)))
+        .collect();
+
+    let metadata_map: HashMap<&str, &NextcladeMetadata> = args
+        .nextclade_metadata
+        .iter()
+        .map(|m| (m.dataset.as_str(), m))
         .collect();
 
     for summary in &mut summary_data {
@@ -134,23 +161,28 @@ pub fn summary_report_update_process(args: &SummaryUpdateArgs) -> Result<(), Box
 
                 _ => {}
             }
+
+            // Default to empty string
+            summary.nextclade_info = Some(String::new());
+
+            if let Some(nc_dataset) = &nc.dataset
+                && let Some(metadata_match) = metadata_map.get(nc_dataset.as_str())
+            {
+                let version = &args.nextclade_version;
+
+                let nextclade_info_value = format!(
+                    "{};{};{}",
+                    version, metadata_match.dataset, metadata_match.tag
+                );
+
+                summary.nextclade_info = Some(nextclade_info_value);
+            }
         }
 
         // Normalize fields
         normalize_nextclade_field(&mut summary.nextclade_field_1);
         normalize_nextclade_field(&mut summary.nextclade_field_2);
         normalize_nextclade_field(&mut summary.nextclade_field_3);
-
-        // Only print nextclade_info if nextclade_field_1 is not empty
-        if summary
-            .nextclade_field_1
-            .as_ref()
-            .is_some_and(|s| !s.trim().is_empty())
-        {
-            summary.nextclade_info = Some(nextclade_info_value.clone());
-        } else {
-            summary.nextclade_info = Some("".to_string());
-        }
     }
 
     write_out_updated_summary_csv(&summary_data, &args.virus, &args.runid, &args.output_path)?;

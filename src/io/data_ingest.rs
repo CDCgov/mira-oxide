@@ -285,6 +285,7 @@ pub struct DaisSeqData {
 /// Nextclade Data
 #[derive(Serialize, Deserialize, Debug)]
 pub struct NextcladeData {
+    pub dataset: Option<String>,
     #[serde(rename = "index")]
     pub index: Option<String>,
     #[serde(rename = "seqName")]
@@ -1027,7 +1028,7 @@ pub fn dais_ref_seq_data_collection(
 }
 
 /////////////// Data reading functions for Nextclade ///////////////
-///  Collect read data created by IRMA and save to vector of `ReadsData`
+/// Collect read data created by IRMA and save to vector of `NextcladeData`
 pub fn nextclade_data_collection(
     work_path: impl AsRef<Path>,
     virus: &str,
@@ -1037,11 +1038,8 @@ pub fn nextclade_data_collection(
     let patterns: Vec<String> = match virus {
         "flu" => vec![format!("{}/flu*ha.tsv", base)],
         "rsv" => vec![format!("{}/rsv_a.tsv", base), format!("{}/rsv_b.tsv", base)],
-        // There should be no sc2-spike nextclade results
         "sc2-wgs" => vec![format!("{}/sars-cov-2.tsv", base)],
-        _ => {
-            return Err(format!("Unsupported virus type: {virus}").into());
-        }
+        _ => return Err(format!("Unsupported virus type: {virus}").into()),
     };
 
     let mut nextclade_data = Vec::new();
@@ -1050,18 +1048,30 @@ pub fn nextclade_data_collection(
         for entry in glob(&pattern)? {
             match entry {
                 Ok(path) => {
+                    // Extract the base name of the file without extension
+                    let dataset_name = path
+                        .file_stem()
+                        .and_then(|s| s.to_str())
+                        .ok_or("Failed to get dataset name from file")?
+                        .to_string();
+
                     let file = File::open(&path)?;
                     let reader = BufReader::new(file);
 
                     let mut records: Vec<NextcladeData> = process_txt_without_sample(reader, true);
-                    // Get sample_id
+
+                    // Add sample_id and dataset
                     for record in &mut records {
                         record.sample_id = record
                             .seq_name
                             .split(" | ")
                             .next()
                             .map(std::string::ToString::to_string);
+
+                        // Add the dataset name derived from the TSV file
+                        record.dataset = Some(dataset_name.clone());
                     }
+
                     nextclade_data.append(&mut records);
                 }
                 Err(e) => eprintln!("Error reading file: {e}"),
