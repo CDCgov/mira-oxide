@@ -67,10 +67,6 @@ pub struct UpdatedIRMASummary {
 fn normalize_nextclade_field(field: &mut Option<String>) {
     let is_empty = field.as_ref().is_none_or(|s| s.trim().is_empty());
 
-    if is_empty {
-        *field = Some("Undetermined".to_string());
-    }
-
     // replace "na" (any case) with empty string
     if let Some(val) = field.as_ref()
         && val.eq_ignore_ascii_case("na")
@@ -131,16 +127,6 @@ pub fn summary_report_update_process(args: &SummaryUpdateArgs) -> Result<(), Box
                 }
                 "rsv" => {
                     summary.nextclade_field_1 = nc.clade.clone();
-                    summary.nextclade_field_2 = nc.g_clade.clone();
-
-                    // If g_clade is missing → "na"
-                    if summary
-                        .nextclade_field_2
-                        .as_ref()
-                        .is_none_or(|s| s.trim().is_empty())
-                    {
-                        summary.nextclade_field_2 = Some("na".to_string());
-                    }
                 }
                 _ => {}
             }

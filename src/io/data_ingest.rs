@@ -299,8 +299,6 @@ pub struct NextcladeData {
     pub clade_who: Option<String>,
     #[serde(rename = "Nextclade_pango")]
     pub nextclade_pango: Option<String>,
-    #[serde(rename = "G_clade")]
-    pub g_clade: Option<String>,
     pub sample_id: Option<String>,
 }
 
