@@ -384,6 +384,7 @@ pub fn write_out_updated_summary_csv(
             "nextclade_field_1",
             "nextclade_field_2",
             "nextclade_field_3",
+            "nextclade_info",
         ]
     } else if virus == "flu" {
         vec![
@@ -403,6 +404,7 @@ pub fn write_out_updated_summary_csv(
             "nextclade_field_1",
             "nextclade_field_2",
             "nextclade_field_3",
+            "nextclade_info",
         ]
     } else {
         vec![
@@ -420,7 +422,7 @@ pub fn write_out_updated_summary_csv(
             "runid",
             "instrument",
             "nextclade_field_1",
-            "nextclade_field_2",
+            "nextclade_info",
         ]
     };
 
@@ -444,6 +446,7 @@ pub fn write_out_updated_summary_csv(
             "clade",
             "clade_who",
             "nextclade_pango",
+            "nextclade_version;dataset;tag",
         ]
     } else if virus == "flu" {
         vec![
@@ -463,6 +466,7 @@ pub fn write_out_updated_summary_csv(
             "clade",
             "short_clade",
             "subclade",
+            "nextclade_version;dataset;tag",
         ]
     } else {
         vec![
@@ -480,7 +484,7 @@ pub fn write_out_updated_summary_csv(
             "runid",
             "instrument",
             "clade",
-            "g_clade",
+            "nextclade_version;dataset;tag",
         ]
     };
 
