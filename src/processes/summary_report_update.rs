@@ -162,27 +162,35 @@ pub fn summary_report_update_process(args: &SummaryUpdateArgs) -> Result<(), Box
                 _ => {}
             }
 
-            // Default to empty string
-            summary.nextclade_info = Some(String::new());
+            // Normalize fields first
+            normalize_nextclade_field(&mut summary.nextclade_field_1);
+            normalize_nextclade_field(&mut summary.nextclade_field_2);
+            normalize_nextclade_field(&mut summary.nextclade_field_3);
 
-            if let Some(nc_dataset) = &nc.dataset
-                && let Some(metadata_match) = metadata_map.get(nc_dataset.as_str())
-            {
-                let version = &args.nextclade_version;
+            // Only add nextclade_info if nextclade_field_1 is NOT empty
+            let field_1_is_nonempty = summary
+                .nextclade_field_1
+                .as_ref()
+                .is_some_and(|s| !s.trim().is_empty());
 
-                let nextclade_info_value = format!(
-                    "{};{};{}",
-                    version, metadata_match.dataset, metadata_match.tag
-                );
+            if field_1_is_nonempty {
+                if let Some(nc_dataset) = &nc.dataset
+                    && let Some(metadata_match) = metadata_map.get(nc_dataset.as_str())
+                {
+                    let version = &args.nextclade_version;
 
-                summary.nextclade_info = Some(nextclade_info_value);
+                    summary.nextclade_info = Some(format!(
+                        "{};{};{}",
+                        version, metadata_match.dataset, metadata_match.tag
+                    ));
+                }
+            } else {
+                summary.nextclade_info = Some(String::new());
             }
+        } else {
+            // If no nextclade match at all
+            summary.nextclade_info = Some(String::new());
         }
-
-        // Normalize fields
-        normalize_nextclade_field(&mut summary.nextclade_field_1);
-        normalize_nextclade_field(&mut summary.nextclade_field_2);
-        normalize_nextclade_field(&mut summary.nextclade_field_3);
     }
 
     write_out_updated_summary_csv(&summary_data, &args.virus, &args.runid, &args.output_path)?;
