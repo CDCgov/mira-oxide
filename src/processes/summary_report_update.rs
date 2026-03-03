@@ -41,7 +41,6 @@ pub struct SummaryUpdateArgs {
     parq: bool,
 }
 
-/// Represents a single nextclade result (dataset, tag, TSV path)
 #[derive(Debug, Clone)]
 pub struct NextcladeMetadata {
     pub dataset: String,
@@ -52,7 +51,6 @@ pub struct NextcladeMetadata {
 impl std::str::FromStr for NextcladeMetadata {
     type Err = String;
 
-    /// Parse from a string like "dataset,tag,/path/to/file.tsv"
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let parts: Vec<&str> = s.splitn(3, ',').collect();
         if parts.len() != 3 {
@@ -66,7 +64,6 @@ impl std::str::FromStr for NextcladeMetadata {
     }
 }
 
-/// Summary struct
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct UpdatedIRMASummary {
     pub sample_id: Option<String>,
@@ -136,11 +133,25 @@ pub fn summary_report_update_process(args: &SummaryUpdateArgs) -> Result<(), Box
                         summary.nextclade_field_3 = nc.subclade.clone();
 
                         if summary
+                            .nextclade_field_1
+                            .as_ref()
+                            .is_none_or(|s| s.trim().is_empty())
+                        {
+                            summary.nextclade_field_1 = Some("na".to_string());
+                        }
+                        if summary
                             .nextclade_field_2
                             .as_ref()
                             .is_none_or(|s| s.trim().is_empty())
                         {
                             summary.nextclade_field_2 = Some("na".to_string());
+                        }
+                        if summary
+                            .nextclade_field_3
+                            .as_ref()
+                            .is_none_or(|s| s.trim().is_empty())
+                        {
+                            summary.nextclade_field_3 = Some("na".to_string());
                         }
                     } else {
                         summary.nextclade_field_1 = Some("na".to_string());
@@ -153,21 +164,59 @@ pub fn summary_report_update_process(args: &SummaryUpdateArgs) -> Result<(), Box
                     summary.nextclade_field_1 = nc.clade.clone();
                     summary.nextclade_field_2 = nc.clade_who.clone();
                     summary.nextclade_field_3 = nc.nextclade_pango.clone();
+
+                    // Ensure all fields default to "na" if empty
+                    if summary
+                        .nextclade_field_1
+                        .as_ref()
+                        .is_none_or(|s| s.trim().is_empty())
+                    {
+                        summary.nextclade_field_1 = Some("na".to_string());
+                    }
+                    if summary
+                        .nextclade_field_2
+                        .as_ref()
+                        .is_none_or(|s| s.trim().is_empty())
+                    {
+                        summary.nextclade_field_2 = Some("na".to_string());
+                    }
+                    if summary
+                        .nextclade_field_3
+                        .as_ref()
+                        .is_none_or(|s| s.trim().is_empty())
+                    {
+                        summary.nextclade_field_3 = Some("na".to_string());
+                    }
                 }
 
                 "rsv" => {
                     summary.nextclade_field_1 = nc.clade.clone();
+
+                    if summary
+                        .nextclade_field_1
+                        .as_ref()
+                        .is_none_or(|s| s.trim().is_empty())
+                    {
+                        summary.nextclade_field_1 = Some("na".to_string());
+                    }
+                    // explicitly set the remaining fields to "na"
+                    if summary.nextclade_field_2.is_none() {
+                        summary.nextclade_field_2 = Some("na".to_string());
+                    }
+                    if summary.nextclade_field_3.is_none() {
+                        summary.nextclade_field_3 = Some("na".to_string());
+                    }
                 }
 
                 _ => {}
             }
 
-            // Normalize fields first
+            // Normalize "na" -> ""
             normalize_nextclade_field(&mut summary.nextclade_field_1);
             normalize_nextclade_field(&mut summary.nextclade_field_2);
             normalize_nextclade_field(&mut summary.nextclade_field_3);
 
-            // Only add nextclade_info if nextclade_field_1 is NOT empty
+            // Only add nextclade_info if nextclade_field_1 is non-empty
             let field_1_is_nonempty = summary
                 .nextclade_field_1
                 .as_ref()
@@ -183,16 +232,23 @@ pub fn summary_report_update_process(args: &SummaryUpdateArgs) -> Result<(), Box
                         "{};{};{}",
                         version, metadata_match.dataset, metadata_match.tag
                     ));
+                } else {
+                    summary.nextclade_info = Some(String::new());
                 }
             } else {
                 summary.nextclade_info = Some(String::new());
             }
         } else {
-            // If no nextclade match at all
+            // No nextclade match
             summary.nextclade_info = Some(String::new());
+            // Ensure all nextclade fields default to ""
+            summary.nextclade_field_1.get_or_insert(String::new());
+            summary.nextclade_field_2.get_or_insert(String::new());
+            summary.nextclade_field_3.get_or_insert(String::new());
         }
     }
 
+    // Write outputs
     write_out_updated_summary_csv(&summary_data, &args.virus, &args.runid, &args.output_path)?;
 
     if args.parq {
