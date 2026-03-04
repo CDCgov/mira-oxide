@@ -45,21 +45,26 @@ pub struct SummaryUpdateArgs {
 pub struct NextcladeMetadata {
     pub dataset: String,
     pub tag: String,
-    pub path: PathBuf,
 }
 
 impl std::str::FromStr for NextcladeMetadata {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let parts: Vec<&str> = s.splitn(3, ',').collect();
-        if parts.len() != 3 {
-            return Err(format!("Expected 3 values separated by commas, got '{s}'"));
+        let s = s.trim();
+
+        let parts: Vec<&str> = s.splitn(2, ',').collect();
+        if parts.len() != 2 {
+            return Err(format!("Expected dataset,tag got '{s}'"));
         }
+
         Ok(Self {
-            dataset: parts[0].to_string(),
-            tag: parts[1].to_string(),
-            path: PathBuf::from(parts[2]),
+            dataset: parts[0].trim().trim_end_matches('[').to_string(),
+            tag: parts[1]
+                .trim()
+                .trim_end_matches(',')
+                .trim_end_matches(']')
+                .to_string(),
         })
     }
 }
@@ -96,6 +101,7 @@ fn normalize_nextclade_field(field: &mut Option<String>) {
     }
 }
 
+#[allow(clippy::too_many_lines)]
 pub fn summary_report_update_process(args: &SummaryUpdateArgs) -> Result<(), Box<dyn Error>> {
     println!("Starting data ingestion...");
     let summary_path = create_reader(&args.summary_csv)?;
@@ -225,6 +231,7 @@ pub fn summary_report_update_process(args: &SummaryUpdateArgs) -> Result<(), Box
             if field_1_is_nonempty {
                 if let Some(nc_dataset) = &nc.dataset
                     && let Some(metadata_match) = metadata_map.get(nc_dataset.as_str())
+                    && metadata_match.dataset == *nc_dataset
                 {
                     let version = &args.nextclade_version;
 
@@ -233,7 +240,7 @@ pub fn summary_report_update_process(args: &SummaryUpdateArgs) -> Result<(), Box
                         version, metadata_match.dataset, metadata_match.tag
                     ));
                 } else {
-                    summary.nextclade_info = Some(String::new());
+                    summary.nextclade_info = Some("dataset_mismatch".to_string());
                 }
             } else {
                 summary.nextclade_info = Some(String::new());
