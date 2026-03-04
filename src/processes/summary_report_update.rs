@@ -59,7 +59,7 @@ impl std::str::FromStr for NextcladeMetadata {
         }
 
         Ok(Self {
-            dataset: parts[0].trim().trim_end_matches('[').to_string(),
+            dataset: parts[0].trim().trim_start_matches('[').to_string(),
             tag: parts[1]
                 .trim()
                 .trim_end_matches(',')
@@ -122,6 +122,8 @@ pub fn summary_report_update_process(args: &SummaryUpdateArgs) -> Result<(), Box
         .iter()
         .map(|m| (m.dataset.as_str(), m))
         .collect();
+
+    println!("{metadata_map:#?}");
 
     for summary in &mut summary_data {
         let Some(sample_id) = &summary.sample_id else {
