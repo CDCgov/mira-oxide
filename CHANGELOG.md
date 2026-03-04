@@ -3,6 +3,16 @@
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.2] - 2025-03-04
+
+- [Amanda Sullivan](https://github.com/mandysulli)
+
+### `Added`
+- [PR #71](https://github.com/CDCgov/mira-oxide/pull/71) - added the column "" to summary.csv and summary.parq if nextclade is run
+
+### `Fixed`
+- [PR #71](https://github.com/CDCgov/mira-oxide/pull/71) - No longer printing undetermined for smaples that didn't run. Now the line is left empty. 
+
 ## [1.4.1] - 2025-02-26
 
 - [Amanda Sullivan](https://github.com/mandysulli)
