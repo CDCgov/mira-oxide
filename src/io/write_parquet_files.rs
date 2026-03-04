@@ -290,8 +290,6 @@ pub fn write_alleles_to_parquet(
     let reference_upstream_position_array: ArrayRef =
         Arc::new(Int32Array::from(reference_upstream_position_vec));
 
-    print!("{:?}", average_quality_array);
-
     // Define the schema for the Arrow IPC file
     let fields = vec![
         Field::new("sample_id", DataType::Utf8, true),
@@ -558,7 +556,7 @@ pub fn write_irma_summary_to_parquet(
         Field::new("median_coverage", DataType::Int32, true),
         Field::new("count_minor_snv_at_or_over_5_pct", DataType::Int32, true),
         Field::new("pass_fail_reason", DataType::Utf8, true),
-        Field::new("mira_module", DataType::Utf8, true),
+        Field::new("mira_version;module;irma_config", DataType::Utf8, true),
         Field::new("runid", DataType::Utf8, true),
         Field::new("instrument", DataType::Utf8, true),
         Field::new("subtype", DataType::Utf8, true),
@@ -906,6 +904,7 @@ pub fn write_updated_irma_summary_to_parquet(
     let mira_module_vec = extract_field(summary_data, |i| i.mira_module.clone());
     let runid_vec = extract_field(summary_data, |i| i.runid.clone());
     let instrument_vec = extract_field(summary_data, |i| i.instrument.clone());
+    let nextclade_info_vec = extract_field(summary_data, |i| i.nextclade_info.clone());
 
     let mut fields = vec![
         Field::new("sample_id", DataType::Utf8, true),
@@ -948,10 +947,12 @@ pub fn write_updated_irma_summary_to_parquet(
     // Common trailing fields
     fields.extend([
         Field::new("pass_fail_reason", DataType::Utf8, true),
-        Field::new("mira_module", DataType::Utf8, true),
+        Field::new("mira_version;module;irma_config", DataType::Utf8, true),
         Field::new("runid", DataType::Utf8, true),
         Field::new("instrument", DataType::Utf8, true),
         Field::new("subtype", DataType::Utf8, true),
+        // 🔹 NEW parquet column header
+        Field::new("nextclade_version; dataset; tag", DataType::Utf8, true),
     ]);
 
     arrays.extend(vec![
@@ -960,6 +961,7 @@ pub fn write_updated_irma_summary_to_parquet(
         Arc::new(StringArray::from(runid_vec)) as ArrayRef,
         Arc::new(StringArray::from(instrument_vec)) as ArrayRef,
         Arc::new(StringArray::from(subtype_vec)) as ArrayRef,
+        Arc::new(StringArray::from(nextclade_info_vec)) as ArrayRef,
     ]);
 
     // Virus-specific Nextclade fields

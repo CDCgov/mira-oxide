@@ -948,7 +948,7 @@ pub fn collect_analysis_metadata(
         .get("Version")
         .ok_or("Version key not found in DESCRIPTION file")?;
 
-    let modulestring = format!("MIRA-NF-v{version} {platform}-{virus} {irma_config}");
+    let modulestring = format!("MIRA-NF-v{version};{platform}-{virus};{irma_config}");
 
     let analysis_metadata = Metadata {
         module: modulestring,
