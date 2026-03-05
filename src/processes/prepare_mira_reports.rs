@@ -99,7 +99,7 @@ pub struct ReportsArgs {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct SamplesheetI {
-    #[serde(rename = "sample_id")]
+    #[serde(rename = "sample_id", alias = "sample")]
     pub sample_id: String,
     #[serde(rename = "sample_type")]
     pub sample_type: Option<String>,
@@ -109,7 +109,7 @@ pub struct SamplesheetI {
 pub struct SamplesheetO {
     #[serde(rename = "barcode")]
     pub barcode: String,
-    #[serde(rename = "sample_id")]
+    #[serde(rename = "sample_id", alias = "sample")]
     pub sample_id: String,
     #[serde(rename = "sample_type")]
     pub sample_type: Option<String>,
