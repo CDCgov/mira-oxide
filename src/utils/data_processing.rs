@@ -1076,7 +1076,6 @@ impl IRMASummary {
     ) -> Result<Vec<IRMASummary>, Box<dyn Error>> {
         let irma_summary: Vec<IRMASummary> = Vec::new();
 
-        let _premature_stop_codon_vec = String::new();
         if !qc_values.allow_stop_codons {
             for entry in dais_vars {
                 if self.sample_id == entry.sample_id
