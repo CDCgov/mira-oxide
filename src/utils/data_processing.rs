@@ -1071,20 +1071,43 @@ impl IRMASummary {
     pub fn add_pass_fail_qc(
         &mut self,
         dais_vars: &[DaisVarsData],
-        _seq_vec: &[SeqData],
+        virus: &str,
         qc_values: &QCSettings,
     ) -> Result<Vec<IRMASummary>, Box<dyn Error>> {
         let irma_summary: Vec<IRMASummary> = Vec::new();
 
         if !qc_values.allow_stop_codons {
-            for entry in dais_vars {
-                if self.sample_id == entry.sample_id
-                    && self.reference == Some(entry.ctype.clone())
-                    && entry.aa_variants.contains('*')
-                {
-                    self.pass_fail_reason =
-                        format!("Premature stop codon '{}'", entry.protein).into();
-                }
+            let proteins_with_stop: Vec<_> = dais_vars
+                .iter()
+                .filter(|entry| {
+                    // Handle sample_id comparison based on virus type
+                    let sample_match = if virus == "flu" {
+                        // Take the last two characters off entry.sample_id before comparing
+                        if let Some(entry_id) = &entry.sample_id {
+                            if entry_id.len() > 2 {
+                                &entry_id[..entry_id.len() - 2]
+                                    == self.sample_id.as_deref().unwrap_or("")
+                            } else {
+                                false
+                            }
+                        } else {
+                            false
+                        }
+                    } else {
+                        // Regular comparison
+                        self.sample_id == entry.sample_id
+                    };
+
+                    sample_match
+                        && self.reference == Some(entry.ctype.clone())
+                        && entry.aa_variants.contains('*')
+                })
+                .map(|entry| entry.protein.clone())
+                .collect();
+
+            if !proteins_with_stop.is_empty() {
+                self.pass_fail_reason =
+                    format!("Premature stop codon '{}'", proteins_with_stop.join(", ")).into();
             }
         }
 
