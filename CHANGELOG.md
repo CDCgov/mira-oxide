@@ -3,6 +3,16 @@
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.3] - 2025-03-05
+
+- [Amanda Sullivan](https://github.com/mandysulli)
+
+### `Added`
+- [PR #74](https://github.com/CDCgov/mira-oxide/pull/74) - allow sample_id ot sample in the samplesheet for AMD Platform compatibility.
+
+### `Fixed`
+- [PR #73](https://github.com/CDCgov/mira-oxide/pull/73) - Update pass fail logic so that it does not Pass HA/NA with "premature stop codon"
+
 ## [1.4.2] - 2025-03-04
 
 - [Amanda Sullivan](https://github.com/mandysulli)
