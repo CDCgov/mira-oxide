@@ -1287,9 +1287,9 @@ pub fn divide_nt_into_pass_fail_vec(
             ("illumina", "flu") => {
                 entry.qc_decision == "Pass"
                     || (entry.qc_decision.contains("Premature stop codon")
-                        && !entry.qc_decision.contains(';')
-                        && !entry.reference.contains("HA")
-                        && !entry.reference.contains("NA"))
+                        && (entry.qc_decision.contains(';')
+                            || !entry.reference.contains("HA")
+                            || !entry.reference.contains("NA")))
             }
             ("illumina", "sc2-wgs") => {
                 entry.qc_decision == "Pass"
