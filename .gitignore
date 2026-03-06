@@ -4,6 +4,7 @@
 *.fasta
 *.fas
 *.fa
+*.seq
 /test
 *test*
 *lock
