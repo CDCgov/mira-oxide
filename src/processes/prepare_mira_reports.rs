@@ -335,7 +335,12 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
         &args.virus,
         &no_premature_stop_codon_proteins,
     )?;
-    let processed_nt_seq = divide_nt_into_pass_fail_vec(&nt_seq_vec, &args.platform, &args.virus)?;
+    let processed_nt_seq = divide_nt_into_pass_fail_vec(
+        &nt_seq_vec,
+        &args.platform,
+        &args.virus,
+        &no_premature_stop_codon_proteins,
+    )?;
 
     // Create nextclade sequence vectors for fasta files if flag given
     let nextclade_nt_seq = divide_nt_into_nextclade_vec(&nt_seq_vec, &args.platform, &args.virus)?;
