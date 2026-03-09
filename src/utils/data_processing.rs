@@ -513,6 +513,7 @@ fn merge_sequences(
                     protein: sample_entry.protein.clone(),
                     vh: sample_entry.vh.clone(),
                     aa_seq: ref_entry.aa_seq.clone(), // reference AA
+                    aa_seq: ref_entry.aa_seq.clone(),
                     aa_aln: sample_entry.aa_aln.clone(),
                     cds_id: sample_entry.cds_id.clone(),
                     insertion: sample_entry.insertion.clone(),
