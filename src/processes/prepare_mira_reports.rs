@@ -3,7 +3,7 @@ use crate::io::coverage_json_per_sample::create_coverage_plot;
 use crate::io::coverage_to_heatmap::coverage_to_heatmap_json;
 use crate::io::create_passfail_heatmap::create_passfail_heatmap;
 use crate::io::create_statichtml::generate_html_report;
-use crate::io::data_ingest::all_alleles_data_collection;
+use crate::io::data_ingest::{all_alleles_data_collection, split_by_comma};
 use crate::io::reads_to_piechart::create_barcode_distribution_figure;
 use crate::io::reads_to_sankey_json::reads_to_sankey_json;
 use crate::io::write_fasta_files::write_out_nextclade_fasta_files;
@@ -266,7 +266,7 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
     let mut qc_values = QCSettings {
         med_cov: 0,
         minor_vars: 0,
-        allow_stop_codons: false,
+        stop_codon_restricted_proteins: String::new(),
         perc_ref_covered: 0,
         negative_control_perc: 0,
         negative_control_perc_exception: 0,
@@ -298,6 +298,11 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
         }
     }
 
+    // Get proteins that can not have premature stop codons
+    let no_premature_stop_codon_proteins =
+        split_by_comma(&qc_values.stop_codon_restricted_proteins);
+    println!("{no_premature_stop_codon_proteins:?}");
+
     // Add pass fail information to irma summary
     for sample in &mut irma_summary {
         if sample.pass_fail_reason.is_none() {
@@ -323,12 +328,27 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
         &args.platform,
     )?;
 
-    // Sort into passing and failing
-    let processed_nt_seq = divide_nt_into_pass_fail_vec(&nt_seq_vec, &args.platform, &args.virus)?;
-    let processed_aa_seq = divide_aa_into_pass_fail_vec(&aa_seq_vec, &args.platform, &args.virus)?;
+    // Sort into passing and failing\
+    let processed_aa_seq = divide_aa_into_pass_fail_vec(
+        &aa_seq_vec,
+        &args.platform,
+        &args.virus,
+        &no_premature_stop_codon_proteins,
+    )?;
+    let processed_nt_seq = divide_nt_into_pass_fail_vec(
+        &nt_seq_vec,
+        &args.platform,
+        &args.virus,
+        &no_premature_stop_codon_proteins,
+    )?;
 
     // Create nextclade sequence vectors for fasta files if flag given
-    let nextclade_nt_seq = divide_nt_into_nextclade_vec(&nt_seq_vec, &args.platform, &args.virus)?;
+    let nextclade_nt_seq = divide_nt_into_nextclade_vec(
+        &nt_seq_vec,
+        &args.platform,
+        &args.virus,
+        &no_premature_stop_codon_proteins,
+    )?;
 
     // Processing data for Dashboard Figures
     let transformed_cov_data = transform_coverage_to_heatmap(&coverage_data, &args.virus);

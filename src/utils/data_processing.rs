@@ -1076,7 +1076,7 @@ impl IRMASummary {
     ) -> Result<Vec<IRMASummary>, Box<dyn Error>> {
         let irma_summary: Vec<IRMASummary> = Vec::new();
 
-        if !qc_values.allow_stop_codons {
+        if !qc_values.stop_codon_restricted_proteins.is_empty() {
             let proteins_with_stop: Vec<_> = dais_vars
                 .iter()
                 .filter(|entry| {
@@ -1300,42 +1300,32 @@ pub fn divide_nt_into_pass_fail_vec(
     nt_seq_vec: &[NTSequences],
     platform: &str,
     virus: &str,
+    no_premature_stop_codon_proteins: &[String],
 ) -> Result<ProcessedSequences, Box<dyn Error>> {
     let mut pass_vec: Vec<SeqData> = Vec::new();
     let mut fail_vec: Vec<SeqData> = Vec::new();
 
     for entry in nt_seq_vec {
-        let is_pass = match (platform, virus) {
-            ("illumina", "flu") => {
-                entry.qc_decision == "Pass"
-                    || (entry.qc_decision.contains("Premature stop codon")
-                        && !entry.qc_decision.contains(';')
-                        && !entry.reference.contains("HA")
-                        && !entry.reference.contains("NA"))
-            }
-            ("illumina", "sc2-wgs") => {
-                entry.qc_decision == "Pass"
-                    || (entry.qc_decision.contains("Premature stop codon")
-                        && !entry.qc_decision.contains(';')
-                        && !entry.qc_decision.contains("Premature stop codon 'S'"))
-            }
-            ("illumina", "rsv") => {
-                entry.qc_decision == "Pass"
-                    || (entry.qc_decision.contains("Premature stop codon")
-                        && !entry.qc_decision.contains(';')
-                        && !entry.reference.contains('F')
-                        && !entry.reference.contains('G'))
-            }
-            ("ont", _) => {
-                entry.qc_decision == "Pass"
-                    || (entry.qc_decision.contains("Premature stop codon")
-                        && !entry.qc_decision.contains(';'))
-            }
-            _ => {
-                return Err(format!(
-                    "Unhandled case for platform '{platform}' and virus '{virus}'"
-                )
-                .into());
+        // Check if any forbidden protein appears in the qc_decision
+        let contains_forbidden_protein = no_premature_stop_codon_proteins
+            .iter()
+            .any(|protein| entry.qc_decision.contains(protein));
+
+        let is_pass = if contains_forbidden_protein {
+            false
+        } else {
+            match (platform, virus) {
+                ("illumina", "flu" | "sc2-wgs" | "rsv") | ("ont", _) => {
+                    entry.qc_decision == "Pass"
+                        || (entry.qc_decision.contains("Premature stop codon")
+                            && !entry.qc_decision.contains(';'))
+                }
+                _ => {
+                    return Err(format!(
+                        "Unhandled case for platform '{platform}' and virus '{virus}'"
+                    )
+                    .into());
+                }
             }
         };
 
@@ -1357,12 +1347,10 @@ pub fn divide_nt_into_pass_fail_vec(
         }
     }
 
-    let processed_nt_seqs = ProcessedSequences {
+    Ok(ProcessedSequences {
         passed_seqs: pass_vec,
         failed_seqs: fail_vec,
-    };
-
-    Ok(processed_nt_seqs)
+    })
 }
 
 pub fn create_aa_seq_vec(
@@ -1433,47 +1421,36 @@ pub fn create_aa_seq_vec(
 
 //Take AASequences and divide them into seqs that pass and seqs that fail
 //Pre step for printing the pass/fail amino acid concensus
-#[allow(clippy::too_many_lines)]
 pub fn divide_aa_into_pass_fail_vec(
     nt_seq_vec: &[AASequences],
     platform: &str,
     virus: &str,
+    no_premature_stop_codon_proteins: &[String],
 ) -> Result<ProcessedSequences, Box<dyn Error>> {
     let mut pass_vec: Vec<SeqData> = Vec::new();
     let mut fail_vec: Vec<SeqData> = Vec::new();
 
     for entry in nt_seq_vec {
-        let is_pass = match (platform, virus) {
-            ("illumina", "flu") => {
-                entry.qc_decision == "Pass"
-                    || (entry.qc_decision.contains("Premature stop codon")
-                        && !entry.qc_decision.contains(';')
-                        && !entry.reference.contains("HA")
-                        && !entry.reference.contains("NA"))
-            }
-            ("illumina", "sc2-wgs") => {
-                entry.qc_decision == "Pass"
-                    || (entry.qc_decision.contains("Premature stop codon")
-                        && !entry.qc_decision.contains(';')
-                        && !entry.qc_decision.contains("Premature stop codon 'S'"))
-            }
-            ("illumina", "rsv") => {
-                entry.qc_decision == "Pass"
-                    || (entry.qc_decision.contains("Premature stop codon")
-                        && !entry.qc_decision.contains(';')
-                        && !entry.reference.contains('F')
-                        && !entry.reference.contains('G'))
-            }
-            ("ont", _) => {
-                entry.qc_decision == "Pass"
-                    || (entry.qc_decision.contains("Premature stop codon")
-                        && !entry.qc_decision.contains(';'))
-            }
-            _ => {
-                return Err(format!(
-                    "Unhandled case for platform '{platform}' and virus '{virus}'"
-                )
-                .into());
+        // Check if any forbidden protein appears in the qc_decision
+        let contains_forbidden_protein = no_premature_stop_codon_proteins
+            .iter()
+            .any(|protein| entry.qc_decision.contains(protein));
+
+        let is_pass = if contains_forbidden_protein {
+            false
+        } else {
+            match (platform, virus) {
+                ("illumina", "flu" | "sc2-wgs" | "rsv") | ("ont", _) => {
+                    entry.qc_decision == "Pass"
+                        || (entry.qc_decision.contains("Premature stop codon")
+                            && !entry.qc_decision.contains(';'))
+                }
+                _ => {
+                    return Err(format!(
+                        "Unhandled case for platform '{platform}' and virus '{virus}'"
+                    )
+                    .into());
+                }
             }
         };
 
@@ -1512,6 +1489,7 @@ pub fn divide_nt_into_nextclade_vec(
     nt_seq_vec: &[NTSequences],
     platform: &str,
     virus: &str,
+    no_premature_stop_codon_proteins: &[String],
 ) -> Result<NextcladeSequences, Box<dyn Error>> {
     let mut nextclade_seqs = NextcladeSequences {
         influenza_a_h3n2_ha: Vec::new(),
@@ -1526,42 +1504,51 @@ pub fn divide_nt_into_nextclade_vec(
     };
 
     for entry in nt_seq_vec {
-        let is_pass = match (platform, virus) {
-            ("illumina", "flu") => {
-                entry.qc_decision == "Pass"
-                    || (entry.qc_decision.contains("Premature stop codon")
-                        && !entry.qc_decision.contains(';')
-                        && !entry.reference.contains("HA")
-                        && !entry.reference.contains("NA"))
-            }
-            ("illumina", "sc2-wgs") => {
-                entry.qc_decision == "Pass"
-                    || (entry.qc_decision.contains("Premature stop codon")
-                        && !entry.qc_decision.contains(';')
-                        && !entry.qc_decision.contains("Premature stop codon 'S'"))
-            }
-            ("illumina", "rsv") => {
-                entry.qc_decision == "Pass"
-                    || (entry.qc_decision.contains("Premature stop codon")
-                        && !entry.qc_decision.contains(';')
-                        && !entry.reference.contains('F')
-                        && !entry.reference.contains('G'))
-            }
-            ("ont", _) => {
-                entry.qc_decision == "Pass"
-                    || (entry.qc_decision.contains("Premature stop codon")
-                        && !entry.qc_decision.contains(';'))
-            }
-            _ => {
-                return Err(format!(
-                    "Unhandled case for platform '{platform}' and virus '{virus}'"
-                )
-                .into());
+        // Check if any forbidden protein appears in the qc_decision
+        let contains_forbidden_protein = no_premature_stop_codon_proteins
+            .iter()
+            .any(|protein| entry.qc_decision.contains(protein));
+
+        let is_pass = if contains_forbidden_protein {
+            false
+        } else {
+            match (platform, virus) {
+                ("illumina", "flu") => {
+                    entry.qc_decision == "Pass"
+                        || (entry.qc_decision.contains("Premature stop codon")
+                            && !entry.qc_decision.contains(';')
+                            && !entry.reference.contains("HA")
+                            && !entry.reference.contains("NA"))
+                }
+                ("illumina", "sc2-wgs") => {
+                    entry.qc_decision == "Pass"
+                        || (entry.qc_decision.contains("Premature stop codon")
+                            && !entry.qc_decision.contains(';')
+                            && !entry.qc_decision.contains("Premature stop codon 'S'"))
+                }
+                ("illumina", "rsv") => {
+                    entry.qc_decision == "Pass"
+                        || (entry.qc_decision.contains("Premature stop codon")
+                            && !entry.qc_decision.contains(';')
+                            && !entry.reference.contains('F')
+                            && !entry.reference.contains('G'))
+                }
+                ("ont", _) => {
+                    entry.qc_decision == "Pass"
+                        || (entry.qc_decision.contains("Premature stop codon")
+                            && !entry.qc_decision.contains(';'))
+                }
+                _ => {
+                    return Err(format!(
+                        "Unhandled case for platform '{platform}' and virus '{virus}'"
+                    )
+                    .into());
+                }
             }
         };
 
         if !is_pass {
-            continue;
+            continue; // Skip sequences that fail QC or contain forbidden proteins
         }
 
         let seq = SeqData {

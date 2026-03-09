@@ -18,7 +18,7 @@ use std::{
 pub struct QCSettings {
     pub med_cov: u32,
     pub minor_vars: u32,
-    pub allow_stop_codons: bool,
+    pub stop_codon_restricted_proteins: String,
     pub perc_ref_covered: u32,
     pub negative_control_perc: u32,
     pub negative_control_perc_exception: u32,
@@ -457,6 +457,15 @@ where
 
     records
 }
+/// Convert string of proteins to Vec<String> for stop codon
+pub fn split_by_comma(input: &str) -> Vec<String> {
+    input
+        .split(',')
+        .filter(|s| !s.trim().is_empty())
+        .map(|s| s.trim().to_string())
+        .collect()
+}
+
 /// Read in the coverage files made by IRMA and save to a vector of `CoverageData`
 pub fn coverage_data_collection(
     irma_path: impl AsRef<Path>,

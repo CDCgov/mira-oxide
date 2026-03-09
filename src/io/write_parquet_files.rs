@@ -984,35 +984,25 @@ pub fn write_updated_irma_summary_to_parquet(
             ]);
         }
         "flu" => {
-            let clade_vec = extract_field(summary_data, |i| i.nextclade_field_1.clone());
-            let short_clade_vec = extract_field(summary_data, |i| i.nextclade_field_2.clone());
-            let subclade_vec = extract_field(summary_data, |i| i.nextclade_field_3.clone());
+            let subclade_vec = extract_field(summary_data, |i| i.nextclade_field_1.clone());
+            let nextclade_alias_vec = extract_field(summary_data, |i| i.nextclade_field_2.clone());
 
             fields.extend([
-                Field::new("clade", DataType::Utf8, true),
-                Field::new("short_clade", DataType::Utf8, true),
                 Field::new("subclade", DataType::Utf8, true),
+                Field::new("nextclade_alias", DataType::Utf8, true),
             ]);
 
             arrays.extend(vec![
-                Arc::new(StringArray::from(clade_vec)) as ArrayRef,
-                Arc::new(StringArray::from(short_clade_vec)) as ArrayRef,
                 Arc::new(StringArray::from(subclade_vec)) as ArrayRef,
+                Arc::new(StringArray::from(nextclade_alias_vec)) as ArrayRef,
             ]);
         }
         _ => {
             let clade_vec = extract_field(summary_data, |i| i.nextclade_field_1.clone());
-            let g_clade_vec = extract_field(summary_data, |i| i.nextclade_field_2.clone());
 
-            fields.extend([
-                Field::new("clade", DataType::Utf8, true),
-                Field::new("g_clade", DataType::Utf8, true),
-            ]);
+            fields.extend([Field::new("clade", DataType::Utf8, true)]);
 
-            arrays.extend(vec![
-                Arc::new(StringArray::from(clade_vec)) as ArrayRef,
-                Arc::new(StringArray::from(g_clade_vec)) as ArrayRef,
-            ]);
+            arrays.extend(vec![Arc::new(StringArray::from(clade_vec)) as ArrayRef]);
         }
     }
 
