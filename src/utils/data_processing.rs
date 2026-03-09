@@ -481,7 +481,7 @@ pub fn compute_cvv_dais_variants(
         .map(|entry| DaisVarsData {
             sample_id: entry.sample_id,
             ctype: entry.ctype,
-            aa_reference_id: None,
+            aa_reference_id: entry.aa_reference_id,
             positional_reference_id: entry.reference.clone(),
             protein: entry.protein.clone(),
             aa_variant_count: entry.insertions_shift_frame.parse::<i32>().unwrap_or(0),
@@ -498,7 +498,7 @@ pub fn compute_cvv_dais_variants(
 fn merge_sequences(
     ref_seqs_data: &[DaisSeqData],
     sample_seqs_data: &[DaisSeqData],
-) -> std::vec::Vec<DaisSeqData> {
+) -> Vec<DaisSeqData> {
     let mut merged_data = Vec::new();
 
     for sample_entry in sample_seqs_data {
@@ -506,14 +506,13 @@ fn merge_sequences(
             if sample_entry.reference == ref_entry.reference
                 && sample_entry.protein == ref_entry.protein
             {
-                // Create a new owned DaisSeqData instance - it was this or lifetimes...
                 let merged_entry = DaisSeqData {
                     sample_id: sample_entry.sample_id.clone(),
                     ctype: sample_entry.ctype.clone(),
                     reference: sample_entry.reference.clone(),
                     protein: sample_entry.protein.clone(),
                     vh: sample_entry.vh.clone(),
-                    aa_seq: ref_entry.aa_seq.clone(),
+                    aa_seq: ref_entry.aa_seq.clone(), // reference AA
                     aa_aln: sample_entry.aa_aln.clone(),
                     cds_id: sample_entry.cds_id.clone(),
                     insertion: sample_entry.insertion.clone(),
@@ -522,9 +521,10 @@ fn merge_sequences(
                     aligned_cds_sequence: sample_entry.aligned_cds_sequence.clone(),
                     reference_nt_positions: sample_entry.reference_nt_positions.clone(),
                     sample_nt_positions: sample_entry.sample_nt_positions.clone(),
+                    aa_reference_id: ref_entry.sample_id.clone(),
                 };
 
-                merged_data.push(merged_entry)
+                merged_data.push(merged_entry);
             }
         }
     }

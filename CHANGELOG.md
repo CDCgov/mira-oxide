@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [Amanda Sullivan](https://github.com/mandysulli)
 
 ### `Added`
-- [PR #76](https://github.com/CDCgov/mira-oxide/pull/76) - the columns `aa_reference_is` and `positional_refrence_id` to the aavars outputs when virus is flu.
+- [PR #76](https://github.com/CDCgov/mira-oxide/pull/76) - the columns `aa_reference_is` and `positional_refrence_id` to the aavars outputs.
 
 ### `Fixed`
 - [PR #76](https://github.com/CDCgov/mira-oxide/pull/76) - Fixed bug that called premature stop codon when reference was just shorter.
