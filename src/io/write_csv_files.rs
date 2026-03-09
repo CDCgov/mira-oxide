@@ -439,7 +439,6 @@ pub fn write_out_updated_summary_csv(
             "instrument",
             "nextclade_field_1",
             "nextclade_field_2",
-            "nextclade_field_3",
             "nextclade_info",
         ]
     } else {
@@ -499,9 +498,8 @@ pub fn write_out_updated_summary_csv(
             "mira_version;module;irma_config",
             "runid",
             "instrument",
-            "clade",
-            "short_clade",
             "subclade",
+            "nextclade_alias",
             "nextclade_version;dataset;tag",
         ]
     } else {
