@@ -50,6 +50,7 @@ pub fn find_fastq(patterns: &[String]) -> Option<PathBuf> {
 }
 
 #[allow(clippy::format_push_string)]
+#[allow(clippy::manual_let_else)]
 pub fn create_nextflow_samplesheet(args: &SamplesheetArgs) -> io::Result<()> {
     thread::sleep(Duration::from_mins(1));
 
@@ -79,12 +80,11 @@ pub fn create_nextflow_samplesheet(args: &SamplesheetArgs) -> io::Result<()> {
 
             let fastq_1 = glob(&pattern).ok().and_then(|mut g| g.find_map(Result::ok));
 
-            let fastq_1 = match fastq_1 {
-                Some(fq) => fq,
-                None => {
-                    missing_samples.push((id, "Missing FASTQ file".to_string()));
-                    continue;
-                }
+            let fastq_1 = if let Some(fq) = fastq_1 {
+                fq
+            } else {
+                missing_samples.push((id, "Missing FASTQ file".to_string()));
+                continue;
             };
 
             if fs::metadata(&fastq_1)?.len() == 0 {

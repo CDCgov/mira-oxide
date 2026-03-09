@@ -44,6 +44,8 @@ struct RowChecker {
     sample_counter: HashMap<String, usize>,
 }
 
+#[allow(clippy::needless_pass_by_value)]
+#[allow(clippy::unused_self)]
 impl RowChecker {
     fn new() -> Self {
         Self {

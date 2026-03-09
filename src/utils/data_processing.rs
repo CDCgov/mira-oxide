@@ -512,7 +512,6 @@ fn merge_sequences(
                     reference: sample_entry.reference.clone(),
                     protein: sample_entry.protein.clone(),
                     vh: sample_entry.vh.clone(),
-                    aa_seq: ref_entry.aa_seq.clone(), // reference AA
                     aa_seq: ref_entry.aa_seq.clone(),
                     aa_aln: sample_entry.aa_aln.clone(),
                     cds_id: sample_entry.cds_id.clone(),
@@ -1071,6 +1070,7 @@ pub fn create_irma_summary_vec(
 }
 
 /// Combine all vec to create IRMA summary
+#[allow(clippy::too_many_lines)]
 impl IRMASummary {
     pub fn add_pass_fail_qc(
         &mut self,

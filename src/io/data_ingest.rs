@@ -460,6 +460,7 @@ where
     records
 }
 /// Convert string of proteins to Vec<String> for stop codon
+#[allow(clippy::must_use_candidate)]
 pub fn split_by_comma(input: &str) -> Vec<String> {
     input
         .split(',')
