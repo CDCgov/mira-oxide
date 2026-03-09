@@ -365,24 +365,14 @@ pub fn write_out_all_json_files(
     )?;
 
     // write out the dais_vars.json
-    let aavars_columns = if virus == "flu" {
-        vec![
-            "sample_id",
-            "aa_reference_id",
-            "positional_reference_id",
-            "protein",
-            "aa_variant_count",
-            "aa_variants",
-        ]
-    } else {
-        vec![
-            "sample_id",
-            "positional_reference_id",
-            "protein",
-            "aa_variant_count",
-            "aa_variants",
-        ]
-    };
+    let aavars_columns = vec![
+        "sample_id",
+        "aa_reference_id",
+        "positional_reference_id",
+        "protein",
+        "aa_variant_count",
+        "aa_variants",
+    ];
 
     write_structs_to_split_json_file(
         &format!("{}/dais_vars.json", output_path.display()),

@@ -279,6 +279,8 @@ pub struct DaisSeqData {
     pub reference_nt_positions: String,
     #[serde(rename = "CDS_nt_coordinates")]
     pub sample_nt_positions: String,
+    #[serde(default)]
+    pub aa_reference_id: Option<String>,
 }
 
 /////////////// Structs to hold nextcalde data ///////////////
