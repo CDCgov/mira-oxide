@@ -136,9 +136,8 @@ pub fn summary_report_update_process(args: &SummaryUpdateArgs) -> Result<(), Box
                     let has_ha = summary.reference.as_ref().is_some_and(|r| r.contains("HA"));
 
                     if has_ha {
-                        summary.nextclade_field_1 = nc.clade.clone();
-                        summary.nextclade_field_2 = nc.short_clade.clone();
-                        summary.nextclade_field_3 = nc.subclade.clone();
+                        summary.nextclade_field_1 = nc.short_clade.clone();
+                        summary.nextclade_field_2 = nc.subclade.clone();
 
                         if summary
                             .nextclade_field_1
@@ -154,17 +153,9 @@ pub fn summary_report_update_process(args: &SummaryUpdateArgs) -> Result<(), Box
                         {
                             summary.nextclade_field_2 = Some("na".to_string());
                         }
-                        if summary
-                            .nextclade_field_3
-                            .as_ref()
-                            .is_none_or(|s| s.trim().is_empty())
-                        {
-                            summary.nextclade_field_3 = Some("na".to_string());
-                        }
                     } else {
                         summary.nextclade_field_1 = Some("na".to_string());
                         summary.nextclade_field_2 = Some("na".to_string());
-                        summary.nextclade_field_3 = Some("na".to_string());
                     }
                 }
 
