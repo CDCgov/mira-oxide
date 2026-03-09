@@ -266,7 +266,7 @@ fn dais_vars_to_plotly_json(vars: &[DaisVarsData]) -> String {
 
     for row in vars {
         columns[0].push(row.sample_id.as_deref().unwrap_or("").to_string());
-        columns[1].push(row.reference_id.clone());
+        columns[1].push(row.positional_reference_id.clone());
         columns[2].push(row.protein.clone());
         columns[3].push(row.aa_variant_count.to_string());
         columns[4].push(row.aa_variants.clone());

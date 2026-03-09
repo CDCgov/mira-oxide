@@ -229,13 +229,25 @@ pub fn write_out_all_csv_mira_reports(
     )?;
 
     // write out the aavars.csv
-    let aavars_columns = vec![
-        "sample_id",
-        "reference_id",
-        "protein",
-        "aa_variant_count",
-        "aa_variants",
-    ];
+    // write out the dais_vars.json
+    let aavars_columns = if virus == "flu" {
+        vec![
+            "sample_id",
+            "aa_reference_id",
+            "positional_reference_id",
+            "protein",
+            "aa_variant_count",
+            "aa_variants",
+        ]
+    } else {
+        vec![
+            "sample_id",
+            "positional_reference_id",
+            "protein",
+            "aa_variant_count",
+            "aa_variants",
+        ]
+    };
 
     write_structs_to_csv_file(
         &format!("{}/mira_{runid}_aavars.csv", output_path.display()),
