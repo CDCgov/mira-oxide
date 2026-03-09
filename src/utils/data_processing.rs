@@ -31,7 +31,8 @@ pub struct ProcessedRecord {
 pub struct DaisVarsData {
     pub sample_id: Option<String>,
     pub ctype: String,
-    pub reference_id: String,
+    pub aa_reference_id: Option<String>,
+    pub positional_reference_id: String,
     pub protein: String,
     pub aa_variant_count: i32,
     pub aa_variants: String,
@@ -392,7 +393,8 @@ pub fn compute_dais_variants(
                 let dais_vars_entry = DaisVarsData {
                     sample_id: sample_entry.sample_id.clone(),
                     ctype: sample_entry.ctype.clone(),
-                    reference_id: sample_entry.reference.clone(),
+                    aa_reference_id: ref_entry.sample_id.clone(),
+                    positional_reference_id: sample_entry.reference.clone(),
                     protein: sample_entry.protein.clone(),
                     aa_variant_count: var_aa_count,
                     aa_variants: aa_vars,
@@ -479,7 +481,8 @@ pub fn compute_cvv_dais_variants(
         .map(|entry| DaisVarsData {
             sample_id: entry.sample_id,
             ctype: entry.ctype,
-            reference_id: entry.reference.clone(),
+            aa_reference_id: None,
+            positional_reference_id: entry.reference.clone(),
             protein: entry.protein.clone(),
             aa_variant_count: entry.insertions_shift_frame.parse::<i32>().unwrap_or(0),
             aa_variants: entry.insertion.clone(),
@@ -510,7 +513,7 @@ fn merge_sequences(
                     reference: sample_entry.reference.clone(),
                     protein: sample_entry.protein.clone(),
                     vh: sample_entry.vh.clone(),
-                    aa_seq: ref_entry.aa_seq.clone(), // Use ref_entry's AA sequence
+                    aa_seq: ref_entry.aa_seq.clone(),
                     aa_aln: sample_entry.aa_aln.clone(),
                     cds_id: sample_entry.cds_id.clone(),
                     insertion: sample_entry.insertion.clone(),
@@ -521,7 +524,7 @@ fn merge_sequences(
                     sample_nt_positions: sample_entry.sample_nt_positions.clone(),
                 };
 
-                merged_data.push(merged_entry); // Push the owned value
+                merged_data.push(merged_entry)
             }
         }
     }
@@ -582,7 +585,7 @@ pub fn extract_subtype_flu(
         let sample_ha = hold_sample[..hold_sample.len() - 2].to_string();
 
         let ha = if entry.protein == "HA" {
-            match entry.reference_id.as_str() {
+            match entry.positional_reference_id.as_str() {
                 "CALI07" => "H1",
                 "ANNARBOR60" => "H2",
                 "HK4801" => "H3",
@@ -608,7 +611,7 @@ pub fn extract_subtype_flu(
         let sample_na = hold_sample[..hold_sample.len() - 2].to_string();
 
         let na = if entry.protein == "NA" {
-            match entry.reference_id.as_str() {
+            match entry.positional_reference_id.as_str() {
                 "CALI07" => "N1",
                 "HK4801" => "N2",
                 "ONTARIO6118" => "N4",
@@ -1100,7 +1103,11 @@ impl IRMASummary {
 
                     sample_match
                         && self.reference == Some(entry.ctype.clone())
-                        && entry.aa_variants.contains('*')
+                        && entry
+                            .aa_variants
+                            .chars()
+                            .zip(entry.aa_variants.chars().skip(1))
+                            .any(|(a, b)| a.is_ascii_digit() && b == '*')
                 })
                 .map(|entry| entry.protein.clone())
                 .collect();
