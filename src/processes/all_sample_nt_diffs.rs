@@ -81,7 +81,7 @@ pub fn all_sample_nt_diffs_process(args: &NTDiffsArgs) {
             &mut writer,
             "sequence_1{delim}sequence_2{delim}nt_sequence_1{delim}position{delim}nt_sequence_2"
         ).unwrap();
-
+#[allow(clippy::needless_for_each)]
         all_sequences.iter().for_each(|f| {
             let name_1 = &f.name;
             let seq1 = &f.sequence;
