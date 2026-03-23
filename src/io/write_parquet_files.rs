@@ -529,6 +529,9 @@ pub fn write_irma_summary_to_parquet(
     let mira_module_vec = extract_field(irma_summary_data, |item| item.mira_module.clone());
     let runid_vec = extract_field(irma_summary_data, |item| item.runid.clone());
     let instrument_vec = extract_field(irma_summary_data, |item| item.instrument.clone());
+    let di_ratios_vec = extract_field(irma_summary_data, |item| {
+        item.di_ratios_5prime_3prime.clone()
+    });
 
     let sample_array: ArrayRef = Arc::new(StringArray::from(sample_ids_vec));
     let total_reads_array: ArrayRef = Arc::new(Int32Array::from(total_reads_vec));
@@ -578,6 +581,7 @@ pub fn write_irma_summary_to_parquet(
         subtype_array,
     ];
 
+    // Existing SC2-specific fields
     if virus == "sc2-wgs" {
         fields.push(Field::new(
             "spike_percent_coverage",
@@ -588,6 +592,12 @@ pub fn write_irma_summary_to_parquet(
 
         arrays.push(Arc::new(Float64Array::from(spike_percent_coverage_vec)));
         arrays.push(Arc::new(Int32Array::from(spike_median_coverage_vec)));
+    }
+
+    // Flu-specific field
+    if virus == "flu" {
+        fields.push(Field::new("di_ratios_5prime_3prime", DataType::Utf8, true));
+        arrays.push(Arc::new(StringArray::from(di_ratios_vec)));
     }
 
     let schema = Arc::new(Schema::new(fields));
@@ -951,7 +961,6 @@ pub fn write_updated_irma_summary_to_parquet(
         Field::new("runid", DataType::Utf8, true),
         Field::new("instrument", DataType::Utf8, true),
         Field::new("subtype", DataType::Utf8, true),
-        // 🔹 NEW parquet column header
         Field::new("nextclade_version; dataset; tag", DataType::Utf8, true),
     ]);
 
@@ -986,23 +995,25 @@ pub fn write_updated_irma_summary_to_parquet(
         "flu" => {
             let subclade_vec = extract_field(summary_data, |i| i.nextclade_field_1.clone());
             let nextclade_alias_vec = extract_field(summary_data, |i| i.nextclade_field_2.clone());
+            let di_ratios_vec = extract_field(summary_data, |i| i.di_ratios_5prime_3prime.clone());
 
             fields.extend([
                 Field::new("subclade", DataType::Utf8, true),
                 Field::new("nextclade_alias", DataType::Utf8, true),
+                Field::new("di_ratios_5prime_3prime", DataType::Utf8, true),
             ]);
 
             arrays.extend(vec![
                 Arc::new(StringArray::from(subclade_vec)) as ArrayRef,
                 Arc::new(StringArray::from(nextclade_alias_vec)) as ArrayRef,
+                Arc::new(StringArray::from(di_ratios_vec)) as ArrayRef,
             ]);
         }
         _ => {
             let clade_vec = extract_field(summary_data, |i| i.nextclade_field_1.clone());
 
-            fields.extend([Field::new("clade", DataType::Utf8, true)]);
-
-            arrays.extend(vec![Arc::new(StringArray::from(clade_vec)) as ArrayRef]);
+            fields.push(Field::new("clade", DataType::Utf8, true));
+            arrays.push(Arc::new(StringArray::from(clade_vec)) as ArrayRef);
         }
     }
 

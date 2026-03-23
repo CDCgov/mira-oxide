@@ -124,7 +124,7 @@ pub fn di_stats_process(args: &DIStatArgs) -> Result<(), std::io::Error> {
     // Write header
     writeln!(
         writer,
-        "run_id\tsample_id\tsegment\tprime5\tprime3\tdi_ratios"
+        "run_id\tsample_id\tsegment\tprime5\tprime3\tdi_ratios_5prime_3prime"
     )?;
 
     if let Err(e) = di_stat_assembly(&args.assembly_dir, &args.run_id, &mut writer) {
