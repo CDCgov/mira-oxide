@@ -77,7 +77,7 @@ pub fn di_stat_assembly(
     run_id: &str,
     writer: &mut impl Write,
 ) -> Result<(), Box<dyn Error>> {
-    let path_pattern = format!("{}/*", assembly_dir.to_str().unwrap_or_default());
+    let path_pattern = format!("{}/*/IRMA/*", assembly_dir.to_str().unwrap_or_default());
 
     for entry in glob(&path_pattern)?.filter_map(Result::ok) {
         if entry.is_dir() {
