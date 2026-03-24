@@ -283,7 +283,7 @@ pub struct DaisSeqData {
     pub aa_reference_id: Option<String>,
 }
 
-/// DIstat Data
+/// `DIstat` Data
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DIStatData {
     pub run_id: String,

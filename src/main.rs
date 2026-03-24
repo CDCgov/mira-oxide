@@ -99,7 +99,7 @@ fn main() {
             samplesheet_check(&cmd_args).unwrap_or_die(&format!("{module}::SamplesheetCheck"));
         }
         Commands::DIStats(cmd_args) => {
-            di_stats_process(&cmd_args).unwrap_or_die(&format!("{module}::DIStats"))
+            di_stats_process(&cmd_args).unwrap_or_die(&format!("{module}::DIStats"));
         }
     }
 }

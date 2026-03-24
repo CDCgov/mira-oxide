@@ -527,11 +527,11 @@ pub fn write_irma_summary_to_parquet(
         extract_field(irma_summary_data, |item| item.pass_fail_reason.clone());
     let subtype_vec = extract_field(irma_summary_data, |item| item.subtype.clone());
     let mira_module_vec = extract_field(irma_summary_data, |item| item.mira_module.clone());
-    let runid_vec = extract_field(irma_summary_data, |item| item.runid.clone());
-    let instrument_vec = extract_field(irma_summary_data, |item| item.instrument.clone());
     let di_ratios_vec = extract_field(irma_summary_data, |item| {
         item.di_ratios_5prime_3prime.clone()
     });
+    let runid_vec = extract_field(irma_summary_data, |item| item.runid.clone());
+    let instrument_vec = extract_field(irma_summary_data, |item| item.instrument.clone());
 
     let sample_array: ArrayRef = Arc::new(StringArray::from(sample_ids_vec));
     let total_reads_array: ArrayRef = Arc::new(Int32Array::from(total_reads_vec));
@@ -993,20 +993,20 @@ pub fn write_updated_irma_summary_to_parquet(
             ]);
         }
         "flu" => {
+            let di_ratios_vec = extract_field(summary_data, |i| i.di_ratios_5prime_3prime.clone());
             let subclade_vec = extract_field(summary_data, |i| i.nextclade_field_1.clone());
             let nextclade_alias_vec = extract_field(summary_data, |i| i.nextclade_field_2.clone());
-            let di_ratios_vec = extract_field(summary_data, |i| i.di_ratios_5prime_3prime.clone());
 
             fields.extend([
+                Field::new("di_ratios_5prime_3prime", DataType::Utf8, true),
                 Field::new("subclade", DataType::Utf8, true),
                 Field::new("nextclade_alias", DataType::Utf8, true),
-                Field::new("di_ratios_5prime_3prime", DataType::Utf8, true),
             ]);
 
             arrays.extend(vec![
+                Arc::new(StringArray::from(di_ratios_vec)) as ArrayRef,
                 Arc::new(StringArray::from(subclade_vec)) as ArrayRef,
                 Arc::new(StringArray::from(nextclade_alias_vec)) as ArrayRef,
-                Arc::new(StringArray::from(di_ratios_vec)) as ArrayRef,
             ]);
         }
         _ => {

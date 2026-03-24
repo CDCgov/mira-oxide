@@ -158,14 +158,14 @@ pub fn summary_report_update_process(args: &SummaryUpdateArgs) -> Result<(), Box
                         if summary
                             .nextclade_field_1
                             .as_ref()
-                            .map_or(true, |s| s.trim().is_empty())
+                            .is_none_or(|s| s.trim().is_empty())
                         {
                             summary.nextclade_field_1 = Some("na".to_string());
                         }
                         if summary
                             .nextclade_field_2
                             .as_ref()
-                            .map_or(true, |s| s.trim().is_empty())
+                            .is_none_or(|s| s.trim().is_empty())
                         {
                             summary.nextclade_field_2 = Some("na".to_string());
                         }
@@ -182,21 +182,21 @@ pub fn summary_report_update_process(args: &SummaryUpdateArgs) -> Result<(), Box
                     if summary
                         .nextclade_field_1
                         .as_ref()
-                        .map_or(true, |s| s.trim().is_empty())
+                        .is_none_or(|s| s.trim().is_empty())
                     {
                         summary.nextclade_field_1 = Some("na".to_string());
                     }
                     if summary
                         .nextclade_field_2
                         .as_ref()
-                        .map_or(true, |s| s.trim().is_empty())
+                        .is_none_or(|s| s.trim().is_empty())
                     {
                         summary.nextclade_field_2 = Some("na".to_string());
                     }
                     if summary
                         .nextclade_field_3
                         .as_ref()
-                        .map_or(true, |s| s.trim().is_empty())
+                        .is_none_or(|s| s.trim().is_empty())
                     {
                         summary.nextclade_field_3 = Some("na".to_string());
                     }
@@ -206,7 +206,7 @@ pub fn summary_report_update_process(args: &SummaryUpdateArgs) -> Result<(), Box
                     if summary
                         .nextclade_field_1
                         .as_ref()
-                        .map_or(true, |s| s.trim().is_empty())
+                        .is_none_or(|s| s.trim().is_empty())
                     {
                         summary.nextclade_field_1 = Some("na".to_string());
                     }
@@ -223,7 +223,7 @@ pub fn summary_report_update_process(args: &SummaryUpdateArgs) -> Result<(), Box
             let field_1_is_nonempty = summary
                 .nextclade_field_1
                 .as_ref()
-                .map_or(false, |s| !s.trim().is_empty());
+                .is_some_and(|s| !s.trim().is_empty());
             if field_1_is_nonempty {
                 if let Some(nc_dataset) = &nc.dataset
                     && let Some(metadata_match) = metadata_map.get(nc_dataset.as_str())

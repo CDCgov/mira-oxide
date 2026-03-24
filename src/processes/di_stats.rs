@@ -28,6 +28,8 @@ pub struct CoverageRecord {
 /// Given a <seg>-coverage.txt file from IRMA's output,
 /// this function returns a tuple with two ratios, one for the 5'
 /// end and one for the 3' end.
+#[allow(clippy::unnecessary_debug_formatting)]
+#[allow(clippy::cast_precision_loss)]
 pub fn di_stat(cov_file: &Path, length: usize) -> Result<(f64, f64), Box<dyn Error>> {
     let mut rdr = csv::ReaderBuilder::new()
         .delimiter(b'\t')
@@ -72,6 +74,7 @@ pub fn di_stat(cov_file: &Path, length: usize) -> Result<(f64, f64), Box<dyn Err
 }
 
 /// Calculate 5p and 3p DI stats for an entire assembly directory.
+#[allow(clippy::unnecessary_debug_formatting)]
 pub fn di_stat_assembly(
     assembly_dir: &Path,
     run_id: &str,

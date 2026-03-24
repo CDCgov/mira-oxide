@@ -112,6 +112,7 @@ fn write_sample_plot_html(
 }
 
 // Format plotly table
+#[allow(clippy::must_use_candidate)]
 pub fn plotly_table_script(div_id: &str, table_json: &str, table_title: &str) -> String {
     format!(
         r#"
@@ -208,6 +209,7 @@ pub fn plotly_table_script(div_id: &str, table_json: &str, table_title: &str) ->
 }
 
 // functions to read in table data and render as HTML table
+#[allow(clippy::must_use_candidate)]
 pub fn irma_summary_to_plotly_json(summary: &[IRMASummary], virus: &str) -> String {
     // Determine headers dynamically based on virus type
     let headers: Vec<&str> = match virus {
@@ -795,7 +797,7 @@ pub fn update_irma_summary_to_plotly_json(summary: &[UpdatedIRMASummary], virus:
             "Instrument",
             "Clade",
             "WHO Clade",
-            "Pango",
+            "Pango Clade",
             "Nextclade Info",
         ]
     } else if virus == "flu" {
@@ -814,8 +816,8 @@ pub fn update_irma_summary_to_plotly_json(summary: &[UpdatedIRMASummary], virus:
             "Run ID",
             "Instrument",
             "DI Ratio 5'/3'",
-            "Clade",
-            "Alias",
+            "Subclade",
+            "Nextclade Alias",
             "Nextclade Info",
         ]
     } else {
@@ -900,7 +902,6 @@ pub fn update_irma_summary_to_plotly_json(summary: &[UpdatedIRMASummary], virus:
             columns[col].push(row.nextclade_field_3.as_deref().unwrap_or("").to_string());
             col += 1;
             columns[col].push(row.nextclade_info.as_deref().unwrap_or("").to_string());
-            col += 1;
         } else if virus == "flu" {
             columns[col].push(
                 row.di_ratios_5prime_3prime
@@ -912,10 +913,8 @@ pub fn update_irma_summary_to_plotly_json(summary: &[UpdatedIRMASummary], virus:
             columns[col].push(row.nextclade_field_2.as_deref().unwrap_or("").to_string());
             col += 1;
             columns[col].push(row.nextclade_info.as_deref().unwrap_or("").to_string());
-            col += 1;
         } else {
             columns[col].push(row.nextclade_info.as_deref().unwrap_or("").to_string());
-            col += 1;
         }
     }
 
