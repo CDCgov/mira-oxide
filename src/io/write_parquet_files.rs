@@ -595,12 +595,12 @@ pub fn write_irma_summary_to_parquet(
         arrays.push(Arc::new(Int32Array::from(spike_median_coverage_vec)));
     }
 
-    // Flu-specific field - inserted before mira_version;module;irma_config
+    // Flu-specific field - inserted before pass_fail_reason
     if virus == "flu" {
         let insert_idx = fields
             .iter()
-            .position(|f| f.name() == "mira_version;module;irma_config")
-            .expect("mira_version;module;irma_config field not found");
+            .position(|f| f.name() == "pass_fail_reason")
+            .expect("pass_fail_reason field not found");
 
         fields.insert(
             insert_idx,
@@ -983,14 +983,14 @@ pub fn write_updated_irma_summary_to_parquet(
         Arc::new(StringArray::from(nextclade_info_vec)) as ArrayRef,
     ]);
 
-    // Insert di_ratios before mira_version;module;irma_config for flu
+    // Insert di_ratios before pass_fail_reason for flu
     if virus == "flu" {
         let di_ratios_vec = extract_field(summary_data, |i| i.di_ratios_5prime_3prime.clone());
 
         let insert_idx = fields
             .iter()
-            .position(|f| f.name() == "mira_version;module;irma_config")
-            .expect("mira_version;module;irma_config field not found");
+            .position(|f| f.name() == "pass_fail_reason")
+            .expect("pass_fail_reasonfield not found");
 
         fields.insert(
             insert_idx,
