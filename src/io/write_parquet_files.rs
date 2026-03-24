@@ -497,7 +497,6 @@ pub fn write_minor_vars_to_parquet(
 
     Ok(())
 }
-/// Write the irma summary data to parquet file.
 pub fn write_irma_summary_to_parquet(
     irma_summary_data: &[IRMASummary],
     virus: &str,
@@ -594,10 +593,19 @@ pub fn write_irma_summary_to_parquet(
         arrays.push(Arc::new(Int32Array::from(spike_median_coverage_vec)));
     }
 
-    // Flu-specific field
+    // Flu-specific field - inserted before mira_version;module;irma_config
     if virus == "flu" {
-        fields.push(Field::new("di_ratios_5prime_3prime", DataType::Utf8, true));
-        arrays.push(Arc::new(StringArray::from(di_ratios_vec)));
+        let insert_idx = fields
+            .iter()
+            .position(|f| f.name() == "mira_version;module;irma_config")
+            .expect("mira_version;module;irma_config field not found");
+
+        fields.insert(
+            insert_idx,
+            Field::new("di_ratios_5prime_3prime", DataType::Utf8, true),
+        );
+
+        arrays.insert(insert_idx, Arc::new(StringArray::from(di_ratios_vec)));
     }
 
     let schema = Arc::new(Schema::new(fields));
@@ -973,6 +981,26 @@ pub fn write_updated_irma_summary_to_parquet(
         Arc::new(StringArray::from(nextclade_info_vec)) as ArrayRef,
     ]);
 
+    // Insert di_ratios before mira_version;module;irma_config for flu
+    if virus == "flu" {
+        let di_ratios_vec = extract_field(summary_data, |i| i.di_ratios_5prime_3prime.clone());
+
+        let insert_idx = fields
+            .iter()
+            .position(|f| f.name() == "mira_version;module;irma_config")
+            .expect("mira_version;module;irma_config field not found");
+
+        fields.insert(
+            insert_idx,
+            Field::new("di_ratios_5prime_3prime", DataType::Utf8, true),
+        );
+
+        arrays.insert(
+            insert_idx,
+            Arc::new(StringArray::from(di_ratios_vec)) as ArrayRef,
+        );
+    }
+
     // Virus-specific Nextclade fields
     match virus {
         "sc2-wgs" => {
@@ -993,18 +1021,15 @@ pub fn write_updated_irma_summary_to_parquet(
             ]);
         }
         "flu" => {
-            let di_ratios_vec = extract_field(summary_data, |i| i.di_ratios_5prime_3prime.clone());
             let subclade_vec = extract_field(summary_data, |i| i.nextclade_field_1.clone());
             let nextclade_alias_vec = extract_field(summary_data, |i| i.nextclade_field_2.clone());
 
             fields.extend([
-                Field::new("di_ratios_5prime_3prime", DataType::Utf8, true),
                 Field::new("subclade", DataType::Utf8, true),
                 Field::new("nextclade_alias", DataType::Utf8, true),
             ]);
 
             arrays.extend(vec![
-                Arc::new(StringArray::from(di_ratios_vec)) as ArrayRef,
                 Arc::new(StringArray::from(subclade_vec)) as ArrayRef,
                 Arc::new(StringArray::from(nextclade_alias_vec)) as ArrayRef,
             ]);

@@ -276,10 +276,10 @@ pub fn write_out_all_csv_mira_reports(
             "count_minor_snv_at_or_over_5_pct",
             "pass_fail_reason",
             "subtype",
+            "di_ratios_5prime_3prime",
             "mira_module",
             "runid",
             "instrument",
-            "di_ratios_5prime_3prime",
         ]
     } else {
         vec![
@@ -329,10 +329,10 @@ pub fn write_out_all_csv_mira_reports(
             "count_minor_snv_at_or_over_5_pct",
             "pass_fail_reason",
             "subtype",
+            "di_ratios_5prime_3prime",
             "mira_version;module;irma_config",
             "runid",
             "instrument",
-            "di_ratios_5prime_3prime",
         ]
     } else {
         vec![
@@ -469,13 +469,13 @@ pub fn write_out_updated_summary_csv(
             "count_minor_snv_at_or_over_5_pct",
             "pass_fail_reason",
             "subtype",
+            "di_ratios_5prime_3prime",
             "mira_version;module;irma_config",
             "runid",
             "instrument",
             "nextclade_field_1",
             "nextclade_field_2",
             "nextclade_info",
-            "di_ratios_5prime_3prime",
         ]
     } else {
         vec![
@@ -531,10 +531,10 @@ pub fn write_out_updated_summary_csv(
             "count_minor_snv_at_or_over_5_pct",
             "pass_fail_reason",
             "subtype",
+            "di_ratios_5prime_3prime",
             "mira_version;module;irma_config",
             "runid",
             "instrument",
-            "di_ratios_5prime_3prime",
             "subclade",
             "nextclade_alias",
             "nextclade_version;dataset;tag",
