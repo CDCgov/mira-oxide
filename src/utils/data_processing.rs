@@ -9,8 +9,8 @@ use std::{
     path::Path,
 };
 
-use crate::processes::prepare_mira_reports::SamplesheetI;
 use crate::processes::prepare_mira_reports::SamplesheetO;
+use crate::{io::data_ingest::DIStatData, processes::prepare_mira_reports::SamplesheetI};
 
 use crate::io::data_ingest::{
     CoverageData, DaisSeqData, MinorVariantsData, QCSettings, ReadsData, SeqData,
@@ -92,6 +92,7 @@ pub struct IRMASummary {
     pub mira_module: Option<String>,
     pub runid: Option<String>,
     pub instrument: Option<String>,
+    pub di_ratios_5prime_3prime: Option<String>,
 }
 
 /// Variant Count struct
@@ -972,6 +973,7 @@ pub fn create_irma_summary_vec(
     subtype_vec: &[Subtype],
     metadata: &Metadata,
     pos_calc_cov_vec: Option<&[ProcessedCoverage]>,
+    di_stats: &[DIStatData],
 ) -> Result<Vec<IRMASummary>, Box<dyn Error>> {
     let mut irma_summary: Vec<IRMASummary> = Vec::new();
     let filtered_minor_vars_count = count_minor_variants(filtered_minor_vars_vec);
@@ -998,6 +1000,7 @@ pub fn create_irma_summary_vec(
                     mira_module: Some(metadata.module.clone()),
                     runid: Some(metadata.runid.clone()),
                     instrument: Some(metadata.instrument.clone()),
+                    di_ratios_5prime_3prime: None,
                 });
             }
         }
@@ -1019,6 +1022,7 @@ pub fn create_irma_summary_vec(
                 mira_module: Some(metadata.module.clone()),
                 runid: Some(metadata.runid.clone()),
                 instrument: Some(metadata.instrument.clone()),
+                di_ratios_5prime_3prime: None,
             });
         }
     }
@@ -1063,6 +1067,15 @@ pub fn create_irma_summary_vec(
             sample.subtype = Some(entry.subtype.clone());
         } else {
             sample.subtype = Some("Undetermined".to_string());
+        }
+
+        if let Some(entry) = di_stats.iter().find(|entry| {
+            sample.sample_id == Some(entry.sample_id.clone())
+                && sample.reference == Some(entry.segment.clone())
+        }) {
+            sample.di_ratios_5prime_3prime = Some(entry.di_ratios_5prime_3prime.clone());
+        } else {
+            sample.di_ratios_5prime_3prime = None;
         }
     }
 

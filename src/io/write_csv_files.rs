@@ -264,6 +264,23 @@ pub fn write_out_all_csv_mira_reports(
             "runid",
             "instrument",
         ]
+    } else if virus == "flu" {
+        vec![
+            "sample_id",
+            "total_reads",
+            "pass_qc",
+            "reads_mapped",
+            "reference",
+            "percent_reference_coverage",
+            "median_coverage",
+            "count_minor_snv_at_or_over_5_pct",
+            "pass_fail_reason",
+            "subtype",
+            "di_ratios_5prime_3prime",
+            "mira_module",
+            "runid",
+            "instrument",
+        ]
     } else {
         vec![
             "sample_id",
@@ -296,6 +313,23 @@ pub fn write_out_all_csv_mira_reports(
             "spike_median_coverage",
             "pass_fail_reason",
             "subtype",
+            "mira_version;module;irma_config",
+            "runid",
+            "instrument",
+        ]
+    } else if virus == "flu" {
+        vec![
+            "sample_id",
+            "total_reads",
+            "pass_qc",
+            "reads_mapped",
+            "reference",
+            "percent_reference_coverage",
+            "median_coverage",
+            "count_minor_snv_at_or_over_5_pct",
+            "pass_fail_reason",
+            "subtype",
+            "di_ratios_5prime_3prime",
             "mira_version;module;irma_config",
             "runid",
             "instrument",
@@ -435,6 +469,7 @@ pub fn write_out_updated_summary_csv(
             "count_minor_snv_at_or_over_5_pct",
             "pass_fail_reason",
             "subtype",
+            "di_ratios_5prime_3prime",
             "mira_version;module;irma_config",
             "runid",
             "instrument",
@@ -496,6 +531,7 @@ pub fn write_out_updated_summary_csv(
             "count_minor_snv_at_or_over_5_pct",
             "pass_fail_reason",
             "subtype",
+            "di_ratios_5prime_3prime",
             "mira_version;module;irma_config",
             "runid",
             "instrument",

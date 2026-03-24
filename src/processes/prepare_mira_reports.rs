@@ -22,9 +22,9 @@ use crate::{
         data_ingest::{
             DaisSeqData, QCConfig, QCSettings, amended_consensus_data_collection,
             coverage_data_collection, create_reader, dais_ref_seq_data_collection,
-            dais_sequence_data_collection, get_reference_lens, indels_data_collection,
-            minor_variant_data_collection, read_csv, read_yaml, reads_data_collection,
-            run_info_collection,
+            dais_sequence_data_collection, di_stat_data_collection, get_reference_lens,
+            indels_data_collection, minor_variant_data_collection, read_csv, read_yaml,
+            reads_data_collection, run_info_collection,
         },
         write_csv_files::write_out_all_csv_mira_reports,
         write_fasta_files::write_out_all_consensus_fasta_files,
@@ -188,8 +188,8 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
         item.reference_name.clone()
     }));
 
-    //Read in DAIS-ribosome data
-    //In MIRA-NF the DAIS outputs are fed right to the working directory to be used in this step
+    // Read in DAIS-ribosome data
+    // In MIRA-NF the DAIS outputs are fed right to the working directory to be used in this step
     let dais_seq_data = dais_sequence_data_collection("./")?;
     let mut dais_ref_data: Vec<DaisSeqData> = Vec::new();
     if args.virus.to_lowercase() == "flu" || args.virus.to_lowercase() == "rsv" {
@@ -198,10 +198,14 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
         dais_ref_data = dais_ref_seq_data_collection(&args.workdir_path, "sc2")?;
     }
 
+    // Read in DI stats
+    // In MIRA-NF the di_stats right before prepare-mira-report
+    // and outputs are fed right to the working directory to be used in this step
+    let di_stats_data = di_stat_data_collection("./")?;
     println!("Finished ingesting data.");
 
     //////////////////////////////// Processing ingested IRMA and Dais data ////////////////////////////////
-    //Calculate AA variants for aavars.csv and dais_vars.json
+    // Calculate AA variants for aavars.csv and dais_vars.json
     let mut dais_vars_data: Vec<DaisVarsData> = Vec::new();
     if args.virus.to_lowercase() == "flu" {
         dais_vars_data =
@@ -261,6 +265,7 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
         &subtype_data,
         &analysis_metadata,
         Some(&calculated_position_cov_vec),
+        &di_stats_data,
     )?;
 
     let mut qc_values = QCSettings {
@@ -301,7 +306,6 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
     // Get proteins that can not have premature stop codons
     let no_premature_stop_codon_proteins =
         split_by_comma(&qc_values.stop_codon_restricted_proteins);
-    println!("{no_premature_stop_codon_proteins:?}");
 
     // Add pass fail information to irma summary
     for sample in &mut irma_summary {

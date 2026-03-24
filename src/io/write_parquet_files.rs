@@ -497,7 +497,8 @@ pub fn write_minor_vars_to_parquet(
 
     Ok(())
 }
-/// Write the irma summary data to parquet file.
+
+#[allow(clippy::too_many_lines)]
 pub fn write_irma_summary_to_parquet(
     irma_summary_data: &[IRMASummary],
     virus: &str,
@@ -527,6 +528,9 @@ pub fn write_irma_summary_to_parquet(
         extract_field(irma_summary_data, |item| item.pass_fail_reason.clone());
     let subtype_vec = extract_field(irma_summary_data, |item| item.subtype.clone());
     let mira_module_vec = extract_field(irma_summary_data, |item| item.mira_module.clone());
+    let di_ratios_vec = extract_field(irma_summary_data, |item| {
+        item.di_ratios_5prime_3prime.clone()
+    });
     let runid_vec = extract_field(irma_summary_data, |item| item.runid.clone());
     let instrument_vec = extract_field(irma_summary_data, |item| item.instrument.clone());
 
@@ -578,6 +582,7 @@ pub fn write_irma_summary_to_parquet(
         subtype_array,
     ];
 
+    // Existing SC2-specific fields
     if virus == "sc2-wgs" {
         fields.push(Field::new(
             "spike_percent_coverage",
@@ -588,6 +593,21 @@ pub fn write_irma_summary_to_parquet(
 
         arrays.push(Arc::new(Float64Array::from(spike_percent_coverage_vec)));
         arrays.push(Arc::new(Int32Array::from(spike_median_coverage_vec)));
+    }
+
+    // Flu-specific field - inserted before mira_version;module;irma_config
+    if virus == "flu" {
+        let insert_idx = fields
+            .iter()
+            .position(|f| f.name() == "mira_version;module;irma_config")
+            .expect("mira_version;module;irma_config field not found");
+
+        fields.insert(
+            insert_idx,
+            Field::new("di_ratios_5prime_3prime", DataType::Utf8, true),
+        );
+
+        arrays.insert(insert_idx, Arc::new(StringArray::from(di_ratios_vec)));
     }
 
     let schema = Arc::new(Schema::new(fields));
@@ -951,7 +971,6 @@ pub fn write_updated_irma_summary_to_parquet(
         Field::new("runid", DataType::Utf8, true),
         Field::new("instrument", DataType::Utf8, true),
         Field::new("subtype", DataType::Utf8, true),
-        // 🔹 NEW parquet column header
         Field::new("nextclade_version; dataset; tag", DataType::Utf8, true),
     ]);
 
@@ -963,6 +982,26 @@ pub fn write_updated_irma_summary_to_parquet(
         Arc::new(StringArray::from(subtype_vec)) as ArrayRef,
         Arc::new(StringArray::from(nextclade_info_vec)) as ArrayRef,
     ]);
+
+    // Insert di_ratios before mira_version;module;irma_config for flu
+    if virus == "flu" {
+        let di_ratios_vec = extract_field(summary_data, |i| i.di_ratios_5prime_3prime.clone());
+
+        let insert_idx = fields
+            .iter()
+            .position(|f| f.name() == "mira_version;module;irma_config")
+            .expect("mira_version;module;irma_config field not found");
+
+        fields.insert(
+            insert_idx,
+            Field::new("di_ratios_5prime_3prime", DataType::Utf8, true),
+        );
+
+        arrays.insert(
+            insert_idx,
+            Arc::new(StringArray::from(di_ratios_vec)) as ArrayRef,
+        );
+    }
 
     // Virus-specific Nextclade fields
     match virus {
@@ -1000,9 +1039,8 @@ pub fn write_updated_irma_summary_to_parquet(
         _ => {
             let clade_vec = extract_field(summary_data, |i| i.nextclade_field_1.clone());
 
-            fields.extend([Field::new("clade", DataType::Utf8, true)]);
-
-            arrays.extend(vec![Arc::new(StringArray::from(clade_vec)) as ArrayRef]);
+            fields.push(Field::new("clade", DataType::Utf8, true));
+            arrays.push(Arc::new(StringArray::from(clade_vec)) as ArrayRef);
         }
     }
 

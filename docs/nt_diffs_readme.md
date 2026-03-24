@@ -19,7 +19,12 @@ ACCAAAACCACTGTTGACCACATGGCCATAATCAAGAAGTACACATCAGGAAGACCTGAA
 After cloning the mira-oxide repo, execute this command to create the table of nucleotide differences and their positions for the samples provided:
 
 ```bash
- cargo run -p all_sample_nt_diff -- -i <PATH>/input.fasta -o <PATH>/outputs.csv
+ cargo run -- nt-diffs -i <PATH>/input.fasta -o <PATH>/outputs.csv
+```
+
+Or run the biniary (inside or outside of container):
+```bash
+ mira-oxide nt-diffs -i <PATH>/input.fasta -o <PATH>/outputs.csv
 ```
 
 If you would like the output to have another deliminator (default: ","), then the `-d` flag can be used to pass another deliminator.

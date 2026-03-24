@@ -40,6 +40,11 @@ After cloning the mira-oxide repo, execute this command to create a mutations of
 cargo run -- prepare-mira-reports -s <PATH>/samplesheet.csv -i ~<PATH_TO_MIRA_NF_OUTPUTS> -o <OUTDIR> -q <PATH>/qc_test.yaml -p <PLATFORM> -w <PATH>/MIRA-NF -r <RUN_ID> -v <VIRUS> -f (optional) -c <CONFIG> (optional)
 ```
 
+Or run the biniary (inside or outside of container):
+```bash
+mira-oxide prepare-mira-reports -s <PATH>/samplesheet.csv -i ~<PATH_TO_MIRA_NF_OUTPUTS> -o <OUTDIR> -q <PATH>/qc_test.yaml -p <PLATFORM> -w <PATH>/MIRA-NF -r <RUN_ID> -v <VIRUS> -f (optional) -c <CONFIG> (optional)
+```
+
 **NOTE: This script expects you to have the DAIS_ribosome.seq file to be in the location that you are deploying the command for MIRA-NF compatibility**
 
 ### Files Outputs

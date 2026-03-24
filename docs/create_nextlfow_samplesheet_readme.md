@@ -65,3 +65,8 @@ After cloning the mira-oxide repo, execute this command to create a hamming dist
 ```bash
 cargo run -- create-nextflow-samplesheet -s <RUNDIR>/samplesheet.csv -r <RUNDIR> -e <experiment_type>
 ```
+
+Or run the biniary (inside or outside of container):
+```bash
+mira-oxide create-nextflow-samplesheet -s <RUNDIR>/samplesheet.csv -r <RUNDIR> -e <experiment_type>
+```

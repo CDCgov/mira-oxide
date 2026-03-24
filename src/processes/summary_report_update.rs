@@ -1,13 +1,29 @@
 #![allow(dead_code, unused_imports)]
-use std::{collections::HashMap, error::Error, path::PathBuf};
+use std::{
+    collections::HashMap,
+    error::Error,
+    path::{Path, PathBuf},
+};
 
 use clap::{Parser, ValueHint};
 use serde::{Deserialize, Serialize};
 
-use crate::io::{
-    data_ingest::{NextcladeData, create_reader, nextclade_data_collection, read_csv},
-    write_csv_files::write_out_updated_summary_csv,
-    write_parquet_files::write_updated_irma_summary_to_parquet,
+use crate::{
+    io::{
+        coverage_json_per_sample::SampleCoverageJson,
+        create_statichtml::{
+            generate_html_report, irma_summary_to_plotly_json, plotly_table_script,
+            update_irma_summary_to_plotly_json, update_summary_in_html,
+        },
+        data_ingest::{
+            IndelsData, MinorVariantsData, NextcladeData, create_reader, nextclade_data_collection,
+            read_csv,
+        },
+        reads_to_sankey_json::SampleSankeyJson,
+        write_csv_files::write_out_updated_summary_csv,
+        write_parquet_files::write_updated_irma_summary_to_parquet,
+    },
+    utils::data_processing::{DaisVarsData, IRMASummary},
 };
 
 #[derive(Debug, Parser)]
@@ -23,6 +39,9 @@ pub struct SummaryUpdateArgs {
 
     #[arg(short = 's', long)]
     summary_csv: PathBuf,
+
+    #[arg(short = 't', long)]
+    static_html_path: PathBuf,
 
     #[arg(short = 'v', long)]
     virus: String,
@@ -87,6 +106,7 @@ pub struct UpdatedIRMASummary {
     pub mira_module: Option<String>,
     pub runid: Option<String>,
     pub instrument: Option<String>,
+    pub di_ratios_5prime_3prime: Option<String>,
     pub nextclade_field_1: Option<String>,
     pub nextclade_field_2: Option<String>,
     pub nextclade_field_3: Option<String>,
@@ -123,8 +143,6 @@ pub fn summary_report_update_process(args: &SummaryUpdateArgs) -> Result<(), Box
         .map(|m| (m.dataset.as_str(), m))
         .collect();
 
-    println!("{metadata_map:#?}");
-
     for summary in &mut summary_data {
         let Some(sample_id) = &summary.sample_id else {
             continue;
@@ -134,11 +152,9 @@ pub fn summary_report_update_process(args: &SummaryUpdateArgs) -> Result<(), Box
             match args.virus.as_str() {
                 "flu" => {
                     let has_ha = summary.reference.as_ref().is_some_and(|r| r.contains("HA"));
-
                     if has_ha {
                         summary.nextclade_field_1 = nc.short_clade.clone();
                         summary.nextclade_field_2 = nc.subclade.clone();
-
                         if summary
                             .nextclade_field_1
                             .as_ref()
@@ -158,13 +174,11 @@ pub fn summary_report_update_process(args: &SummaryUpdateArgs) -> Result<(), Box
                         summary.nextclade_field_2 = Some("na".to_string());
                     }
                 }
-
                 "sc2-wgs" => {
                     summary.nextclade_field_1 = nc.clade.clone();
                     summary.nextclade_field_2 = nc.clade_who.clone();
                     summary.nextclade_field_3 = nc.nextclade_pango.clone();
 
-                    // Ensure all fields default to "na" if empty
                     if summary
                         .nextclade_field_1
                         .as_ref()
@@ -187,10 +201,8 @@ pub fn summary_report_update_process(args: &SummaryUpdateArgs) -> Result<(), Box
                         summary.nextclade_field_3 = Some("na".to_string());
                     }
                 }
-
                 "rsv" => {
                     summary.nextclade_field_1 = nc.clade.clone();
-
                     if summary
                         .nextclade_field_1
                         .as_ref()
@@ -198,39 +210,28 @@ pub fn summary_report_update_process(args: &SummaryUpdateArgs) -> Result<(), Box
                     {
                         summary.nextclade_field_1 = Some("na".to_string());
                     }
-                    // explicitly set the remaining fields to "na"
-                    if summary.nextclade_field_2.is_none() {
-                        summary.nextclade_field_2 = Some("na".to_string());
-                    }
-                    if summary.nextclade_field_3.is_none() {
-                        summary.nextclade_field_3 = Some("na".to_string());
-                    }
+                    summary.nextclade_field_2.get_or_insert("na".to_string());
+                    summary.nextclade_field_3.get_or_insert("na".to_string());
                 }
-
                 _ => {}
             }
 
-            // Normalize "na" -> ""
             normalize_nextclade_field(&mut summary.nextclade_field_1);
             normalize_nextclade_field(&mut summary.nextclade_field_2);
             normalize_nextclade_field(&mut summary.nextclade_field_3);
 
-            // Only add nextclade_info if nextclade_field_1 is non-empty
             let field_1_is_nonempty = summary
                 .nextclade_field_1
                 .as_ref()
                 .is_some_and(|s| !s.trim().is_empty());
-
             if field_1_is_nonempty {
                 if let Some(nc_dataset) = &nc.dataset
                     && let Some(metadata_match) = metadata_map.get(nc_dataset.as_str())
                     && metadata_match.dataset == *nc_dataset
                 {
-                    let version = &args.nextclade_version;
-
                     summary.nextclade_info = Some(format!(
                         "{};{};{}",
-                        version, metadata_match.dataset, metadata_match.tag
+                        args.nextclade_version, metadata_match.dataset, metadata_match.tag
                     ));
                 } else {
                     summary.nextclade_info = Some("dataset_mismatch".to_string());
@@ -239,18 +240,15 @@ pub fn summary_report_update_process(args: &SummaryUpdateArgs) -> Result<(), Box
                 summary.nextclade_info = Some(String::new());
             }
         } else {
-            // No nextclade match
             summary.nextclade_info = Some(String::new());
-            // Ensure all nextclade fields default to ""
             summary.nextclade_field_1.get_or_insert(String::new());
             summary.nextclade_field_2.get_or_insert(String::new());
             summary.nextclade_field_3.get_or_insert(String::new());
         }
     }
 
-    // Write outputs
+    // Write CSV and PARQUET outputs
     write_out_updated_summary_csv(&summary_data, &args.virus, &args.runid, &args.output_path)?;
-
     if args.parq {
         println!("Writing PARQUET files");
         write_updated_irma_summary_to_parquet(
@@ -263,6 +261,14 @@ pub fn summary_report_update_process(args: &SummaryUpdateArgs) -> Result<(), Box
             ),
         )?;
     }
+
+    // Udpating the StaticHTML
+    let summary_json = update_irma_summary_to_plotly_json(&summary_data, &args.virus);
+
+    let new_summary_html =
+        plotly_table_script("irma_summary_table", &summary_json, "MIRA Summary Table");
+
+    update_summary_in_html(&args.static_html_path, &new_summary_html)?;
 
     Ok(())
 }

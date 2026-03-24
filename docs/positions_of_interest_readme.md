@@ -37,7 +37,11 @@ B	PA	38	T	true
 After cloning the mira-oxide repo, execute this command to create a positions of interest table for the samples:
 
 ```bash
-cargo run -p positions-of-interest -- -i <PATH>/DAIS_ribosome.seq -r <PATH>/ref_table.txt -o <PATH>/outputs.csv -m <PATH>/positions_of_interest.txt
+cargo run -- positions-of-interest -- -i <PATH>/DAIS_ribosome.seq -r <PATH>/ref_table.txt -o <PATH>/outputs.csv -m <PATH>/positions_of_interest.txt
+```
+Or run the biniary (inside or outside of container):
+```bash
+mira-oxide positions-of-interest -i <PATH>/DAIS_ribosome.seq -r <PATH>/ref_table.txt -o <PATH>/outputs.csv -m <PATH>/positions_of_interest.txt
 ```
 
 If you would like the output to have another deliminator (default: ","), then the `-d` flag can be used to pass another deliminator.

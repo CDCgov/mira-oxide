@@ -9,6 +9,7 @@ use crate::processes::{
     all_sample_nt_diffs::{NTDiffsArgs, all_sample_nt_diffs_process},
     check_mira_version::{MiraVersionArgs, check_mira_version},
     create_nextflow_samplesheet::{SamplesheetArgs, create_nextflow_samplesheet},
+    di_stats::{DIStatArgs, di_stats_process},
     find_chemistry::{FindChemArgs, find_chemistry_process},
     plotter::{PlotterArgs, plotter_process},
     positions_of_interest::{PositionsArgs, positions_of_interest_process},
@@ -38,7 +39,7 @@ enum Commands {
     FindChemistry(FindChemArgs),
     /// Hamming
     Hamming(HammingArgs),
-    /// nt diffs
+    /// NT diffs
     NTDiffs(NTDiffsArgs),
     /// Plotter
     Plotter(PlotterArgs),
@@ -52,6 +53,8 @@ enum Commands {
     CreateNextflowSamplesheet(SamplesheetArgs),
     /// Samplesheet Nextflow format validation
     SamplesheetCheck(SamplesheetCheckArgs),
+    /// DI Stats
+    DIStats(DIStatArgs),
 }
 
 fn main() {
@@ -94,6 +97,9 @@ fn main() {
         }
         Commands::SamplesheetCheck(cmd_args) => {
             samplesheet_check(&cmd_args).unwrap_or_die(&format!("{module}::SamplesheetCheck"));
+        }
+        Commands::DIStats(cmd_args) => {
+            di_stats_process(&cmd_args).unwrap_or_die(&format!("{module}::DIStats"));
         }
     }
 }

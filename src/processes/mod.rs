@@ -1,5 +1,6 @@
 pub mod all_sample_hd;
 pub mod all_sample_nt_diffs;
+pub mod di_stats;
 pub mod check_mira_version;
 pub mod create_nextflow_samplesheet;
 pub mod find_chemistry;

@@ -283,6 +283,17 @@ pub struct DaisSeqData {
     pub aa_reference_id: Option<String>,
 }
 
+/// `DIstat` Data
+#[derive(Serialize, Deserialize, Debug)]
+pub struct DIStatData {
+    pub run_id: String,
+    pub sample_id: String,
+    pub segment: String,
+    pub prime5: String,
+    pub prime3: String,
+    pub di_ratios_5prime_3prime: String,
+}
+
 /////////////// Structs to hold nextcalde data ///////////////
 /// Nextclade Data
 #[derive(Serialize, Deserialize, Debug)]
@@ -1012,7 +1023,6 @@ pub fn dais_ref_seq_data_collection(
     organism: &str,
 ) -> Result<Vec<DaisSeqData>, Box<dyn std::error::Error>> {
     // Construct the glob pattern for matching files
-    //If using * situation, you will have to use glob
     let pattern = format!(
         "{}/data/references/*{}.seq",
         dais_path.as_ref().display(),
@@ -1037,6 +1047,34 @@ pub fn dais_ref_seq_data_collection(
     }
 
     Ok(dais_seq_data)
+}
+
+/// Read in dais-ribosome ins file fto `DaisSeqData` struct
+pub fn di_stat_data_collection(
+    di_stat_path: impl AsRef<Path>,
+) -> Result<Vec<DIStatData>, Box<dyn std::error::Error>> {
+    // Construct the glob pattern for matching files
+    let pattern = format!("{}di_stats.txt", di_stat_path.as_ref().display());
+
+    let mut di_stats_data: Vec<DIStatData> = Vec::new();
+
+    // Use the glob crate to find all matching files
+    for entry in glob(&pattern)? {
+        println!("{entry:#?}");
+        match entry {
+            Ok(path) => {
+                let file = File::open(&path)?;
+                let reader = BufReader::new(file);
+                let mut records: Vec<DIStatData> = process_txt(reader, true)?;
+                di_stats_data.append(&mut records);
+            }
+            Err(e) => {
+                eprintln!("Error processing file: {e}");
+            }
+        }
+    }
+
+    Ok(di_stats_data)
 }
 
 /////////////// Data reading functions for Nextclade ///////////////

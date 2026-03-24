@@ -2,10 +2,11 @@
 use super::coverage_json_per_sample::SampleCoverageJson;
 use super::data_ingest::{IndelsData, MinorVariantsData};
 use super::reads_to_sankey_json::SampleSankeyJson;
+use crate::processes::summary_report_update::UpdatedIRMASummary;
 use crate::utils::data_processing::{DaisVarsData, IRMASummary};
 use glob::glob;
 use serde_json::json;
-use std::fs::{read, write};
+use std::fs::{self, read, write};
 use std::path::{Path, PathBuf};
 
 // Helper functions to base64 encode an image file
@@ -111,7 +112,8 @@ fn write_sample_plot_html(
 }
 
 // Format plotly table
-fn plotly_table_script(div_id: &str, table_json: &str, table_title: &str) -> String {
+#[allow(clippy::must_use_candidate)]
+pub fn plotly_table_script(div_id: &str, table_json: &str, table_title: &str) -> String {
     format!(
         r#"
 <style>
@@ -207,22 +209,60 @@ fn plotly_table_script(div_id: &str, table_json: &str, table_title: &str) -> Str
 }
 
 // functions to read in table data and render as HTML table
-fn irma_summary_to_plotly_json(summary: &[IRMASummary]) -> String {
-    let headers = [
-        "Sample",
-        "Total Reads",
-        "Pass QC",
-        "Reads Mapped",
-        "Reference",
-        "% Reference Covered",
-        "Median Coverage",
-        "Count of Minor SNVs >= 0.05",
-        "Pass/Fail Reason",
-        "Subtype",
-        "MIRA module",
-        "Run ID",
-        "Instrument",
-    ];
+#[allow(clippy::must_use_candidate)]
+pub fn irma_summary_to_plotly_json(summary: &[IRMASummary], virus: &str) -> String {
+    // Determine headers dynamically based on virus type
+    let headers: Vec<&str> = match virus {
+        "sc2-wgs" => vec![
+            "Sample",
+            "Total Reads",
+            "Pass QC",
+            "Reads Mapped",
+            "Reference",
+            "% Reference Covered",
+            "Median Coverage",
+            "Count of Minor SNVs >= 0.05",
+            "Spike % Coverage",
+            "Spike Median Coverage",
+            "Pass/Fail Reason",
+            "Subtype",
+            "MIRA module",
+            "Run ID",
+            "Instrument",
+        ],
+        "flu" => vec![
+            "Sample",
+            "Total Reads",
+            "Pass QC",
+            "Reads Mapped",
+            "Reference",
+            "% Reference Covered",
+            "Median Coverage",
+            "Count of Minor SNVs >= 0.05",
+            "Pass/Fail Reason",
+            "Subtype",
+            "DI Ratios 5'/3'",
+            "MIRA module",
+            "Run ID",
+            "Instrument",
+        ],
+        _ => vec![
+            "Sample",
+            "Total Reads",
+            "Pass QC",
+            "Reads Mapped",
+            "Reference",
+            "% Reference Covered",
+            "Median Coverage",
+            "Count of Minor SNVs >= 0.05",
+            "Pass/Fail Reason",
+            "Subtype",
+            "MIRA module",
+            "Run ID",
+            "Instrument",
+        ],
+    };
+
     let mut columns: Vec<Vec<String>> = vec![Vec::new(); headers.len()];
 
     for row in summary {
@@ -240,11 +280,47 @@ fn irma_summary_to_plotly_json(summary: &[IRMASummary]) -> String {
             row.count_minor_snv_at_or_over_5_pct
                 .map_or(String::new(), |v| v.to_string()),
         );
-        columns[8].push(row.pass_fail_reason.as_deref().unwrap_or("").to_string());
-        columns[9].push(row.subtype.as_deref().unwrap_or("").to_string());
-        columns[10].push(row.mira_module.as_deref().unwrap_or("").to_string());
-        columns[11].push(row.runid.as_deref().unwrap_or("").to_string());
-        columns[12].push(row.instrument.as_deref().unwrap_or("").to_string());
+
+        // Virus-specific extra columns
+        let mut col_index = 8;
+        if virus == "sc2-wgs" {
+            columns[col_index].push(
+                row.spike_percent_coverage
+                    .map_or(String::new(), |v| format!("{v:.2}")),
+            );
+            col_index += 1;
+            columns[col_index].push(
+                row.spike_median_coverage
+                    .map_or(String::new(), |v| v.to_string()),
+            );
+            col_index += 1;
+        }
+
+        // Common columns after spike
+        columns[col_index].push(row.pass_fail_reason.as_deref().unwrap_or("").to_string());
+        col_index += 1;
+
+        columns[col_index].push(row.subtype.as_deref().unwrap_or("").to_string());
+        col_index += 1;
+
+        // ✅ Correct placement of DI Ratios for flu
+        if virus == "flu" {
+            columns[col_index].push(
+                row.di_ratios_5prime_3prime
+                    .as_deref()
+                    .unwrap_or("")
+                    .to_string(),
+            );
+            col_index += 1;
+        }
+
+        columns[col_index].push(row.mira_module.as_deref().unwrap_or("").to_string());
+        col_index += 1;
+
+        columns[col_index].push(row.runid.as_deref().unwrap_or("").to_string());
+        col_index += 1;
+
+        columns[col_index].push(row.instrument.as_deref().unwrap_or("").to_string());
     }
 
     json!({
@@ -471,7 +547,7 @@ pub fn generate_html_report(
     let chm_html = plotly_json_script("cov_heatmap_plot", &cov_heatmap_json_str);
 
     // Pull in data tables for htmls
-    let irma_summary_json = irma_summary_to_plotly_json(irma_summary);
+    let irma_summary_json = irma_summary_to_plotly_json(irma_summary, virus);
     let irma_sum_html = plotly_table_script(
         "irma_summary_table",
         &irma_summary_json,
@@ -626,6 +702,7 @@ pub fn generate_html_report(
             The heatmap summarizes the mean coverage per sample per reference.
         </p>
         <hr>
+        <!-- START_IRMA_SUMMARY -->
         {irma_sum_html}
         <div class="centered-link">
             <a href="./{runid}_summary.csv" download>
@@ -633,6 +710,7 @@ pub fn generate_html_report(
                 <img src="data:image/png;base64,{base64_excellogo}" alt="Download excel" width="60" height="40">
             </a>
         </div>
+        <!-- END_IRMA_SUMMARY -->
         <hr>
         {coverage_links_html}
         <hr>
@@ -673,4 +751,185 @@ pub fn generate_html_report(
     println!("  -> static HTML saved to {:?}", out_path.display());
 
     Ok(())
+}
+////////////// For updating after running Nextclade ////////////////
+pub fn update_summary_in_html(
+    html_path: &Path,
+    new_summary_html: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let html = fs::read_to_string(html_path)?;
+
+    let start_marker = "<!-- START_IRMA_SUMMARY -->";
+    let end_marker = "<!-- END_IRMA_SUMMARY -->";
+
+    let start = html
+        .find(start_marker)
+        .ok_or("START_IRMA_SUMMARY not found")?;
+    let end = html.find(end_marker).ok_or("END_IRMA_SUMMARY not found")?;
+
+    let end = end + end_marker.len();
+
+    let mut updated_html = String::new();
+    updated_html.push_str(&html[..start]);
+    updated_html.push_str(start_marker);
+    updated_html.push('\n');
+    updated_html.push_str(new_summary_html);
+    updated_html.push('\n');
+    updated_html.push_str(&html[end_marker.len() + html[..end].rfind(end_marker).unwrap()..]);
+
+    fs::write(html_path, updated_html)?;
+    Ok(())
+}
+
+#[must_use]
+pub fn update_irma_summary_to_plotly_json(summary: &[UpdatedIRMASummary], virus: &str) -> String {
+    let headers: Vec<&str> = if virus == "sc2-wgs" {
+        vec![
+            "Sample",
+            "Total Reads",
+            "Pass QC",
+            "Reads Mapped",
+            "Reference",
+            "% Reference Covered",
+            "Median Coverage",
+            "Count Minor SNVs >= 0.05",
+            "Spike % Coverage",
+            "Spike Median Coverage",
+            "Pass/Fail Reason",
+            "Subtype",
+            "MIRA module",
+            "Run ID",
+            "Instrument",
+            "Clade",
+            "WHO Clade",
+            "Pango Clade",
+            "Nextclade Info",
+        ]
+    } else if virus == "flu" {
+        vec![
+            "Sample",
+            "Total Reads",
+            "Pass QC",
+            "Reads Mapped",
+            "Reference",
+            "% Reference Covered",
+            "Median Coverage",
+            "Count Minor SNVs >= 0.05",
+            "Pass/Fail Reason",
+            "Subtype",
+            "DI Ratio 5'/3'",
+            "MIRA module",
+            "Run ID",
+            "Instrument",
+            "Subclade",
+            "Nextclade Alias",
+            "Nextclade Info",
+        ]
+    } else {
+        vec![
+            "Sample",
+            "Total Reads",
+            "Pass QC",
+            "Reads Mapped",
+            "Reference",
+            "% Reference Covered",
+            "Median Coverage",
+            "Count Minor SNVs >= 0.05",
+            "Pass/Fail Reason",
+            "Subtype",
+            "MIRA module",
+            "Run ID",
+            "Instrument",
+            "Clade",
+            "Nextclade Info",
+        ]
+    };
+
+    let mut columns: Vec<Vec<String>> = vec![Vec::new(); headers.len()];
+
+    for row in summary {
+        let mut col = 0;
+
+        columns[col].push(row.sample_id.as_deref().unwrap_or("").to_string());
+        col += 1;
+        columns[col].push(row.total_reads.map_or(String::new(), |v| v.to_string()));
+        col += 1;
+        columns[col].push(row.pass_qc.map_or(String::new(), |v| v.to_string()));
+        col += 1;
+        columns[col].push(row.reads_mapped.map_or(String::new(), |v| v.to_string()));
+        col += 1;
+        columns[col].push(row.reference.as_deref().unwrap_or("").to_string());
+        col += 1;
+        columns[col].push(
+            row.percent_reference_coverage
+                .map_or(String::new(), |v| format!("{v:.2}")),
+        );
+        col += 1;
+        columns[col].push(row.median_coverage.map_or(String::new(), |v| v.to_string()));
+        col += 1;
+        columns[col].push(
+            row.count_minor_snv_at_or_over_5_pct
+                .map_or(String::new(), |v| v.to_string()),
+        );
+        col += 1;
+
+        if virus == "sc2-wgs" {
+            columns[col].push(
+                row.spike_percent_coverage
+                    .map_or(String::new(), |v| format!("{v:.2}")),
+            );
+            col += 1;
+            columns[col].push(
+                row.spike_median_coverage
+                    .map_or(String::new(), |v| v.to_string()),
+            );
+            col += 1;
+        }
+
+        columns[col].push(row.pass_fail_reason.as_deref().unwrap_or("").to_string());
+        col += 1;
+        columns[col].push(row.subtype.as_deref().unwrap_or("").to_string());
+        col += 1;
+
+        if virus == "flu" {
+            columns[col].push(
+                row.di_ratios_5prime_3prime
+                    .as_deref()
+                    .unwrap_or("")
+                    .to_string(),
+            );
+            col += 1;
+        }
+
+        columns[col].push(row.mira_module.as_deref().unwrap_or("").to_string());
+        col += 1;
+        columns[col].push(row.runid.as_deref().unwrap_or("").to_string());
+        col += 1;
+        columns[col].push(row.instrument.as_deref().unwrap_or("").to_string());
+        col += 1;
+
+        // Nextclade fields (aligned with CSV logic)
+        columns[col].push(row.nextclade_field_1.as_deref().unwrap_or("").to_string());
+        col += 1;
+
+        if virus == "sc2-wgs" {
+            columns[col].push(row.nextclade_field_2.as_deref().unwrap_or("").to_string());
+            col += 1;
+            columns[col].push(row.nextclade_field_3.as_deref().unwrap_or("").to_string());
+            col += 1;
+            columns[col].push(row.nextclade_info.as_deref().unwrap_or("").to_string());
+        } else if virus == "flu" {
+            columns[col].push(row.nextclade_field_2.as_deref().unwrap_or("").to_string());
+            col += 1;
+            columns[col].push(row.nextclade_info.as_deref().unwrap_or("").to_string());
+        } else {
+            columns[col].push(row.nextclade_info.as_deref().unwrap_or("").to_string());
+        }
+    }
+
+    json!({
+        "header": headers,
+        "columns": columns
+    })
+    .to_string()
 }
