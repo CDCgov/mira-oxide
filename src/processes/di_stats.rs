@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
 pub struct DIStatArgs {
     /// Path to the IRMA assembly directory
     #[arg(short = 'a', long)]
-    assembly_dir: PathBuf,
+    assemblies_dir: PathBuf,
 
     /// Run ID to include in output
     #[arg(short = 'r', long)]
@@ -130,7 +130,7 @@ pub fn di_stats_process(args: &DIStatArgs) -> Result<(), std::io::Error> {
         "run_id\tsample_id\tsegment\tprime5\tprime3\tdi_ratios_5prime_3prime"
     )?;
 
-    if let Err(e) = di_stat_assembly(&args.assembly_dir, &args.run_id, &mut writer) {
+    if let Err(e) = di_stat_assembly(&args.assemblies_dir, &args.run_id, &mut writer) {
         eprintln!("Application error: {e}");
     }
 

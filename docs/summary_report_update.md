@@ -28,6 +28,11 @@ After cloning the mira-oxide repo, execute this command to create a mutations of
 cargo run -- summary-report-update -s <PATH>/summary.csv -i ~<PATH_TO_NEXTCLADE_TSV_FILES> -o <OUTDIR> -w <PATH>/MIRA-NF -r <RUN_ID> -v <VIRUS> -f (optional)
 ```
 
+Or run the biniary (inside or outside of container):
+```bash
+mira-oxide summary-report-update -s <PATH>/summary.csv -i ~<PATH_TO_NEXTCLADE_TSV_FILES> -o <OUTDIR> -w <PATH>/MIRA-NF -r <RUN_ID> -v <VIRUS> -f (optional)
+```
+
 ### Files Outputs
 ### Where parquet files only generated when -f flag invoked
 

@@ -19,7 +19,12 @@ ACCAAAACCACTGTTGACCACATGGCCATAATCAAGAAGTACACATCAGGAAGACCTGAA
 After cloning the mira-oxide repo, execute this command to create a hamming distance matrix for the samples provided:
 
 ```bash
- cargo run -p all_sample_hamming_dist -- -i <PATH>/input.fasta -o <PATH>/outputs.csv
+ cargo run -- hamming -i <PATH>/input.fasta -o <PATH>/outputs.csv
+```
+
+Or run the biniary (inside or outside of container):
+```bash
+ mira-oxide hamming -i <PATH>/input.fasta -o <PATH>/outputs.csv
 ```
 
 If you would like the output to have another deliminator (default: ","), then the `-d` flag can be used to pass another deliminator.
