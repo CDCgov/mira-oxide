@@ -497,6 +497,8 @@ pub fn write_minor_vars_to_parquet(
 
     Ok(())
 }
+
+#[allow(clippy::too_many_lines)]
 pub fn write_irma_summary_to_parquet(
     irma_summary_data: &[IRMASummary],
     virus: &str,

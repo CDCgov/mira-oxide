@@ -299,15 +299,11 @@ pub fn irma_summary_to_plotly_json(summary: &[IRMASummary], virus: &str) -> Stri
         // Common columns after spike
         columns[col_index].push(row.pass_fail_reason.as_deref().unwrap_or("").to_string());
         col_index += 1;
+
         columns[col_index].push(row.subtype.as_deref().unwrap_or("").to_string());
         col_index += 1;
-        columns[col_index].push(row.mira_module.as_deref().unwrap_or("").to_string());
-        col_index += 1;
-        columns[col_index].push(row.runid.as_deref().unwrap_or("").to_string());
-        col_index += 1;
-        columns[col_index].push(row.instrument.as_deref().unwrap_or("").to_string());
-        col_index += 1;
 
+        // ✅ Correct placement of DI Ratios for flu
         if virus == "flu" {
             columns[col_index].push(
                 row.di_ratios_5prime_3prime
@@ -315,7 +311,16 @@ pub fn irma_summary_to_plotly_json(summary: &[IRMASummary], virus: &str) -> Stri
                     .unwrap_or("")
                     .to_string(),
             );
+            col_index += 1;
         }
+
+        columns[col_index].push(row.mira_module.as_deref().unwrap_or("").to_string());
+        col_index += 1;
+
+        columns[col_index].push(row.runid.as_deref().unwrap_or("").to_string());
+        col_index += 1;
+
+        columns[col_index].push(row.instrument.as_deref().unwrap_or("").to_string());
     }
 
     json!({
@@ -885,6 +890,17 @@ pub fn update_irma_summary_to_plotly_json(summary: &[UpdatedIRMASummary], virus:
         col += 1;
         columns[col].push(row.subtype.as_deref().unwrap_or("").to_string());
         col += 1;
+
+        if virus == "flu" {
+            columns[col].push(
+                row.di_ratios_5prime_3prime
+                    .as_deref()
+                    .unwrap_or("")
+                    .to_string(),
+            );
+            col += 1;
+        }
+
         columns[col].push(row.mira_module.as_deref().unwrap_or("").to_string());
         col += 1;
         columns[col].push(row.runid.as_deref().unwrap_or("").to_string());
@@ -903,13 +919,6 @@ pub fn update_irma_summary_to_plotly_json(summary: &[UpdatedIRMASummary], virus:
             col += 1;
             columns[col].push(row.nextclade_info.as_deref().unwrap_or("").to_string());
         } else if virus == "flu" {
-            columns[col].push(
-                row.di_ratios_5prime_3prime
-                    .as_deref()
-                    .unwrap_or("")
-                    .to_string(),
-            );
-            col += 1;
             columns[col].push(row.nextclade_field_2.as_deref().unwrap_or("").to_string());
             col += 1;
             columns[col].push(row.nextclade_info.as_deref().unwrap_or("").to_string());
