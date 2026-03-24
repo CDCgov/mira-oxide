@@ -3,8 +3,13 @@
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-<<<<<<< di-stats
-=======
+## [1.5.0] - 2025-03-09
+- [Amanda Sullivan](https://github.com/mandysulli)
+- [Kristine Lacek](https://github.com/kristinelacek)
+
+### `Added`
+- [PR #49](https://github.com/CDCgov/mira-oxide/pull/49) - new subprocess call `di-stats` that calculates the DI stats for flu genomes.
+
 ## [1.4.4] - 2025-03-09
 
 - [Amanda Sullivan](https://github.com/mandysulli)
