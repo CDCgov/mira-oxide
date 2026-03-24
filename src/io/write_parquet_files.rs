@@ -604,7 +604,7 @@ pub fn write_irma_summary_to_parquet(
 
         fields.insert(
             insert_idx,
-            Field::new("di_ratios_5prime_3prime", DataType::Utf8, true),
+            Field::new("di_5prime;di_3prime", DataType::Utf8, true),
         );
 
         arrays.insert(insert_idx, Arc::new(StringArray::from(di_ratios_vec)));
@@ -994,7 +994,7 @@ pub fn write_updated_irma_summary_to_parquet(
 
         fields.insert(
             insert_idx,
-            Field::new("di_ratios_5prime_3prime", DataType::Utf8, true),
+            Field::new("di_5prime;di_3prime", DataType::Utf8, true),
         );
 
         arrays.insert(
