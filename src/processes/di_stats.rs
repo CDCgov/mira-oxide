@@ -107,7 +107,7 @@ pub fn di_stat_assembly(
                         Ok((prime5, prime3)) => {
                             writeln!(
                                 writer,
-                                "{run_id}\t{sample_id}\t{seg}\t{prime5}\t{prime3}\t({prime5};{prime3})"
+                                "{run_id}\t{sample_id}\t{seg}\t{prime5}\t{prime3}\t{prime5};{prime3}"
                             )?;
                         }
                         Err(e) => eprintln!("Could not process file {cov_path:?}: {e}"),
