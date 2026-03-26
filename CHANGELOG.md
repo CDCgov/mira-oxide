@@ -3,7 +3,13 @@
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.5.0] - 2025-03-09
+## [1.5.1] - 2025-03-26
+- [Amanda Sullivan](https://github.com/mandysulli)
+
+### `Fixed`
+- [PR #81](https://github.com/CDCgov/mira-oxide/pull/81) - fixed bug in summary-reports-update where the di_stat values get dropped and return as null.
+
+## [1.5.0] - 2025-03-24
 - [Amanda Sullivan](https://github.com/mandysulli)
 - [Kristine Lacek](https://github.com/kristinelacek)
 
