@@ -100,13 +100,14 @@ pub struct UpdatedIRMASummary {
     pub count_minor_snv_at_or_over_5_pct: Option<i32>,
     pub spike_percent_coverage: Option<f64>,
     pub spike_median_coverage: Option<i32>,
+    #[serde(rename = "di_5prime;di_3prime")]
+    pub di_ratios_5prime_3prime: Option<String>,
     pub pass_fail_reason: Option<String>,
     pub subtype: Option<String>,
     #[serde(rename = "mira_version;module;irma_config")]
     pub mira_module: Option<String>,
     pub runid: Option<String>,
     pub instrument: Option<String>,
-    pub di_ratios_5prime_3prime: Option<String>,
     pub nextclade_field_1: Option<String>,
     pub nextclade_field_2: Option<String>,
     pub nextclade_field_3: Option<String>,
