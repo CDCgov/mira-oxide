@@ -390,6 +390,59 @@ pub fn write_out_all_json_files(
     )?;
 
     // write out the summary.json
+    let summary_struct_values: Vec<&str> = if virus == "sc2-wgs" {
+        vec![
+            "sample_id",
+            "total_reads",
+            "pass_qc",
+            "reads_mapped",
+            "reference",
+            "percent_reference_coverage",
+            "median_coverage",
+            "count_minor_snv_at_or_over_5_pct",
+            "spike_percent_coverage",
+            "spike_median_coverage",
+            "pass_fail_reason",
+            "subtype",
+            "mira_module",
+            "runid",
+            "instrument",
+        ]
+    } else if virus == "flu" {
+        vec![
+            "sample_id",
+            "total_reads",
+            "pass_qc",
+            "reads_mapped",
+            "reference",
+            "percent_reference_coverage",
+            "median_coverage",
+            "count_minor_snv_at_or_over_5_pct",
+            "di_ratios_5prime_3prime",
+            "pass_fail_reason",
+            "subtype",
+            "mira_module",
+            "runid",
+            "instrument",
+        ]
+    } else {
+        vec![
+            "sample_id",
+            "total_reads",
+            "pass_qc",
+            "reads_mapped",
+            "reference",
+            "percent_reference_coverage",
+            "median_coverage",
+            "count_minor_snv_at_or_over_5_pct",
+            "pass_fail_reason",
+            "subtype",
+            "mira_module",
+            "runid",
+            "instrument",
+        ]
+    };
+
     let summary_columns: Vec<&str> = if virus == "sc2-wgs" {
         vec![
             "sample_id",
@@ -447,7 +500,7 @@ pub fn write_out_all_json_files(
         &format!("{}/irma_summary.json", output_path.display()),
         irma_summary,
         &summary_columns,
-        &summary_columns,
+        &summary_struct_values,
     )?;
 
     write_irma_summary_to_pass_fail_json_file(
