@@ -21,6 +21,7 @@ use crate::{
         },
         reads_to_sankey_json::SampleSankeyJson,
         write_csv_files::write_out_updated_summary_csv,
+        write_json_files::{write_out_updated_json_files, write_structs_to_split_json_file},
         write_parquet_files::write_updated_irma_summary_to_parquet,
     },
     utils::data_processing::{DaisVarsData, IRMASummary},
@@ -262,6 +263,9 @@ pub fn summary_report_update_process(args: &SummaryUpdateArgs) -> Result<(), Box
             ),
         )?;
     }
+
+    // Write JSON output
+    write_out_updated_json_files(&args.output_path, &summary_data, &args.virus)?;
 
     // Udpating the StaticHTML
     let summary_json = update_irma_summary_to_plotly_json(&summary_data, &args.virus);
