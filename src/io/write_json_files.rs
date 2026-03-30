@@ -3,14 +3,17 @@ use std::{collections::HashMap, error::Error, fs::File, io::Write, path::Path};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-use crate::utils::data_processing::{
-    DaisVarsData, IRMASummary, NTSequences, ProcessedRecord, filter_struct_by_ids,
+use crate::{
+    processes::summary_report_update::UpdatedIRMASummary,
+    utils::data_processing::{
+        DaisVarsData, IRMASummary, NTSequences, ProcessedRecord, filter_struct_by_ids,
+    },
 };
 use std::collections::HashSet;
 
 use super::data_ingest::{CoverageData, IndelsData, MinorVariantDataCollection, ReadsData};
 
-//////////////// Function to collection and write out all CSV files ///////////////
+//////////////// Function to collection and write out all JSON files ///////////////
 /////////////// Structs ///////////////
 // PassQC struct
 #[derive(Serialize, Deserialize, Debug)]
@@ -19,7 +22,6 @@ pub struct ReadQC {
     pub percent_mapping: f64,
 }
 
-/////////////// Functions to write to json and csv files ///////////////
 /// Function to serialize a vector of structs into split-oriented JSON with precision and indexing
 pub fn write_structs_to_split_json_file<T: Serialize>(
     file_path: &str,
@@ -387,8 +389,8 @@ pub fn write_out_all_json_files(
         neg_control_list,
     )?;
 
-    // write out the summary.json and the {runid}_summary.csv
-    let summary_columns: Vec<&str> = if virus == "sc2-wgs" {
+    // write out the summary.json
+    let summary_struct_values: Vec<&str> = if virus == "sc2-wgs" {
         vec![
             "sample_id",
             "total_reads",
@@ -397,9 +399,26 @@ pub fn write_out_all_json_files(
             "reference",
             "percent_reference_coverage",
             "median_coverage",
-            "count_minor_snv",
+            "count_minor_snv_at_or_over_5_pct",
             "spike_percent_coverage",
             "spike_median_coverage",
+            "pass_fail_reason",
+            "subtype",
+            "mira_module",
+            "runid",
+            "instrument",
+        ]
+    } else if virus == "flu" {
+        vec![
+            "sample_id",
+            "total_reads",
+            "pass_qc",
+            "reads_mapped",
+            "reference",
+            "percent_reference_coverage",
+            "median_coverage",
+            "count_minor_snv_at_or_over_5_pct",
+            "di_ratios_5prime_3prime",
             "pass_fail_reason",
             "subtype",
             "mira_module",
@@ -415,10 +434,63 @@ pub fn write_out_all_json_files(
             "reference",
             "percent_reference_coverage",
             "median_coverage",
-            "count_minor_snv",
+            "count_minor_snv_at_or_over_5_pct",
             "pass_fail_reason",
             "subtype",
             "mira_module",
+            "runid",
+            "instrument",
+        ]
+    };
+
+    let summary_columns: Vec<&str> = if virus == "sc2-wgs" {
+        vec![
+            "sample_id",
+            "total_reads",
+            "pass_qc",
+            "reads_mapped",
+            "reference",
+            "percent_reference_coverage",
+            "median_coverage",
+            "count_minor_snv_at_or_over_5_pct",
+            "spike_percent_coverage",
+            "spike_median_coverage",
+            "pass_fail_reason",
+            "subtype",
+            "mira_version;module;irma_config",
+            "runid",
+            "instrument",
+        ]
+    } else if virus == "flu" {
+        vec![
+            "sample_id",
+            "total_reads",
+            "pass_qc",
+            "reads_mapped",
+            "reference",
+            "percent_reference_coverage",
+            "median_coverage",
+            "count_minor_snv_at_or_over_5_pct",
+            "di_5prime;di_3prime",
+            "pass_fail_reason",
+            "subtype",
+            "mira_version;module;irma_config",
+            "runid",
+            "instrument",
+        ]
+    } else {
+        vec![
+            "sample_id",
+            "total_reads",
+            "pass_qc",
+            "reads_mapped",
+            "reference",
+            "percent_reference_coverage",
+            "median_coverage",
+            "count_minor_snv_at_or_over_5_pct",
+            "pass_fail_reason",
+            "subtype",
+            "mira_version;module;irma_config",
             "runid",
             "instrument",
         ]
@@ -428,7 +500,7 @@ pub fn write_out_all_json_files(
         &format!("{}/irma_summary.json", output_path.display()),
         irma_summary,
         &summary_columns,
-        &summary_columns,
+        &summary_struct_values,
     )?;
 
     write_irma_summary_to_pass_fail_json_file(
@@ -448,6 +520,146 @@ pub fn write_out_all_json_files(
         nt_seq_vec,
         &nt_seq_columns,
         &nt_seq_columns,
+    )?;
+
+    Ok(())
+}
+
+pub fn write_out_updated_json_files(
+    output_path: &Path,
+    irma_summary: &[UpdatedIRMASummary],
+    virus: &str,
+) -> Result<(), Box<dyn Error>> {
+    // write out the summary.json
+    let summary_struct_values: Vec<&str> = if virus == "sc2-wgs" {
+        vec![
+            "sample_id",
+            "total_reads",
+            "pass_qc",
+            "reads_mapped",
+            "reference",
+            "percent_reference_coverage",
+            "median_coverage",
+            "count_minor_snv_at_or_over_5_pct",
+            "spike_percent_coverage",
+            "spike_median_coverage",
+            "pass_fail_reason",
+            "subtype",
+            "mira_version;module;irma_config",
+            "runid",
+            "instrument",
+            "nextclade_field_1",
+            "nextclade_field_2",
+            "nextclade_field_3",
+            "nextclade_info",
+        ]
+    } else if virus == "flu" {
+        vec![
+            "sample_id",
+            "total_reads",
+            "pass_qc",
+            "reads_mapped",
+            "reference",
+            "percent_reference_coverage",
+            "median_coverage",
+            "count_minor_snv_at_or_over_5_pct",
+            "di_5prime;di_3prime",
+            "pass_fail_reason",
+            "subtype",
+            "mira_version;module;irma_config",
+            "runid",
+            "instrument",
+            "nextclade_field_1",
+            "nextclade_field_2",
+            "nextclade_info",
+        ]
+    } else {
+        vec![
+            "sample_id",
+            "total_reads",
+            "pass_qc",
+            "reads_mapped",
+            "reference",
+            "percent_reference_coverage",
+            "median_coverage",
+            "count_minor_snv_at_or_over_5_pct",
+            "pass_fail_reason",
+            "subtype",
+            "mira_version;module;irma_config",
+            "runid",
+            "instrument",
+            "nextclade_field_1",
+            "nextclade_info",
+        ]
+    };
+
+    let summary_columns: Vec<&str> = if virus == "sc2-wgs" {
+        vec![
+            "sample_id",
+            "total_reads",
+            "pass_qc",
+            "reads_mapped",
+            "reference",
+            "percent_reference_coverage",
+            "median_coverage",
+            "count_minor_snv_at_or_over_5_pct",
+            "spike_percent_coverage",
+            "spike_median_coverage",
+            "pass_fail_reason",
+            "subtype",
+            "mira_version;module;irma_config",
+            "runid",
+            "instrument",
+            "clade",
+            "clade_who",
+            "nextclade_pango",
+            "nextclade_version;dataset;tag",
+        ]
+    } else if virus == "flu" {
+        vec![
+            "sample_id",
+            "total_reads",
+            "pass_qc",
+            "reads_mapped",
+            "reference",
+            "percent_reference_coverage",
+            "median_coverage",
+            "count_minor_snv_at_or_over_5_pct",
+            "di_5prime;di_3prime",
+            "pass_fail_reason",
+            "subtype",
+            "mira_version;module;irma_config",
+            "runid",
+            "instrument",
+            "subclade",
+            "nextclade_alias",
+            "nextclade_version;dataset;tag",
+        ]
+    } else {
+        vec![
+            "sample_id",
+            "total_reads",
+            "pass_qc",
+            "reads_mapped",
+            "reference",
+            "percent_reference_coverage",
+            "median_coverage",
+            "count_minor_snv_at_or_over_5_pct",
+            "pass_fail_reason",
+            "subtype",
+            "mira_version;module;irma_config",
+            "runid",
+            "instrument",
+            "clade",
+            "nextclade_version;dataset;tag",
+        ]
+    };
+
+    write_structs_to_split_json_file(
+        &format!("{}/irma_summary.json", output_path.display()),
+        irma_summary,
+        &summary_columns,
+        &summary_struct_values,
     )?;
 
     Ok(())

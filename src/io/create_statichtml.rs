@@ -778,6 +778,7 @@ pub fn update_summary_in_html(
     updated_html.push_str(&html[end_marker.len() + html[..end].rfind(end_marker).unwrap()..]);
 
     fs::write(html_path, updated_html)?;
+    println!(" -> HTML written to {}", html_path.display());
     Ok(())
 }
 
