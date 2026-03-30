@@ -525,6 +525,7 @@ pub fn write_out_all_json_files(
     Ok(())
 }
 
+#[allow(clippy::too_many_lines)]
 pub fn write_out_updated_json_files(
     output_path: &Path,
     irma_summary: &[UpdatedIRMASummary],
