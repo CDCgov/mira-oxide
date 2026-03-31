@@ -36,9 +36,9 @@ jobs:
           [[ "${{ github.ref_name }}" == "test" ]] && latest="--latest=false" || latest=
 
           gh release create "${{ github.ref_name }}" \
-          --title "${RELEASE_BIN} ${{ github.ref_name }}" \
-          --notes-file "$RUNNER_TEMP/release_notes.md" \
-          $latest
+            --title "${RELEASE_BIN} ${{ github.ref_name }}" \
+            --notes-file "$RUNNER_TEMP/release_notes.md" \
+            $latest
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -72,6 +72,7 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ github.repository }}
           tags: |
+            type=raw,value=${{ github.ref_name }}-${{ matrix.arch }}
             type=raw,value=latest-${{ matrix.arch }}
 
       - name: Debug Git ref
@@ -124,27 +125,25 @@ jobs:
         shell: bash
         run: |
           REPO=$(echo "${{ env.REGISTRY }}/${{ github.repository }}" | tr '[A-Z]' '[a-z]')
+
+          # Versioned tag
           VERSION=${REPO}:${{ github.ref_name }}
+          docker buildx imagetools create -t $VERSION \
+            ${REPO}:${{ github.ref_name }}-x86_64 \
+            ${REPO}:${{ github.ref_name }}-aarch64
+
+          # Latest tag
           LATEST=${REPO}:latest
-
-          docker buildx imagetools create \
-            -t $VERSION \
-            ${LATEST}-x86_64 \
-            ${LATEST}-aarch64
-
-          docker buildx imagetools create \
-            -t $LATEST \
-            ${LATEST}-x86_64 \
-            ${LATEST}-aarch64
+          docker buildx imagetools create -t $LATEST \
+            ${REPO}:latest-x86_64 \
+            ${REPO}:latest-aarch64
 
   build-mac-artifacts:
     name: Build Mac Artifacts
     needs: create-release
     runs-on: macos-latest
-
     permissions:
       contents: write
-
     steps:
       - uses: actions/checkout@v4
 
@@ -164,7 +163,7 @@ jobs:
           lipo -create -output ${{ env.RELEASE_BIN }} \
             target/aarch64-apple-darwin/release/${{ env.RELEASE_BIN }} \
             target/x86_64-apple-darwin/release/${{ env.RELEASE_BIN }}
-          tar -czf ${{ env.RELEASE_BIN }}-apple-universal-${{ github.ref_name }}.tar.gz ${{ env.RELEASE_BIN }}
+          tar -czf ${{ env.RELEASE_BIN }}-apple-universal-${{ github.ref_name }}.tar.gz ${{ env.RELEASE_BIN}}
 
       - name: Upload Release Asset
         shell: bash

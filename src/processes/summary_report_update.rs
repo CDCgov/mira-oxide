@@ -157,6 +157,7 @@ pub fn summary_report_update_process(args: &SummaryUpdateArgs) -> Result<(), Box
                     if has_ha {
                         summary.nextclade_field_1 = nc.short_clade.clone();
                         summary.nextclade_field_2 = nc.subclade.clone();
+
                         if summary
                             .nextclade_field_1
                             .as_ref()
@@ -222,11 +223,40 @@ pub fn summary_report_update_process(args: &SummaryUpdateArgs) -> Result<(), Box
             normalize_nextclade_field(&mut summary.nextclade_field_2);
             normalize_nextclade_field(&mut summary.nextclade_field_3);
 
-            let field_1_is_nonempty = summary
-                .nextclade_field_1
-                .as_ref()
-                .is_some_and(|s| !s.trim().is_empty());
-            if field_1_is_nonempty {
+            // --- Conditional logic for nextclade_info: added if relevant fields are NOT all empty ---
+            let set_nextclade_info = match args.virus.as_str() {
+                "flu" => {
+                    summary
+                        .nextclade_field_1
+                        .as_ref()
+                        .is_some_and(|s| !s.trim().is_empty())
+                        || summary
+                            .nextclade_field_2
+                            .as_ref()
+                            .is_some_and(|s| !s.trim().is_empty())
+                }
+                "sc2-wgs" => {
+                    summary
+                        .nextclade_field_1
+                        .as_ref()
+                        .is_some_and(|s| !s.trim().is_empty())
+                        || summary
+                            .nextclade_field_2
+                            .as_ref()
+                            .is_some_and(|s| !s.trim().is_empty())
+                        || summary
+                            .nextclade_field_3
+                            .as_ref()
+                            .is_some_and(|s| !s.trim().is_empty())
+                }
+                "rsv" => summary
+                    .nextclade_field_1
+                    .as_ref()
+                    .is_some_and(|s| !s.trim().is_empty()),
+                _ => false,
+            };
+
+            if set_nextclade_info {
                 if let Some(nc_dataset) = &nc.dataset
                     && let Some(metadata_match) = metadata_map.get(nc_dataset.as_str())
                     && metadata_match.dataset == *nc_dataset
