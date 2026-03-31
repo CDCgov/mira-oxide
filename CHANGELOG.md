@@ -3,6 +3,12 @@
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.3] - 2025-03-31
+- [Amanda Sullivan](https://github.com/mandysulli)
+
+### `Fixed`
+- [PR #83](https://github.com/CDCgov/mira-oxide/pull/83) - Added rewrite for adding nextclade information to account for changes in nextclade output with version bump.
+
 ## [1.5.2] - 2025-03-27
 - [Amanda Sullivan](https://github.com/mandysulli)
 
