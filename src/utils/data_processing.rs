@@ -334,12 +334,7 @@ pub fn return_seg_data(
 
     let mut segset: Vec<String> = Vec::new();
     for segment in &segments {
-        let parts: Vec<&str> = segment.split('_').collect();
-        if parts.len() > 1 {
-            segset.push(parts[1].to_string());
-        } else {
-            segset.push(segment.clone());
-        }
+        segset.push(segment.split('_').nth(1).unwrap_or(segment).to_string());
     }
 
     let segset: Vec<String> = segset
