@@ -1,11 +1,12 @@
 use crate::constants::heatmap_ref::get_references_for_virus;
+use crate::processes::prepare_mira_reports::Virus;
 use crate::utils::data_processing::TransformedData;
 use serde_json::json;
 
-fn normalize_rsv_segments(coverage_data: &[TransformedData], virus: &str) -> Vec<TransformedData> {
+fn normalize_rsv_segments(coverage_data: &[TransformedData], virus: Virus) -> Vec<TransformedData> {
     let mut filtered_data = coverage_data.to_vec();
 
-    if virus.to_lowercase() == "rsv" {
+    if virus == Virus::Rsv {
         for data in &mut filtered_data {
             if data.ref_id.contains("AD") || data.ref_id.contains("BD") {
                 data.ref_id = "RSV".to_string();
@@ -136,7 +137,7 @@ fn build_layout_json(colorscale: &[(f64, &str)]) -> serde_json::Value {
 pub fn coverage_to_heatmap_json(
     coverage_data: &[TransformedData],
     sample_list: &[String],
-    virus: &str,
+    virus: Virus,
     output_file: &str,
 ) -> serde_json::Value {
     println!("Building coverage heatmap as JSON");

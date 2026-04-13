@@ -5,11 +5,14 @@ use serde::{self, Deserialize, Deserializer, Serialize, de::DeserializeOwned};
 use std::{
     collections::HashMap,
     error::Error,
+    fmt::Display,
     fs::{File, OpenOptions},
     io::{self, BufRead, BufReader, Read, Stdin},
     path::{Path, PathBuf},
     time::{SystemTime, UNIX_EPOCH},
 };
+
+use crate::processes::prepare_mira_reports::Virus;
 
 /////////////// Structs to hold IRMA data ///////////////
 ///
@@ -485,9 +488,9 @@ pub fn coverage_data_collection(
     irma_path: impl AsRef<Path>,
     platform: &str,
     runid: &str,
-    virus: &str,
+    virus: Virus,
 ) -> Result<Vec<CoverageData>, Box<dyn std::error::Error>> {
-    let pattern = if virus.to_lowercase() == "sc2-spike" {
+    let pattern = if virus == Virus::Sc2Spike {
         format!(
             "{}/*/IRMA/*/tables/*coverage.a2m.txt",
             irma_path.as_ref().display()
@@ -514,7 +517,7 @@ pub fn coverage_data_collection(
                     process_txt_with_sample(reader, true, &sample)?;
 
                 // If virus is "sc2-spike", replace position with hmm_position
-                if virus == "sc2-spike" {
+                if virus == Virus::Sc2Spike {
                     for line in &mut records {
                         line.position = line.hmm_position.unwrap_or(0);
                     }
@@ -732,10 +735,10 @@ pub fn all_alleles_data_collection(
 /// Read in IRMA amended consensus fasta files to `SeqData` struct
 pub fn amended_consensus_data_collection(
     irma_path: impl AsRef<Path>,
-    organism: &str,
+    organism: Virus,
 ) -> Result<Vec<SeqData>, Box<dyn std::error::Error>> {
     // Determine the glob pattern based on the organism
-    let pattern = if organism == "flu" || organism == "sc2-spike" {
+    let pattern = if organism == Virus::Flu || organism == Virus::Sc2Spike {
         format!(
             "{}/*/IRMA/*/amended_consensus/*fa",
             irma_path.as_ref().display()
@@ -1020,7 +1023,7 @@ pub fn dais_sequence_data_collection(
 /// Read in dais-ribosome ins file fto `DaisSeqData` struct
 pub fn dais_ref_seq_data_collection(
     dais_path: impl AsRef<Path>,
-    organism: &str,
+    organism: impl Display,
 ) -> Result<Vec<DaisSeqData>, Box<dyn std::error::Error>> {
     // Construct the glob pattern for matching files
     let pattern = format!(

@@ -1,5 +1,5 @@
 use crate::io::data_ingest::{AllAllelesData, ReadsData};
-use crate::processes::prepare_mira_reports::Samplesheet;
+use crate::processes::prepare_mira_reports::{Samplesheet, Virus};
 use crate::processes::summary_report_update::UpdatedIRMASummary;
 use crate::utils::data_processing::{AASequences, IRMASummary, NTSequences, extract_field};
 use arrow::array::Float64Array;
@@ -501,7 +501,7 @@ pub fn write_minor_vars_to_parquet(
 #[allow(clippy::too_many_lines)]
 pub fn write_irma_summary_to_parquet(
     irma_summary_data: &[IRMASummary],
-    virus: &str,
+    virus: Virus,
     output_file: &str,
 ) -> Result<(), Box<dyn Error>> {
     if irma_summary_data.is_empty() {
@@ -582,7 +582,7 @@ pub fn write_irma_summary_to_parquet(
     ];
 
     // Existing SC2-specific fields
-    if virus == "sc2-wgs" {
+    if virus == Virus::Sc2Wgs {
         fields.push(Field::new(
             "spike_percent_coverage",
             DataType::Float64,
@@ -595,7 +595,7 @@ pub fn write_irma_summary_to_parquet(
     }
 
     // Flu-specific field - inserted before pass_fail_reason
-    if virus == "flu" {
+    if virus == Virus::Flu {
         let insert_idx = fields
             .iter()
             .position(|f| f.name() == "pass_fail_reason")

@@ -9,7 +9,7 @@ use std::{
     path::Path,
 };
 
-use crate::processes::prepare_mira_reports::SamplesheetO;
+use crate::processes::prepare_mira_reports::{SamplesheetO, Virus};
 use crate::{io::data_ingest::DIStatData, processes::prepare_mira_reports::SamplesheetI};
 
 use crate::io::data_ingest::{
@@ -431,12 +431,12 @@ pub fn compute_cvv_dais_variants(
     sample_seqs_data: &[DaisSeqData],
     runid: &str,
     instrument: &str,
-    virus: &str,
+    virus: Virus,
 ) -> Result<Vec<DaisVarsData>, Box<dyn Error>> {
     let mut merged_data = merge_sequences(ref_seqs_data, sample_seqs_data);
 
     // Filter dais var data based on virus type
-    if virus == "sc2-spike" {
+    if virus == Virus::Sc2Spike {
         merged_data.retain(|entry| entry.protein == "S");
     }
 
@@ -924,7 +924,7 @@ pub fn count_minor_variants(data: &[MinorVariantsData]) -> Vec<VariantCountData>
 pub fn collect_analysis_metadata(
     work_path: &Path,
     platform: &str,
-    virus: &str,
+    virus: Virus,
     irma_config: &String,
     input_runid: &str,
 ) -> Result<Metadata, Box<dyn Error>> {
@@ -1082,7 +1082,7 @@ impl IRMASummary {
     pub fn add_pass_fail_qc(
         &mut self,
         dais_vars: &[DaisVarsData],
-        virus: &str,
+        virus: Virus,
         qc_values: &QCSettings,
     ) -> Result<Vec<IRMASummary>, Box<dyn Error>> {
         let irma_summary: Vec<IRMASummary> = Vec::new();
@@ -1092,7 +1092,7 @@ impl IRMASummary {
                 .iter()
                 .filter(|entry| {
                     // Handle sample_id comparison based on virus type
-                    let sample_match = if virus == "flu" {
+                    let sample_match = if virus == Virus::Flu {
                         // Take the last two characters off entry.sample_id before comparing
                         let entry_id = &entry.sample_id;
 
@@ -1206,13 +1206,13 @@ pub fn create_nt_seq_vec(
     seq_data: &[SeqData],
     vtype_vec: &[ProcessedRecord],
     irma_summary_vec: &[IRMASummary],
-    virus: &str,
+    virus: Virus,
     runid: &str,
     instrument: &str,
 ) -> Result<Vec<NTSequences>, Box<dyn Error>> {
     let mut nt_seq_vec: Vec<NTSequences> = Vec::new();
 
-    if virus == "flu" {
+    if virus == Virus::Flu {
         //Split name and segemnt unmber by last underscore
         for entry in seq_data {
             let parts: Vec<&str> = entry.name.rsplitn(2, '_').collect();
@@ -1308,7 +1308,7 @@ pub fn create_nt_seq_vec(
 pub fn divide_nt_into_pass_fail_vec(
     nt_seq_vec: &[NTSequences],
     platform: &str,
-    virus: &str,
+    virus: Virus,
     no_premature_stop_codon_proteins: &[String],
 ) -> Result<ProcessedSequences, Box<dyn Error>> {
     let mut pass_vec: Vec<SeqData> = Vec::new();
@@ -1324,7 +1324,7 @@ pub fn divide_nt_into_pass_fail_vec(
             false
         } else {
             match (platform, virus) {
-                ("illumina", "flu" | "sc2-wgs" | "rsv") | ("ont", _) => {
+                ("illumina", Virus::Flu | Virus::Sc2Wgs | Virus::Rsv) | ("ont", _) => {
                     entry.qc_decision == "Pass"
                         || (entry.qc_decision.contains("Premature stop codon")
                             && !entry.qc_decision.contains(';'))
@@ -1365,13 +1365,13 @@ pub fn divide_nt_into_pass_fail_vec(
 pub fn create_aa_seq_vec(
     aa_data: &[DaisSeqData],
     irma_summary_vec: &[IRMASummary],
-    virus: &str,
+    virus: Virus,
     runid: &str,
     instrument: &str,
 ) -> Result<Vec<AASequences>, Box<dyn Error>> {
     let mut aa_seq_vec: Vec<AASequences> = Vec::new();
 
-    if virus == "flu" {
+    if virus == Virus::Flu {
         for entry in aa_data {
             let parts: Vec<&str> = entry.sample_id.rsplitn(2, '_').collect();
             if parts.len() != 2 {
@@ -1421,7 +1421,7 @@ pub fn create_aa_seq_vec(
 pub fn divide_aa_into_pass_fail_vec(
     nt_seq_vec: &[AASequences],
     platform: &str,
-    virus: &str,
+    virus: Virus,
     no_premature_stop_codon_proteins: &[String],
 ) -> Result<ProcessedSequences, Box<dyn Error>> {
     let mut pass_vec: Vec<SeqData> = Vec::new();
@@ -1437,7 +1437,7 @@ pub fn divide_aa_into_pass_fail_vec(
             false
         } else {
             match (platform, virus) {
-                ("illumina", "flu" | "sc2-wgs" | "rsv") | ("ont", _) => {
+                ("illumina", Virus::Flu | Virus::Sc2Wgs | Virus::Rsv) | ("ont", _) => {
                     entry.qc_decision == "Pass"
                         || (entry.qc_decision.contains("Premature stop codon")
                             && !entry.qc_decision.contains(';'))
@@ -1485,7 +1485,7 @@ pub fn divide_aa_into_pass_fail_vec(
 pub fn divide_nt_into_nextclade_vec(
     nt_seq_vec: &[NTSequences],
     platform: &str,
-    virus: &str,
+    virus: Virus,
     no_premature_stop_codon_proteins: &[String],
 ) -> Result<NextcladeSequences, Box<dyn Error>> {
     let mut nextclade_seqs = NextcladeSequences {
@@ -1510,20 +1510,20 @@ pub fn divide_nt_into_nextclade_vec(
             false
         } else {
             match (platform, virus) {
-                ("illumina", "flu") => {
+                ("illumina", Virus::Flu) => {
                     entry.qc_decision == "Pass"
                         || (entry.qc_decision.contains("Premature stop codon")
                             && !entry.qc_decision.contains(';')
                             && !entry.reference.contains("HA")
                             && !entry.reference.contains("NA"))
                 }
-                ("illumina", "sc2-wgs") => {
+                ("illumina", Virus::Sc2Wgs) => {
                     entry.qc_decision == "Pass"
                         || (entry.qc_decision.contains("Premature stop codon")
                             && !entry.qc_decision.contains(';')
                             && !entry.qc_decision.contains("Premature stop codon 'S'"))
                 }
-                ("illumina", "rsv") => {
+                ("illumina", Virus::Rsv) => {
                     entry.qc_decision == "Pass"
                         || (entry.qc_decision.contains("Premature stop codon")
                             && !entry.qc_decision.contains(';')
@@ -1577,13 +1577,13 @@ pub fn divide_nt_into_nextclade_vec(
 #[must_use]
 pub fn transform_coverage_to_heatmap(
     coverage_data: &[CoverageData],
-    virus: &str,
+    virus: Virus,
 ) -> Vec<TransformedData> {
     // Filter for SC2-Spike region if virus is "sc2-spike"
     let position_1 = 21563;
     let position_2 = 25384;
 
-    let filtered_data: Vec<&CoverageData> = if virus.to_lowercase() == "sc2-spike" {
+    let filtered_data: Vec<&CoverageData> = if virus == Virus::Sc2Spike {
         coverage_data
             .iter()
             .filter(|row| row.position > position_1 && row.position < position_2)
