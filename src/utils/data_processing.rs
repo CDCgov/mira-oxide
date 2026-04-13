@@ -430,6 +430,7 @@ pub fn compute_dais_variants(
 }
 
 /// Compute CVV DAIS Variants
+#[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
 pub fn compute_cvv_dais_variants(
     ref_seqs_data: &[DaisSeqData],
     sample_seqs_data: &[DaisSeqData],
@@ -444,33 +445,37 @@ pub fn compute_cvv_dais_variants(
         entry.insertion = compute_aa_variants(&entry.aa_aln, &entry.aa_seq);
     }
 
-    for entry in &mut merged_data {
-        entry.insertions_shift_frame = if entry.insertion.is_empty() {
-            "0".to_string()
-        } else {
-            entry.insertion.split(',').count().to_string()
-        };
-    }
+    let mut merged_data_with_num_variants = merged_data
+        .into_iter()
+        .map(|entry| {
+            let num_variants = if entry.insertion.is_empty() {
+                0
+            } else {
+                entry.insertion.split(',').count()
+            };
+            (entry, num_variants)
+        })
+        .collect::<Vec<_>>();
 
     // Filter and sort the data - keep first
-    merged_data.sort_by(|a, b| {
+    merged_data_with_num_variants.sort_by(|(a, a_num_variants), (b, b_num_variants)| {
         a.protein
             .cmp(&b.protein)
             .then(a.sample_id.cmp(&b.sample_id))
-            .then(a.insertions_shift_frame.cmp(&b.insertions_shift_frame))
+            .then(a_num_variants.cmp(b_num_variants))
     });
 
     let mut unique_data = HashMap::new();
-    for entry in merged_data {
+    for (entry, num_variants) in merged_data_with_num_variants {
         let key = (entry.sample_id.clone(), entry.protein.clone());
-        unique_data.entry(key).or_insert(entry);
+        unique_data.entry(key).or_insert((entry, num_variants));
     }
 
     // Filter dais var data based on virus type
-    let filtered_data: Vec<DaisSeqData> = if virus == "sc2-spike" {
+    let filtered_data: Vec<(DaisSeqData, usize)> = if virus == "sc2-spike" {
         unique_data
             .into_values()
-            .filter(|entry| entry.protein == "S")
+            .filter(|(entry, _num_variants)| entry.protein == "S")
             .collect()
     } else {
         unique_data.into_values().collect()
@@ -479,13 +484,14 @@ pub fn compute_cvv_dais_variants(
     // Convert DaisSeqData to DaisVarsData and collect into a Vec
     let result: Vec<DaisVarsData> = filtered_data
         .into_iter()
-        .map(|entry| DaisVarsData {
+        .map(|(entry, num_variants)| DaisVarsData {
             sample_id: entry.sample_id,
             ctype: entry.ctype,
             aa_reference_id: entry.aa_reference_id,
             positional_reference_id: entry.reference.clone(),
             protein: entry.protein.clone(),
-            aa_variant_count: entry.insertions_shift_frame.parse::<i32>().unwrap_or(0),
+            // TODO: Eventually, we can change this field to be a usize perhaps
+            aa_variant_count: num_variants as i32,
             aa_variants: entry.insertion.clone(),
             runid: runid.to_owned(),
             instrument: instrument.to_owned(),

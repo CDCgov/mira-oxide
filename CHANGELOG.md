@@ -3,32 +3,38 @@
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.5.3] - 2025-03-31
+## [1.5.4] - 2026-04-13
+- [William Chettleburgh](https://github.com/willchet)
+
+### `Fixed`
+- [PR #84](https://github.com/CDCgov/mira-oxide/pull/84) - Fixed sorting of merged data for RSV
+
+## [1.5.3] - 2026-03-31
 - [Amanda Sullivan](https://github.com/mandysulli)
 
 ### `Fixed`
 - [PR #83](https://github.com/CDCgov/mira-oxide/pull/83) - Added rewrite for adding nextclade information to account for changes in nextclade output with version bump.
 
-## [1.5.2] - 2025-03-27
+## [1.5.2] - 2026-03-27
 - [Amanda Sullivan](https://github.com/mandysulli)
 
 ### `Fixed`
 - [PR #82](https://github.com/CDCgov/mira-oxide/pull/82) - Added rewrite the `irma_summary.json` file into the the `summary-report-update` subprocess.
 
-## [1.5.1] - 2025-03-26
+## [1.5.1] - 2026-03-26
 - [Amanda Sullivan](https://github.com/mandysulli)
 
 ### `Fixed`
 - [PR #81](https://github.com/CDCgov/mira-oxide/pull/81) - fixed bug in summary-reports-update where the di_stat values get dropped and return as null.
 
-## [1.5.0] - 2025-03-24
+## [1.5.0] - 2026-03-24
 - [Amanda Sullivan](https://github.com/mandysulli)
 - [Kristine Lacek](https://github.com/kristinelacek)
 
 ### `Added`
 - [PR #49](https://github.com/CDCgov/mira-oxide/pull/49) - new subprocess call `di-stats` that calculates the DI stats for flu genomes.
 
-## [1.4.4] - 2025-03-09
+## [1.4.4] - 2026-03-09
 
 - [Amanda Sullivan](https://github.com/mandysulli)
 
@@ -38,7 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### `Fixed`
 - [PR #76](https://github.com/CDCgov/mira-oxide/pull/76) - Fixed bug that called premature stop codon when reference was just shorter.
 
-## [1.4.3] - 2025-03-05
+## [1.4.3] - 2026-03-05
 
 - [Amanda Sullivan](https://github.com/mandysulli)
 
@@ -48,7 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### `Fixed`
 - [PR #73](https://github.com/CDCgov/mira-oxide/pull/73) - Update pass fail logic so that it does not Pass HA/NA with "premature stop codon"
 
-## [1.4.2] - 2025-03-04
+## [1.4.2] - 2026-03-04
 
 - [Amanda Sullivan](https://github.com/mandysulli)
 
@@ -58,7 +64,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### `Fixed`
 - [PR #71](https://github.com/CDCgov/mira-oxide/pull/71) - No longer printing undetermined for smaples that didn't run. Now the line is left empty. 
 
-## [1.4.1] - 2025-02-26
+## [1.4.1] - 2026-02-26
 
 - [Amanda Sullivan](https://github.com/mandysulli)
 
@@ -66,7 +72,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### `Fixed`
 - [PR #68](https://github.com/CDCgov/mira-oxide/pull/68) - Remove indel count collumn from statichtml since we no longer make that value
 
-## [1.4.0] - 2025-02-12
+## [1.4.0] - 2026-02-12
 
 - [Amanda Sullivan](https://github.com/mandysulli)
 - [Sam Wiley](https://github.com/samcwiley)
@@ -88,7 +94,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [PR #65](https://github.com/CDCgov/mira-oxide/pull/65) - minor_variants.csv and minor_variants.parq no longer filtered to frequency of 0.05
 - [PR #65](https://github.com/CDCgov/mira-oxide/pull/65) - the minor_indel_count column has been removed from summary.csv, summary.json and summary.parq - may break schemas
 
-## [1.3.2] - 2025-02-02
+## [1.3.2] - 2026-02-02
 
 - [Amanda Sullivan](https://github.com/mandysulli)
 
@@ -96,14 +102,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [PR #63](https://github.com/CDCgov/mira-oxide/pull/63) - Fix low median coverage flag call and made BYAM subtype call stricter (need 100% of HA segment now).
 
 
-## [1.3.1] - 2025-01-13
+## [1.3.1] - 2026-01-13
 
 - [Amanda Sullivan](https://github.com/mandysulli)
 
 ### `Fixed`
 - [PR #62](https://github.com/CDCgov/mira-oxide/pull/62) - Fix compatibility with MIRA-NF.
 
-## [1.3.0] - 2025-01-13
+## [1.3.0] - 2026-01-13
 
 - [Amanda Sullivan](https://github.com/mandysulli)
 
@@ -111,7 +117,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [PR #60](https://github.com/CDCgov/mira-oxide/pull/60) - Added divide_nt_into_nextclade_vec and write_out_nextclade_fasta_files funcitons to write out nextclade fastsa files that are divided by subtype( and segment for flu).
 - [PR #60](https://github.com/CDCgov/mira-oxide/pull/60) - Added summary_report_update function to add the nextclade clade results back into the summary.csv and sumary.parq files.
 
-## [1.2.3] - 2025-01-05
+## [1.2.3] - 2026-01-05
 
 - [Amanda Sullivan](https://github.com/mandysulli)
 - [Kristine Lacek](https://github.com/kristinelacek)
