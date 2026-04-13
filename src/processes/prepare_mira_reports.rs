@@ -37,11 +37,13 @@ use crate::{
     },
     utils::data_processing::extract_subtype_rsv,
 };
-use clap::Parser;
+use clap::builder::PossibleValue;
+use clap::{Parser, ValueEnum};
 use csv::ReaderBuilder;
 use either::Either;
 use serde::{self, Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::json;
+use std::fmt::Display;
 use std::fs;
 use std::sync::Arc;
 use std::{
@@ -75,10 +77,10 @@ pub struct ReportsArgs {
     /// Options: illumina or ont
     platform: String,
 
-    #[arg(short = 'v', long)]
+    #[arg(short = 'v', long, ignore_case = true)]
     /// The virus the the data was generated from.
     /// Options: flu, sc2-wgs, sc2-spike or rsv
-    virus: String,
+    virus: Virus,
 
     #[arg(short = 'r', long)]
     /// The run id. Used to create custom file names associated with `run_id`.
@@ -99,6 +101,43 @@ pub struct ReportsArgs {
     #[arg(short = 't', long, default_value = "")]
     /// (Optional) if a custom qc template is used for QC.
     qc_template: String,
+}
+
+#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
+pub enum Virus {
+    Flu,
+    Sc2Wgs,
+    Sc2Spike,
+    Rsv,
+}
+
+impl Display for Virus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Virus::Flu => write!(f, "flu"),
+            Virus::Sc2Wgs => write!(f, "sc2-wgs"),
+            Virus::Sc2Spike => write!(f, "sc2-spike"),
+            Virus::Rsv => write!(f, "rsv"),
+        }
+    }
+}
+
+// Allows case insensitivity for trim ends
+impl ValueEnum for Virus {
+    #[inline]
+    fn value_variants<'a>() -> &'a [Self] {
+        &[Self::Flu, Self::Sc2Wgs, Self::Sc2Spike, Self::Rsv]
+    }
+
+    #[inline]
+    fn to_possible_value(&self) -> Option<PossibleValue> {
+        match self {
+            Virus::Flu => Some(PossibleValue::new("flu")),
+            Virus::Sc2Wgs => Some(PossibleValue::new("sc2-wgs")),
+            Virus::Sc2Spike => Some(PossibleValue::new("sc2-spike")),
+            Virus::Rsv => Some(PossibleValue::new("rsv")),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -172,14 +211,14 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
 
     // Read in IRMA data
     let coverage_data =
-        coverage_data_collection(&args.irma_path, &args.platform, &args.runid, &args.virus)?;
+        coverage_data_collection(&args.irma_path, &args.platform, &args.runid, args.virus)?;
     let read_data = reads_data_collection(&args.irma_path, &args.platform, &args.runid)?;
     let vtype_data = create_vtype_data(&read_data);
     let minor_variant_data =
         minor_variant_data_collection(&args.irma_path, &args.platform, &args.runid)?;
     let indel_data = indels_data_collection(&args.irma_path, &args.platform, &args.runid)?;
     let run_info = run_info_collection(&args.irma_path, &args.platform, &args.runid)?;
-    let seq_data = amended_consensus_data_collection(&args.irma_path, &args.virus)?;
+    let seq_data = amended_consensus_data_collection(&args.irma_path, args.virus)?;
     let ref_lengths = match get_reference_lens(&args.irma_path) {
         Ok(data) => data,
         Err(e) => {
@@ -196,9 +235,9 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
     // In MIRA-NF the DAIS outputs are fed right to the working directory to be used in this step
     let dais_seq_data = dais_sequence_data_collection("./")?;
     let mut dais_ref_data: Vec<DaisSeqData> = Vec::new();
-    if args.virus.to_lowercase() == "flu" || args.virus.to_lowercase() == "rsv" {
-        dais_ref_data = dais_ref_seq_data_collection(&args.workdir_path, &args.virus)?;
-    } else if args.virus.to_lowercase() == "sc2-wgs" || args.virus.to_lowercase() == "sc2-spike" {
+    if args.virus == Virus::Flu || args.virus == Virus::Rsv {
+        dais_ref_data = dais_ref_seq_data_collection(&args.workdir_path, args.virus)?;
+    } else if args.virus == Virus::Sc2Wgs || args.virus == Virus::Sc2Spike {
         dais_ref_data = dais_ref_seq_data_collection(&args.workdir_path, "sc2")?;
     }
 
@@ -211,19 +250,19 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
     //////////////////////////////// Processing ingested IRMA and Dais data ////////////////////////////////
     // Calculate AA variants for aavars.csv and dais_vars.json
     let mut dais_vars_data: Vec<DaisVarsData> = Vec::new();
-    if args.virus.to_lowercase() == "flu" {
+    if args.virus == Virus::Flu {
         dais_vars_data =
             compute_dais_variants(&dais_ref_data, &dais_seq_data, &args.runid, &args.platform)?;
-    } else if args.virus.to_lowercase() == "sc2-wgs"
-        || args.virus.to_lowercase() == "sc2-spike"
-        || args.virus.to_lowercase() == "rsv"
+    } else if args.virus == Virus::Sc2Wgs
+        || args.virus == Virus::Sc2Spike
+        || args.virus == Virus::Rsv
     {
         dais_vars_data = compute_cvv_dais_variants(
             &dais_ref_data,
             &dais_seq_data,
             &args.runid,
             &args.platform,
-            &args.virus,
+            args.virus,
         )?;
     }
 
@@ -232,22 +271,22 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
     let mut calculated_cov_vec: Vec<ProcessedCoverage> = Vec::new();
     let mut calculated_position_cov_vec: Vec<ProcessedCoverage> = Vec::new();
 
-    if args.virus.to_lowercase() == "flu" || args.virus.to_lowercase() == "rsv" {
+    if args.virus == Virus::Flu || args.virus == Virus::Rsv {
         calculated_cov_vec = process_wgs_coverage_data(&coverage_data, &ref_lengths)?;
-    } else if args.virus.to_lowercase() == "sc2-spike" {
+    } else if args.virus == Virus::Sc2Spike {
         calculated_cov_vec = process_position_coverage_data(&coverage_data, 21563, 25384)?;
-    } else if args.virus.to_lowercase() == "sc2-wgs" {
+    } else if args.virus == Virus::Sc2Wgs {
         calculated_cov_vec = process_wgs_coverage_data(&coverage_data, &ref_lengths)?;
         calculated_position_cov_vec = process_position_coverage_data(&coverage_data, 21563, 25384)?;
     }
 
     //Gather subtype information
     let mut subtype_data: Vec<Subtype> = Vec::new();
-    if args.virus.to_lowercase() == "flu" {
+    if args.virus == Virus::Flu {
         subtype_data = extract_subtype_flu(&dais_vars_data, &calculated_cov_vec)?;
-    } else if args.virus.to_lowercase() == "sc2-wgs" || args.virus.to_lowercase() == "sc2-spike" {
+    } else if args.virus == Virus::Sc2Wgs || args.virus == Virus::Sc2Spike {
         subtype_data = extract_subtype_sc2(&dais_vars_data)?;
-    } else if args.virus.to_lowercase() == "rsv" {
+    } else if args.virus == Virus::Rsv {
         subtype_data = extract_subtype_rsv(&dais_vars_data)?;
     }
 
@@ -255,7 +294,7 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
     let analysis_metadata = collect_analysis_metadata(
         &args.workdir_path,
         &args.platform,
-        &args.virus,
+        args.virus,
         &args.irma_config,
         &args.qc_template,
         &args.runid,
@@ -286,21 +325,21 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
         perc_ref_spike_covered: None,
     };
     // Set qc values based on given virus and platform
-    if args.virus.to_lowercase() == "flu" {
+    if args.virus == Virus::Flu {
         if args.platform.to_lowercase() == "illumina" {
             qc_values = qc_config.illumina_flu;
         } else {
             qc_values = qc_config.ont_flu;
         }
-    } else if args.virus.to_lowercase() == "sc2-wgs" {
+    } else if args.virus == Virus::Sc2Wgs {
         if args.platform.to_lowercase() == "illumina" {
             qc_values = qc_config.illumina_sc2;
         } else {
             qc_values = qc_config.ont_sc2;
         }
-    } else if args.virus.to_lowercase() == "sc2-spike" {
+    } else if args.virus == Virus::Sc2Spike {
         qc_values = qc_config.ont_sc2_spike;
-    } else if args.virus.to_lowercase() == "rsv" {
+    } else if args.virus == Virus::Rsv {
         if args.platform.to_lowercase() == "illumina" {
             qc_values = qc_config.illumina_rsv;
         } else {
@@ -315,7 +354,7 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
     // Add pass fail information to irma summary
     for sample in &mut irma_summary {
         if sample.pass_fail_reason.is_none() {
-            sample.add_pass_fail_qc(&dais_vars_data, &args.virus, &qc_values)?;
+            sample.add_pass_fail_qc(&dais_vars_data, args.virus, &qc_values)?;
         }
     }
 
@@ -324,7 +363,7 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
         &seq_data,
         &vtype_data,
         &irma_summary,
-        &args.virus,
+        args.virus,
         &args.runid,
         &args.platform,
     )?;
@@ -332,7 +371,7 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
     let aa_seq_vec = create_aa_seq_vec(
         &dais_seq_data,
         &irma_summary,
-        &args.virus,
+        args.virus,
         &args.runid,
         &args.platform,
     )?;
@@ -341,13 +380,13 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
     let processed_aa_seq = divide_aa_into_pass_fail_vec(
         &aa_seq_vec,
         &args.platform,
-        &args.virus,
+        args.virus,
         &no_premature_stop_codon_proteins,
     )?;
     let processed_nt_seq = divide_nt_into_pass_fail_vec(
         &nt_seq_vec,
         &args.platform,
-        &args.virus,
+        args.virus,
         &no_premature_stop_codon_proteins,
     )?;
 
@@ -355,12 +394,12 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
     let nextclade_nt_seq = divide_nt_into_nextclade_vec(
         &nt_seq_vec,
         &args.platform,
-        &args.virus,
+        args.virus,
         &no_premature_stop_codon_proteins,
     )?;
 
     // Processing data for Dashboard Figures
-    let transformed_cov_data = transform_coverage_to_heatmap(&coverage_data, &args.virus);
+    let transformed_cov_data = transform_coverage_to_heatmap(&coverage_data, args.virus);
 
     //////////////////////////////// Write all files ////////////////////////////////
     println!("Writing Output Files...");
@@ -391,7 +430,7 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
         &aa_seq_vec,
         &run_info,
         &args.runid,
-        &args.virus,
+        args.virus,
     )?;
 
     println!("Writing JSON files");
@@ -406,7 +445,7 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
         &neg_control_list,
         &irma_summary,
         &nt_seq_vec,
-        &args.virus,
+        args.virus,
     )?;
 
     // Write fields to parq if flag given
@@ -447,7 +486,7 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
         )?;
         write_irma_summary_to_parquet(
             &irma_summary,
-            &args.virus,
+            args.virus,
             &format!(
                 "{}/mira_{}_summary.parq",
                 args.output_path.display(),
@@ -508,27 +547,27 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
     let coverage_json_per_sample = create_coverage_plot(
         &coverage_data,
         segments,
-        &args.virus,
+        args.virus,
         &format!("{}/", args.output_path.display()),
     )?;
 
     let sankey_json_per_sample = reads_to_sankey_json(
         &read_data,
-        &args.virus,
+        args.virus,
         &format!("{}/", args.output_path.display()),
     );
 
     let cov_heatmap_json = coverage_to_heatmap_json(
         &transformed_cov_data,
         &sample_list,
-        &args.virus,
+        args.virus,
         &format!("{}/", args.output_path.display()),
     );
 
     let pass_fail_heatmap_json = create_passfail_heatmap(
         &irma_summary,
         &sample_list,
-        &args.virus,
+        args.virus,
         &format!("{}/", args.output_path.display()),
     );
 
@@ -549,7 +588,7 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
         &sankey_json_per_sample,
         &args.runid,
         Some(&args.workdir_path),
-        &args.virus,
+        args.virus,
     );
 
     Ok(())

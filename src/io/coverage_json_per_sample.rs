@@ -1,4 +1,4 @@
-use crate::io::data_ingest::CoverageData;
+use crate::{io::data_ingest::CoverageData, processes::prepare_mira_reports::Virus};
 use plotly::{
     Plot, Scatter,
     common::{Fill, Line, Mode, Title},
@@ -19,7 +19,7 @@ pub fn create_sample_coverage_fig(
     data: &[CoverageData],
     segments: &[String],
     cov_linear_y: bool,
-    virus: &str,
+    virus: Virus,
 ) -> Result<Plot, Box<dyn Error>> {
     let mut plot = Plot::new();
 
@@ -182,7 +182,7 @@ pub fn create_sample_coverage_fig(
             let y: Vec<i32> = segment_data.iter().map(|d| d.coverage_depth).collect();
 
             // Determine color by virus
-            let color = if virus == "flu" {
+            let color = if virus == Virus::Flu {
                 flu_pattern_colors
                     .iter()
                     .find(|(pattern, _)| segment.contains(pattern))
@@ -255,7 +255,7 @@ pub fn create_sample_coverage_fig(
 pub fn create_coverage_plot(
     data: &[CoverageData],
     segments: Vec<String>,
-    virus: &str,
+    virus: Virus,
     output_file: &str,
 ) -> Result<Vec<SampleCoverageJson>, Box<dyn Error>> {
     let samples: Vec<String> = data

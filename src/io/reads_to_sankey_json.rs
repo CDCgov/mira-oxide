@@ -1,4 +1,4 @@
-use crate::io::data_ingest::ReadsData;
+use crate::{io::data_ingest::ReadsData, processes::prepare_mira_reports::Virus};
 use serde_json::{Value, json};
 use std::collections::HashMap;
 
@@ -19,7 +19,7 @@ fn seg(label: &str) -> std::string::String {
     label.to_string()
 }
 #[allow(clippy::too_many_lines)]
-fn dash_reads_to_sankey(data: &[ReadsData], virus: &str) -> Value {
+fn dash_reads_to_sankey(data: &[ReadsData], virus: Virus) -> Value {
     // Filter out rows where "Stage" is None or "Stage" is 0 or 5
     let filtered_data: Vec<_> = data
         .iter()
@@ -79,7 +79,7 @@ fn dash_reads_to_sankey(data: &[ReadsData], virus: &str) -> Value {
                 // Default: stage 4→N nodes
 
                 // 🔹 If virus == flu, try matching segment prefix
-                if virus == "flu" {
+                if virus == Virus::Flu {
                     let mut applied_flu_color = None;
 
                     // Try each prefix (HA, NA, ...)
@@ -168,7 +168,7 @@ fn dash_reads_to_sankey(data: &[ReadsData], virus: &str) -> Value {
 #[must_use]
 pub fn reads_to_sankey_json(
     data: &[ReadsData],
-    virus: &str,
+    virus: Virus,
     output_file: &str,
 ) -> Vec<SampleSankeyJson> {
     println!("Building read sankey plots as JSON");
