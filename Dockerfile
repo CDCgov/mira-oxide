@@ -1,62 +1,51 @@
-# Create an argument to pull a particular version of an image
+# syntax=docker/dockerfile:1.7
 
-####################################################################################################
-# BASE IMAGE
-####################################################################################################
-FROM rustlang/rust:nightly-alpine AS builder
+FROM rustlang/rust:nightly-bookworm AS builder
 
-# Replace with other certs if needed
-COPY .certs/min-cdc-bundle-ca.crt /etc/ssl/certs/ca.crt
+WORKDIR /build/mira-oxide
 
-# Required certs for gitlab and cargo
-RUN cat /etc/ssl/certs/ca.crt >> /etc/ssl/certs/ca-certificates.crt
+COPY mira-oxide/Cargo.toml mira-oxide/Cargo.lock ./
+COPY mira-oxide/src ./src
 
-# Install required packages, including bash
-RUN apk update && apk add --no-cache \
-    build-base \
-    openssl-dev \
-    bash
+RUN cargo build --release
 
-# Set workdir
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get -o Acquire::Check-Valid-Until=false -o Acquire::Check-Date=false update \
+    && apt-get install -y --no-install-recommends \
+        bash \
+        ca-certificates \
+        curl \
+        fuse-overlayfs \
+        openjdk-17-jre-headless \
+        podman \
+        procps \
+        slirp4netns \
+        uidmap \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN curl -fsSL https://get.nextflow.io | bash \
+    && mv nextflow /usr/local/bin/nextflow \
+    && chmod +x /usr/local/bin/nextflow
+
+RUN mkdir -p /etc/containers \
+    && printf '[storage]\ndriver = "vfs"\nrunroot = "/var/run/containers/storage"\ngraphroot = "/var/lib/containers/storage"\n' > /etc/containers/storage.conf
+
+COPY --from=builder /build/mira-oxide/target/release/mira-oxide /usr/local/bin/mira-oxide
+COPY MIRA-NF /opt/MIRA-NF
+
+ENV MIRA_NF_DIR=/opt/MIRA-NF \
+    MIRA_UI_DATA_ROOT=/workspace \
+    MIRA_UI_STATE_DIR=/var/lib/mira-oxide-ui
+
 WORKDIR /app
 
-# Copy all scripts and source code to the Docker image
-COPY . .
+RUN mkdir -p /workspace /var/lib/mira-oxide-ui
 
-# This build step will cache the dependencies
-RUN cargo build --release \
-    || CARGO_HTTP_CAINFO=/etc/ssl/certs/ca.crt cargo build --release
+VOLUME ["/workspace", "/var/lib/mira-oxide-ui"]
 
-####################################################################################################
-# DEPLOY IMAGE
-####################################################################################################
-FROM alpine:3.18
+EXPOSE 3000
 
-# Required certs for apk update
-COPY .certs/min-cdc-bundle-ca.crt /etc/ssl/certs/ca.crt
-
-# Put certs in /etc/ssl/certs location
-RUN cat /etc/ssl/certs/ca.crt >> /etc/ssl/certs/ca-certificates.crt
-
-RUN apk update && apk add --no-cache bash
-
-# Set workdir
-WORKDIR /app
-
-# Copy the compiled binary from the builder stage
-COPY --from=builder /app/target/release/mira-oxide /app/
-
-# Create working directory variable
-ENV WORKDIR=/data
-
-# Set up volume directory in Docker
-VOLUME ${WORKDIR}
-
-# Export project directory to PATH
-ENV PATH="$PATH:/app"
-
-# Set bash as the default shell
-SHELL ["/bin/bash", "-c"]
-
-# Default command to run when the container starts
-CMD ["bash"]
+CMD ["mira-oxide", "serve", "--listen", "0.0.0.0:3000", "--data-root", "/workspace", "--pipeline-dir", "/opt/MIRA-NF", "--state-dir", "/var/lib/mira-oxide-ui"]

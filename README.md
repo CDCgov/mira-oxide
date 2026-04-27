@@ -14,6 +14,46 @@ The material embodied in this software is provided to you "as-is" and without wa
 
 MIRA-Oxide is a RUST package that is utilized by [MIRA-NF](https://github.com/CDCgov/MIRA-NF) to perform assembly and annotation of Influenza genomes, SARS-CoV-2 genomes, the SARS-CoV-2 spike-gene and RSV genomes.
 
+## Web UI
+
+This repository now also exposes a small local web application for launching and monitoring `MIRA-NF` runs:
+
+```bash
+mira-oxide serve --listen 127.0.0.1:3000 --pipeline-dir ../MIRA-NF --data-root /PATH/TO/RUNS
+```
+
+The UI:
+
+- builds the launch form from `../MIRA-NF/nextflow_schema.json`
+- uploads `samplesheet.csv` into the selected run directory beside `fastqs` or `fastq_pass`
+- launches `../MIRA-NF/main.nf`
+- exposes HTML status via `mira-oxide nf-status`
+
+### Podman image for local testing
+
+The `Dockerfile` expects the build context to be the parent directory that contains both `mira-oxide/` and `MIRA-NF/`.
+
+Build:
+
+```bash
+podman build -f mira-oxide/Dockerfile -t mira-oxide-ui ..
+```
+
+Run:
+
+```bash
+podman run --rm -it \
+  --privileged \
+  --device /dev/fuse \
+  --security-opt label=disable \
+  -p 3000:3000 \
+  -v /PATH/TO/RUNS:/workspace \
+  -v mira-oxide-ui-state:/var/lib/mira-oxide-ui \
+  mira-oxide-ui
+```
+
+Then open `http://127.0.0.1:3000`.
+
 ### Subprocesses
 
 MIRA-Oxide has standalone subprocesses within it that perform different tasks. These are run on their own with

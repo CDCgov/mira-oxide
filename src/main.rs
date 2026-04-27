@@ -11,6 +11,7 @@ use crate::processes::{
     create_nextflow_samplesheet::{SamplesheetArgs, create_nextflow_samplesheet},
     di_stats::{DIStatArgs, di_stats_process},
     find_chemistry::{FindChemArgs, find_chemistry_process},
+    nf_status::{NfStatusArgs, build_status_report, default_pipeline_dir, default_state_dir},
     plotter::{PlotterArgs, plotter_process},
     positions_of_interest::{PositionsArgs, positions_of_interest_process},
     prepare_mira_reports::{ReportsArgs, prepare_mira_reports_process},
@@ -18,6 +19,7 @@ use crate::processes::{
     summary_report_update::{SummaryUpdateArgs, summary_report_update_process},
     variants_of_interest::{VariantsArgs, variants_of_interest_process},
 };
+use crate::web::{ServeArgs, render_nf_status_document, serve};
 use clap::{Parser, Subcommand};
 use zoe::prelude::OrFail;
 
@@ -55,9 +57,14 @@ enum Commands {
     SamplesheetCheck(SamplesheetCheckArgs),
     /// DI Stats
     DIStats(DIStatArgs),
+    /// Serve the local browser UI
+    Serve(ServeArgs),
+    /// Render HTML status for the latest or a selected Nextflow run
+    NfStatus(NfStatusArgs),
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let args = Cli::parse();
     let module = module_path!();
 
@@ -101,6 +108,26 @@ fn main() {
         Commands::DIStats(cmd_args) => {
             di_stats_process(&cmd_args).unwrap_or_die(&format!("{module}::DIStats"));
         }
+        Commands::Serve(cmd_args) => {
+            serve(cmd_args)
+                .await
+                .unwrap_or_else(|e| panic!("{module}::Serve: {e}"));
+        }
+        Commands::NfStatus(cmd_args) => {
+            let state_dir = if cmd_args.state_dir.as_os_str().is_empty() {
+                default_state_dir()
+            } else {
+                cmd_args.state_dir.clone()
+            };
+            let pipeline_dir = if cmd_args.pipeline_dir.as_os_str().is_empty() {
+                default_pipeline_dir()
+            } else {
+                cmd_args.pipeline_dir.clone()
+            };
+            let report = build_status_report(&state_dir, &pipeline_dir, cmd_args.run_id.as_deref())
+                .unwrap_or_else(|e| panic!("{module}::NfStatus: {e}"));
+            print!("{}", render_nf_status_document(&report, None));
+        }
     }
 }
 
@@ -108,3 +135,4 @@ pub mod constants;
 pub mod io;
 pub mod processes;
 pub mod utils;
+pub mod web;
