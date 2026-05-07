@@ -12,7 +12,11 @@ use std::{
 };
 use zoe::{
     alignment::{ScalarProfile, sw::sw_scalar_align},
-    data::{ByteIndexMap, StdGeneticCode, WeightMatrix, nucleotides::GetCodons},
+    data::{
+        WeightMatrix,
+        mappings::{ByteIndexMap, StdGeneticCode},
+        nucleotides::GetCodons,
+    },
     prelude::{Len, Nucleotides},
 };
 

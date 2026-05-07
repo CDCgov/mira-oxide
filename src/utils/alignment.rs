@@ -1,6 +1,6 @@
 use zoe::{
     alignment::{LocalProfiles, MaybeAligned},
-    data::{ByteIndexMap, WeightMatrix},
+    data::{WeightMatrix, mappings::ByteIndexMap},
     prelude::{ProfileSets, SeqSrc},
 };
 
