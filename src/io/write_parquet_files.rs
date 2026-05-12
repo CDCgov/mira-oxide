@@ -508,8 +508,7 @@ pub fn write_irma_summary_to_parquet(
         return Err("Input data is empty".into());
     }
 
-    let sample_ids_vec: Vec<Option<String>> =
-        extract_field(irma_summary_data, |item| item.sample_id.clone());
+    let sample_ids_vec = extract_field(irma_summary_data, |item| item.sample_id.clone());
     let total_reads_vec = extract_field(irma_summary_data, |item| item.total_reads);
     let pass_qc_vec = extract_field(irma_summary_data, |item| item.pass_qc);
     let reads_mapped_vec = extract_field(irma_summary_data, |item| item.reads_mapped);

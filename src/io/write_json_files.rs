@@ -67,7 +67,7 @@ pub fn write_irma_summary_to_pass_fail_json_file(
     // Extract unique sample_id and reference values
     let unique_sample_ids: Vec<String> = data
         .iter()
-        .filter_map(|item| item.sample_id.clone())
+        .map(|item| item.sample_id.clone())
         .collect::<HashSet<_>>()
         .into_iter()
         .collect();
@@ -82,9 +82,9 @@ pub fn write_irma_summary_to_pass_fail_json_file(
     // Create a mapping of (sample_id, reference) to pass_fail_reason
     let mut pass_fail_map: HashMap<(String, String), Option<String>> = HashMap::new();
     for item in data {
-        if let (Some(sample_id), Some(reference)) = (&item.sample_id, &item.reference) {
+        if let Some(reference) = &item.reference {
             pass_fail_map.insert(
-                (sample_id.clone(), reference.clone()),
+                (item.sample_id.clone(), reference.clone()),
                 item.pass_fail_reason.clone(),
             );
         }

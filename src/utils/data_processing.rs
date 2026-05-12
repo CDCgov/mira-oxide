@@ -77,7 +77,7 @@ pub struct ProcessedCoverage {
 /// IRMA struct
 #[derive(Serialize, Debug, Clone)]
 pub struct IRMASummary {
-    pub sample_id: Option<String>,
+    pub sample_id: String,
     pub total_reads: Option<i32>,
     pub pass_qc: Option<i32>,
     pub reads_mapped: Option<i32>,
@@ -991,7 +991,7 @@ pub fn create_irma_summary_vec(
             if *sample == entry.sample_id {
                 found_match = true;
                 irma_summary.push(IRMASummary {
-                    sample_id: Some(entry.sample_id.clone()),
+                    sample_id: entry.sample_id.clone(),
                     reference: Some(entry.reference.clone()),
                     total_reads: Some(entry.total_reads),
                     pass_qc: Some(entry.pass_qc),
@@ -1013,7 +1013,7 @@ pub fn create_irma_summary_vec(
         // If no match was found, push the default IRMASummary entry that will indicate failed
         if !found_match {
             irma_summary.push(IRMASummary {
-                sample_id: Some(sample.clone()),
+                sample_id: sample.clone(),
                 reference: Some("Undetermined".to_owned()),
                 total_reads: Some(0),
                 pass_qc: Some(0),
@@ -1036,8 +1036,7 @@ pub fn create_irma_summary_vec(
     //Update irma_summary with data from other dataframes
     for sample in &mut irma_summary {
         for entry in calc_cov_vec {
-            if sample.sample_id == Some(entry.sample.clone())
-                && sample.reference == Some(entry.reference.clone())
+            if sample.sample_id == entry.sample && sample.reference == Some(entry.reference.clone())
             {
                 sample.percent_reference_coverage = entry.percent_reference_covered;
                 sample.median_coverage = Some(entry.median_coverage);
@@ -1046,7 +1045,7 @@ pub fn create_irma_summary_vec(
 
         if let Some(result) = pos_calc_cov_vec {
             if let Some(entry) = result.iter().find(|entry| {
-                sample.sample_id == Some(entry.sample.clone())
+                sample.sample_id == entry.sample
                     && sample.reference == Some(entry.reference.clone())
             }) {
                 sample.spike_percent_coverage =
@@ -1059,7 +1058,7 @@ pub fn create_irma_summary_vec(
         }
 
         for entry in &filtered_minor_vars_count {
-            if sample.sample_id == entry.sample_id.clone()
+            if Some(&sample.sample_id) == entry.sample_id.as_ref()
                 && sample.reference == Some(entry.reference.clone())
             {
                 sample.count_minor_snv_at_or_over_5_pct = Some(entry.minor_variant_count);
@@ -1068,7 +1067,7 @@ pub fn create_irma_summary_vec(
 
         if let Some(entry) = subtype_vec
             .iter()
-            .find(|entry| entry.sample_id == sample.sample_id)
+            .find(|entry| entry.sample_id == Some(sample.sample_id.clone()))
         {
             sample.subtype = Some(entry.subtype.clone());
         } else {
@@ -1076,8 +1075,7 @@ pub fn create_irma_summary_vec(
         }
 
         if let Some(entry) = di_stats.iter().find(|entry| {
-            sample.sample_id == Some(entry.sample_id.clone())
-                && sample.reference == Some(entry.segment.clone())
+            sample.sample_id == entry.sample_id && sample.reference.as_ref() == Some(&entry.segment)
         }) {
             sample.di_ratios_5prime_3prime = Some(entry.di_ratios_5prime_3prime.clone());
         } else {
@@ -1109,14 +1107,13 @@ impl IRMASummary {
                         let entry_id = &entry.sample_id;
 
                         if entry_id.len() > 2 {
-                            &entry_id[..entry_id.len() - 2]
-                                == self.sample_id.as_deref().unwrap_or("")
+                            entry_id[..entry_id.len() - 2] == self.sample_id
                         } else {
                             false
                         }
                     } else {
                         // Regular comparison
-                        self.sample_id.as_ref() == Some(&entry.sample_id)
+                        self.sample_id == entry.sample_id
                     };
 
                     sample_match
@@ -1275,8 +1272,7 @@ pub fn create_nt_seq_vec(
                     }
 
                     for record in irma_summary_vec {
-                        if let Some(record_sample_id) = &record.sample_id
-                            && sample_id == *record_sample_id
+                        if sample_id == *record.sample_id
                             && record.reference == Some(sample.original_ref.clone())
                             && assigned_segment == sample.ref_type
                         {
@@ -1300,11 +1296,9 @@ pub fn create_nt_seq_vec(
     } else {
         for entry in seq_data {
             for record in irma_summary_vec {
-                if let Some(record_sample_id) = &record.sample_id
-                    && entry.name == *record_sample_id
-                {
+                if entry.name == record.sample_id {
                     nt_seq_vec.push(NTSequences {
-                        sample_id: record_sample_id.clone(),
+                        sample_id: record.sample_id.clone(),
                         sequence: entry.sequence.clone(),
                         target_ref: None,
                         reference: record.reference.clone().unwrap_or(String::new()),
@@ -1397,9 +1391,7 @@ pub fn create_aa_seq_vec(
             let sample_id = parts[1].to_string();
 
             for sample in irma_summary_vec {
-                if Some(sample_id.clone()) == sample.sample_id
-                    && Some(entry.ctype.clone()) == sample.reference
-                {
+                if sample_id == sample.sample_id && Some(entry.ctype.clone()) == sample.reference {
                     aa_seq_vec.push(AASequences {
                         sample_id: sample_id.clone(),
                         sequence: entry.aa_seq.clone(),
@@ -1415,7 +1407,7 @@ pub fn create_aa_seq_vec(
     } else {
         for entry in aa_data {
             for sample in irma_summary_vec {
-                if Some(entry.sample_id.clone()) == sample.sample_id
+                if entry.sample_id == sample.sample_id
                     && Some(entry.ctype.clone()) == sample.reference
                 {
                     aa_seq_vec.push(AASequences {
