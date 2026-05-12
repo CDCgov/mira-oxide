@@ -29,7 +29,7 @@ pub struct ProcessedRecord {
 /// Dais Variants Struct
 #[derive(Serialize, Debug)]
 pub struct DaisVarsData {
-    pub sample_id: Option<String>,
+    pub sample_id: String,
     pub ctype: String,
     pub aa_reference_id: Option<String>,
     pub positional_reference_id: String,
@@ -392,7 +392,7 @@ pub fn compute_dais_variants(
                 }
 
                 let dais_vars_entry = DaisVarsData {
-                    sample_id: Some(sample_entry.sample_id.clone()),
+                    sample_id: sample_entry.sample_id.clone(),
                     ctype: sample_entry.ctype.clone(),
                     aa_reference_id: Some(ref_entry.sample_id.clone()),
                     positional_reference_id: sample_entry.reference.clone(),
@@ -485,7 +485,7 @@ pub fn compute_cvv_dais_variants(
     let result: Vec<DaisVarsData> = filtered_data
         .into_iter()
         .map(|(entry, num_variants)| DaisVarsData {
-            sample_id: Some(entry.sample_id),
+            sample_id: entry.sample_id,
             ctype: entry.ctype,
             aa_reference_id: entry.aa_reference_id,
             positional_reference_id: entry.reference.clone(),
@@ -581,14 +581,14 @@ pub fn extract_subtype_flu(
     // Collect all sample IDs
     let mut all_sample_ids: HashSet<String> = HashSet::new();
     for entry in dais_vars {
-        let hold_sample = entry.sample_id.clone().ok_or("Missing sample_id")?;
+        let hold_sample = entry.sample_id.clone();
         let sample_id = hold_sample[..hold_sample.len() - 2].to_string();
         all_sample_ids.insert(sample_id);
     }
 
     // HA extraction
     for entry in dais_vars {
-        let hold_sample = entry.sample_id.clone().ok_or("Missing sample_id")?;
+        let hold_sample = entry.sample_id.clone();
         let sample_ha = hold_sample[..hold_sample.len() - 2].to_string();
 
         let ha = if entry.protein == "HA" {
@@ -614,7 +614,7 @@ pub fn extract_subtype_flu(
 
     // NA extraction
     for entry in dais_vars {
-        let hold_sample = entry.sample_id.clone().ok_or("Missing sample_id")?;
+        let hold_sample = entry.sample_id.clone();
         let sample_na = hold_sample[..hold_sample.len() - 2].to_string();
 
         let na = if entry.protein == "NA" {
@@ -680,7 +680,7 @@ pub fn extract_subtype_sc2(dais_vars: &[DaisVarsData]) -> Result<Vec<Subtype>, B
 
     for entry in dais_vars {
         subtype_data.push(Subtype {
-            sample_id: entry.sample_id.clone(),
+            sample_id: Some(entry.sample_id.clone()),
             subtype: entry.ctype.clone(),
         });
     }
@@ -693,7 +693,7 @@ pub fn extract_subtype_rsv(dais_vars: &[DaisVarsData]) -> Result<Vec<Subtype>, B
 
     for entry in dais_vars {
         subtype_data.push(Subtype {
-            sample_id: entry.sample_id.clone(),
+            sample_id: Some(entry.sample_id.clone()),
             subtype: entry.ctype.clone(),
         });
     }
@@ -1106,19 +1106,17 @@ impl IRMASummary {
                     // Handle sample_id comparison based on virus type
                     let sample_match = if virus == "flu" {
                         // Take the last two characters off entry.sample_id before comparing
-                        if let Some(entry_id) = &entry.sample_id {
-                            if entry_id.len() > 2 {
-                                &entry_id[..entry_id.len() - 2]
-                                    == self.sample_id.as_deref().unwrap_or("")
-                            } else {
-                                false
-                            }
+                        let entry_id = &entry.sample_id;
+
+                        if entry_id.len() > 2 {
+                            &entry_id[..entry_id.len() - 2]
+                                == self.sample_id.as_deref().unwrap_or("")
                         } else {
                             false
                         }
                     } else {
                         // Regular comparison
-                        self.sample_id == entry.sample_id
+                        self.sample_id.as_ref() == Some(&entry.sample_id)
                     };
 
                     sample_match
