@@ -27,7 +27,7 @@ pub struct ProcessedRecord {
 }
 
 /// Dais Variants Struct
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Debug)]
 pub struct DaisVarsData {
     pub sample_id: Option<String>,
     pub ctype: String,
