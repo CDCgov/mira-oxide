@@ -249,7 +249,7 @@ pub struct SeqData {
 
 /////////////// Structs to hold dais-ribosome data ///////////////
 /// Dais Sequence Data
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Deserialize, Debug)]
 pub struct DaisSeqData {
     #[serde(rename = "ID")]
     pub sample_id: Option<String>,
