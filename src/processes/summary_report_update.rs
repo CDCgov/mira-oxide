@@ -288,7 +288,7 @@ pub fn summary_report_update_process(args: &SummaryUpdateArgs) -> Result<(), Box
             &args.virus,
             &format!(
                 "{}/mira_{}_summary.parq",
-                &args.output_path.display(),
+                args.output_path.display(),
                 args.runid
             ),
         )?;
