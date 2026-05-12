@@ -252,7 +252,7 @@ pub struct SeqData {
 #[derive(Deserialize, Debug)]
 pub struct DaisSeqData {
     #[serde(rename = "ID")]
-    pub sample_id: Option<String>,
+    pub sample_id: String,
     #[serde(rename = "C_type")]
     pub ctype: String,
     #[serde(rename = "Ref_ID")]
