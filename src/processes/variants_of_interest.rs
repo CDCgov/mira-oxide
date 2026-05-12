@@ -11,7 +11,7 @@ use std::{
     path::PathBuf,
 };
 use zoe::{
-    data::{StdGeneticCode, nucleotides::GetCodons},
+    data::{mappings::StdGeneticCode, nucleotides::GetCodons},
     prelude::{Len, Nucleotides},
 };
 
