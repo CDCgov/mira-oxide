@@ -27,9 +27,9 @@ pub struct ProcessedRecord {
 }
 
 /// Dais Variants Struct
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Debug)]
 pub struct DaisVarsData {
-    pub sample_id: Option<String>,
+    pub sample_id: String,
     pub ctype: String,
     pub aa_reference_id: Option<String>,
     pub positional_reference_id: String,
@@ -77,7 +77,7 @@ pub struct ProcessedCoverage {
 /// IRMA struct
 #[derive(Serialize, Debug, Clone)]
 pub struct IRMASummary {
-    pub sample_id: Option<String>,
+    pub sample_id: String,
     pub total_reads: Option<i32>,
     pub pass_qc: Option<i32>,
     pub reads_mapped: Option<i32>,
@@ -394,7 +394,7 @@ pub fn compute_dais_variants(
                 let dais_vars_entry = DaisVarsData {
                     sample_id: sample_entry.sample_id.clone(),
                     ctype: sample_entry.ctype.clone(),
-                    aa_reference_id: ref_entry.sample_id.clone(),
+                    aa_reference_id: Some(ref_entry.sample_id.clone()),
                     positional_reference_id: sample_entry.reference.clone(),
                     protein: sample_entry.protein.clone(),
                     aa_variant_count: var_aa_count,
@@ -528,7 +528,7 @@ fn merge_sequences(
                     aligned_cds_sequence: sample_entry.aligned_cds_sequence.clone(),
                     reference_nt_positions: sample_entry.reference_nt_positions.clone(),
                     sample_nt_positions: sample_entry.sample_nt_positions.clone(),
-                    aa_reference_id: ref_entry.sample_id.clone(),
+                    aa_reference_id: Some(ref_entry.sample_id.clone()),
                 };
 
                 merged_data.push(merged_entry);
@@ -581,14 +581,14 @@ pub fn extract_subtype_flu(
     // Collect all sample IDs
     let mut all_sample_ids: HashSet<String> = HashSet::new();
     for entry in dais_vars {
-        let hold_sample = entry.sample_id.clone().ok_or("Missing sample_id")?;
+        let hold_sample = entry.sample_id.clone();
         let sample_id = hold_sample[..hold_sample.len() - 2].to_string();
         all_sample_ids.insert(sample_id);
     }
 
     // HA extraction
     for entry in dais_vars {
-        let hold_sample = entry.sample_id.clone().ok_or("Missing sample_id")?;
+        let hold_sample = entry.sample_id.clone();
         let sample_ha = hold_sample[..hold_sample.len() - 2].to_string();
 
         let ha = if entry.protein == "HA" {
@@ -614,7 +614,7 @@ pub fn extract_subtype_flu(
 
     // NA extraction
     for entry in dais_vars {
-        let hold_sample = entry.sample_id.clone().ok_or("Missing sample_id")?;
+        let hold_sample = entry.sample_id.clone();
         let sample_na = hold_sample[..hold_sample.len() - 2].to_string();
 
         let na = if entry.protein == "NA" {
@@ -680,7 +680,7 @@ pub fn extract_subtype_sc2(dais_vars: &[DaisVarsData]) -> Result<Vec<Subtype>, B
 
     for entry in dais_vars {
         subtype_data.push(Subtype {
-            sample_id: entry.sample_id.clone(),
+            sample_id: Some(entry.sample_id.clone()),
             subtype: entry.ctype.clone(),
         });
     }
@@ -693,7 +693,7 @@ pub fn extract_subtype_rsv(dais_vars: &[DaisVarsData]) -> Result<Vec<Subtype>, B
 
     for entry in dais_vars {
         subtype_data.push(Subtype {
-            sample_id: entry.sample_id.clone(),
+            sample_id: Some(entry.sample_id.clone()),
             subtype: entry.ctype.clone(),
         });
     }
@@ -991,7 +991,7 @@ pub fn create_irma_summary_vec(
             if *sample == entry.sample_id {
                 found_match = true;
                 irma_summary.push(IRMASummary {
-                    sample_id: Some(entry.sample_id.clone()),
+                    sample_id: entry.sample_id.clone(),
                     reference: Some(entry.reference.clone()),
                     total_reads: Some(entry.total_reads),
                     pass_qc: Some(entry.pass_qc),
@@ -1013,7 +1013,7 @@ pub fn create_irma_summary_vec(
         // If no match was found, push the default IRMASummary entry that will indicate failed
         if !found_match {
             irma_summary.push(IRMASummary {
-                sample_id: Some(sample.clone()),
+                sample_id: sample.clone(),
                 reference: Some("Undetermined".to_owned()),
                 total_reads: Some(0),
                 pass_qc: Some(0),
@@ -1036,8 +1036,7 @@ pub fn create_irma_summary_vec(
     //Update irma_summary with data from other dataframes
     for sample in &mut irma_summary {
         for entry in calc_cov_vec {
-            if sample.sample_id == Some(entry.sample.clone())
-                && sample.reference == Some(entry.reference.clone())
+            if sample.sample_id == entry.sample && sample.reference == Some(entry.reference.clone())
             {
                 sample.percent_reference_coverage = entry.percent_reference_covered;
                 sample.median_coverage = Some(entry.median_coverage);
@@ -1046,7 +1045,7 @@ pub fn create_irma_summary_vec(
 
         if let Some(result) = pos_calc_cov_vec {
             if let Some(entry) = result.iter().find(|entry| {
-                sample.sample_id == Some(entry.sample.clone())
+                sample.sample_id == entry.sample
                     && sample.reference == Some(entry.reference.clone())
             }) {
                 sample.spike_percent_coverage =
@@ -1059,7 +1058,7 @@ pub fn create_irma_summary_vec(
         }
 
         for entry in &filtered_minor_vars_count {
-            if sample.sample_id == entry.sample_id.clone()
+            if Some(&sample.sample_id) == entry.sample_id.as_ref()
                 && sample.reference == Some(entry.reference.clone())
             {
                 sample.count_minor_snv_at_or_over_5_pct = Some(entry.minor_variant_count);
@@ -1068,7 +1067,7 @@ pub fn create_irma_summary_vec(
 
         if let Some(entry) = subtype_vec
             .iter()
-            .find(|entry| entry.sample_id == sample.sample_id)
+            .find(|entry| entry.sample_id == Some(sample.sample_id.clone()))
         {
             sample.subtype = Some(entry.subtype.clone());
         } else {
@@ -1076,8 +1075,7 @@ pub fn create_irma_summary_vec(
         }
 
         if let Some(entry) = di_stats.iter().find(|entry| {
-            sample.sample_id == Some(entry.sample_id.clone())
-                && sample.reference == Some(entry.segment.clone())
+            sample.sample_id == entry.sample_id && sample.reference.as_ref() == Some(&entry.segment)
         }) {
             sample.di_ratios_5prime_3prime = Some(entry.di_ratios_5prime_3prime.clone());
         } else {
@@ -1106,13 +1104,10 @@ impl IRMASummary {
                     // Handle sample_id comparison based on virus type
                     let sample_match = if virus == "flu" {
                         // Take the last two characters off entry.sample_id before comparing
-                        if let Some(entry_id) = &entry.sample_id {
-                            if entry_id.len() > 2 {
-                                &entry_id[..entry_id.len() - 2]
-                                    == self.sample_id.as_deref().unwrap_or("")
-                            } else {
-                                false
-                            }
+                        let entry_id = &entry.sample_id;
+
+                        if entry_id.len() > 2 {
+                            entry_id[..entry_id.len() - 2] == self.sample_id
                         } else {
                             false
                         }
@@ -1277,8 +1272,7 @@ pub fn create_nt_seq_vec(
                     }
 
                     for record in irma_summary_vec {
-                        if let Some(record_sample_id) = &record.sample_id
-                            && sample_id == *record_sample_id
+                        if sample_id == *record.sample_id
                             && record.reference == Some(sample.original_ref.clone())
                             && assigned_segment == sample.ref_type
                         {
@@ -1302,11 +1296,9 @@ pub fn create_nt_seq_vec(
     } else {
         for entry in seq_data {
             for record in irma_summary_vec {
-                if let Some(record_sample_id) = &record.sample_id
-                    && entry.name == *record_sample_id
-                {
+                if entry.name == record.sample_id {
                     nt_seq_vec.push(NTSequences {
-                        sample_id: record_sample_id.clone(),
+                        sample_id: record.sample_id.clone(),
                         sequence: entry.sequence.clone(),
                         target_ref: None,
                         reference: record.reference.clone().unwrap_or(String::new()),
@@ -1391,54 +1383,42 @@ pub fn create_aa_seq_vec(
 
     if virus == "flu" {
         for entry in aa_data {
-            if let Some(sample_id_str) = entry.sample_id.as_ref() {
-                let parts: Vec<&str> = sample_id_str.rsplitn(2, '_').collect();
-                if parts.len() != 2 {
-                    continue;
-                }
+            let parts: Vec<&str> = entry.sample_id.rsplitn(2, '_').collect();
+            if parts.len() != 2 {
+                continue;
+            }
 
-                let sample_id = parts[1].to_string();
+            let sample_id = parts[1].to_string();
 
-                for sample in irma_summary_vec {
-                    if Some(sample_id.clone()) == sample.sample_id
-                        && Some(entry.ctype.clone()) == sample.reference
-                    {
-                        aa_seq_vec.push(AASequences {
-                            sample_id: sample_id.clone(),
-                            sequence: entry.aa_seq.clone(),
-                            protein: Some(entry.protein.clone()),
-                            reference: sample.reference.clone().unwrap_or_else(String::new),
-                            qc_decision: sample
-                                .pass_fail_reason
-                                .clone()
-                                .unwrap_or_else(String::new),
-                            runid: runid.to_owned(),
-                            instrument: instrument.to_owned(),
-                        });
-                    }
+            for sample in irma_summary_vec {
+                if sample_id == sample.sample_id && Some(entry.ctype.clone()) == sample.reference {
+                    aa_seq_vec.push(AASequences {
+                        sample_id: sample_id.clone(),
+                        sequence: entry.aa_seq.clone(),
+                        protein: Some(entry.protein.clone()),
+                        reference: sample.reference.clone().unwrap_or_else(String::new),
+                        qc_decision: sample.pass_fail_reason.clone().unwrap_or_else(String::new),
+                        runid: runid.to_owned(),
+                        instrument: instrument.to_owned(),
+                    });
                 }
             }
         }
     } else {
         for entry in aa_data {
-            if let Some(sample_id_str) = entry.sample_id.as_ref() {
-                for sample in irma_summary_vec {
-                    if Some(sample_id_str.clone()) == sample.sample_id
-                        && Some(entry.ctype.clone()) == sample.reference
-                    {
-                        aa_seq_vec.push(AASequences {
-                            sample_id: sample_id_str.clone(),
-                            sequence: entry.aa_seq.clone(),
-                            protein: Some(entry.protein.clone()),
-                            reference: sample.reference.clone().unwrap_or_else(String::new),
-                            qc_decision: sample
-                                .pass_fail_reason
-                                .clone()
-                                .unwrap_or_else(String::new),
-                            runid: runid.to_owned(),
-                            instrument: instrument.to_owned(),
-                        });
-                    }
+            for sample in irma_summary_vec {
+                if entry.sample_id == sample.sample_id
+                    && Some(entry.ctype.clone()) == sample.reference
+                {
+                    aa_seq_vec.push(AASequences {
+                        sample_id: entry.sample_id.clone(),
+                        sequence: entry.aa_seq.clone(),
+                        protein: Some(entry.protein.clone()),
+                        reference: sample.reference.clone().unwrap_or_else(String::new),
+                        qc_decision: sample.pass_fail_reason.clone().unwrap_or_else(String::new),
+                        runid: runid.to_owned(),
+                        instrument: instrument.to_owned(),
+                    });
                 }
             }
         }

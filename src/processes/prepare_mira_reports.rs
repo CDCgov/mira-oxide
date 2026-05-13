@@ -412,7 +412,7 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
             &coverage_data,
             &format!(
                 "{}/mira_{}_coverage.parq",
-                &args.output_path.display(),
+                args.output_path.display(),
                 args.runid
             ),
         )?;
@@ -420,7 +420,7 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
             &read_data,
             &format!(
                 "{}/mira_{}_reads.parq",
-                &args.output_path.display(),
+                args.output_path.display(),
                 args.runid
             ),
         )?;
@@ -428,7 +428,7 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
             &indel_data,
             &format!(
                 "{}/mira_{}_indels.parq",
-                &args.output_path.display(),
+                args.output_path.display(),
                 args.runid
             ),
         )?;
@@ -436,7 +436,7 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
             &minor_variant_data.all_minor_variants,
             &format!(
                 "{}/mira_{}_minor_variants.parq",
-                &args.output_path.display(),
+                args.output_path.display(),
                 args.runid
             ),
         )?;
@@ -445,7 +445,7 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
             &args.virus,
             &format!(
                 "{}/mira_{}_summary.parq",
-                &args.output_path.display(),
+                args.output_path.display(),
                 args.runid
             ),
         )?;
@@ -453,7 +453,7 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
             &nt_seq_vec,
             &format!(
                 "{}/mira_{}_amended_consensus.parq",
-                &args.output_path.display(),
+                args.output_path.display(),
                 args.runid
             ),
         )?;
@@ -461,7 +461,7 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
             &aa_seq_vec,
             &format!(
                 "{}/mira_{}_amino_acid_consensus.parq",
-                &args.output_path.display(),
+                args.output_path.display(),
                 args.runid
             ),
         )?;
@@ -469,7 +469,7 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
             &run_info,
             &format!(
                 "{}/mira_{}_irma_config.parq",
-                &args.output_path.display(),
+                args.output_path.display(),
                 args.runid
             ),
         )?;
@@ -477,7 +477,7 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
             samplesheet,
             &format!(
                 "{}/mira_{}_samplesheet.parq",
-                &args.output_path.display(),
+                args.output_path.display(),
                 args.runid
             ),
             &args.runid,
@@ -492,7 +492,7 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
             &all_alleles_data,
             &format!(
                 "{}/mira_{}_all_alleles.parq",
-                &args.output_path.display(),
+                args.output_path.display(),
                 args.runid
             ),
         )?;
@@ -504,33 +504,31 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
         &coverage_data,
         segments,
         &args.virus,
-        &format!("{}/", &args.output_path.display()),
+        &format!("{}/", args.output_path.display()),
     )?;
 
     let sankey_json_per_sample = reads_to_sankey_json(
         &read_data,
         &args.virus,
-        &format!("{}/", &args.output_path.display()),
+        &format!("{}/", args.output_path.display()),
     );
 
     let cov_heatmap_json = coverage_to_heatmap_json(
         &transformed_cov_data,
         &sample_list,
         &args.virus,
-        &format!("{}/", &args.output_path.display()),
+        &format!("{}/", args.output_path.display()),
     );
 
     let pass_fail_heatmap_json = create_passfail_heatmap(
         &irma_summary,
         &sample_list,
         &args.virus,
-        &format!("{}/", &args.output_path.display()),
+        &format!("{}/", args.output_path.display()),
     );
 
-    let barcode_distribution_json = create_barcode_distribution_figure(
-        &read_data,
-        &format!("{}/", &args.output_path.display()),
-    );
+    let barcode_distribution_json =
+        create_barcode_distribution_figure(&read_data, &format!("{}/", args.output_path.display()));
 
     //////////////////////////////// Create staticHTML ////////////////////////////////
     let _ = generate_html_report(

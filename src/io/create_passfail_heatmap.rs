@@ -69,16 +69,13 @@ fn build_records(
         for reference in heatmap_refs {
             // Try to find a summary for this sample/reference
             if let Some(summary) = summaries.iter().find(|s| {
-                s.sample_id.as_ref() == Some(sample)
+                &s.sample_id == sample
                     && normalize_reference(
                         &s.reference.clone().unwrap_or_else(|| "Unknown".to_string()),
                         virus,
                     ) == *reference
             }) {
-                let sample = summary
-                    .sample_id
-                    .clone()
-                    .unwrap_or_else(|| "Unknown".to_string());
+                let sample = &summary.sample_id;
                 let reference = normalize_reference(
                     &summary
                         .reference
@@ -94,7 +91,7 @@ fn build_records(
                     reason = "No assembly".to_string();
                 }
                 let reason = remove_brace_content(&reason);
-                records.push((sample, reference, reason));
+                records.push((sample.clone(), reference, reason));
             } else {
                 // Not found: add default record
                 records.push((sample.clone(), reference.clone(), "No assembly".to_string()));

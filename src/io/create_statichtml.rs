@@ -266,7 +266,7 @@ pub fn irma_summary_to_plotly_json(summary: &[IRMASummary], virus: &str) -> Stri
     let mut columns: Vec<Vec<String>> = vec![Vec::new(); headers.len()];
 
     for row in summary {
-        columns[0].push(row.sample_id.as_deref().unwrap_or("").to_string());
+        columns[0].push(row.sample_id.clone());
         columns[1].push(row.total_reads.map_or(String::new(), |v| v.to_string()));
         columns[2].push(row.pass_qc.map_or(String::new(), |v| v.to_string()));
         columns[3].push(row.reads_mapped.map_or(String::new(), |v| v.to_string()));
@@ -341,7 +341,7 @@ fn dais_vars_to_plotly_json(vars: &[DaisVarsData]) -> String {
     let mut columns: Vec<Vec<String>> = vec![Vec::new(); headers.len()];
 
     for row in vars {
-        columns[0].push(row.sample_id.as_deref().unwrap_or("").to_string());
+        columns[0].push(row.sample_id.clone());
         columns[1].push(row.positional_reference_id.clone());
         columns[2].push(row.protein.clone());
         columns[3].push(row.aa_variant_count.to_string());
