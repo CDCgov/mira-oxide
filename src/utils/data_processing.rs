@@ -759,10 +759,7 @@ pub fn process_wgs_coverage_data<S: BuildHasher>(
 
     let mut cov_ref_lens: HashMap<(String, String), usize> = HashMap::new();
     for row in &filtered_coverage {
-        let key = (
-            row.sample_id.clone().unwrap_or_default(),
-            row.reference_name.clone(),
-        );
+        let key = (row.sample_id.clone(), row.reference_name.clone());
         *cov_ref_lens.entry(key).or_insert(0) += 1;
     }
 
@@ -783,10 +780,7 @@ pub fn process_wgs_coverage_data<S: BuildHasher>(
     // Calculate Median Coverage
     let mut coverage_vec_grouped: HashMap<(String, String), Vec<i32>> = HashMap::new();
     for row in coverage_vec {
-        let key = (
-            row.sample_id.clone().unwrap_or_default(),
-            row.reference_name.clone(),
-        );
+        let key = (row.sample_id.clone(), row.reference_name.clone());
         coverage_vec_grouped
             .entry(key)
             .or_default()
@@ -837,10 +831,7 @@ pub fn process_position_coverage_data(
 
     let mut cov_sample_lens: HashMap<(String, String), usize> = HashMap::new();
     for row in &filtered_coverage {
-        let key = (
-            row.sample_id.clone().unwrap_or_default(),
-            row.reference_name.clone(),
-        );
+        let key = (row.sample_id.clone(), row.reference_name.clone());
         *cov_sample_lens.entry(key).or_insert(0) += 1;
     }
 
@@ -862,10 +853,7 @@ pub fn process_position_coverage_data(
     // Calculate median coverage
     let mut sample_med_cov_grouped: HashMap<(String, String), Vec<i32>> = HashMap::new();
     for row in &filtered_coverage {
-        let key = (
-            row.sample_id.clone().unwrap_or_default(),
-            row.reference_name.clone(),
-        );
+        let key = (row.sample_id.clone(), row.reference_name.clone());
 
         sample_med_cov_grouped
             .entry(key)
@@ -1593,7 +1581,7 @@ pub fn transform_coverage_to_heatmap(
     };
 
     // Group by sample_id and reference_name, and calculate median coverage depth
-    let mut grouped_data: HashMap<(Option<String>, String), Vec<i32>> = HashMap::new();
+    let mut grouped_data: HashMap<(String, String), Vec<i32>> = HashMap::new();
     for data in filtered_data {
         let key = (data.sample_id.clone(), data.reference_name.clone());
         grouped_data
@@ -1602,7 +1590,7 @@ pub fn transform_coverage_to_heatmap(
             .push(data.coverage_depth);
     }
 
-    let mut median_data: Vec<(Option<String>, String, i32)> = Vec::new();
+    let mut median_data: Vec<(String, String, i32)> = Vec::new();
     for ((sample_id, reference_name), depths) in grouped_data {
         let median_depth = calculate_median(&depths);
         median_data.push((sample_id, reference_name, median_depth));
@@ -1619,7 +1607,7 @@ pub fn transform_coverage_to_heatmap(
         };
 
         transformed_data.push(TransformedData {
-            sample_id,
+            sample_id: Some(sample_id),
             ref_id: segment,
             coverage_depth,
         });

@@ -10,6 +10,7 @@ use std::{
     path::{Path, PathBuf},
     time::{SystemTime, UNIX_EPOCH},
 };
+use zoe::iter_utils::ProcessResultsExt;
 
 /////////////// Structs to hold IRMA data ///////////////
 ///
@@ -62,10 +63,8 @@ where
 }
 
 /// Coverage struct
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct CoverageData {
-    #[serde(rename = "Sample")]
-    pub sample_id: Option<String>,
+#[derive(Clone, Debug, Deserialize)]
+struct CoverageDataNoId {
     #[serde(rename = "Reference_Name")]
     pub reference_name: String,
     #[serde(rename = "Position")]
@@ -89,6 +88,57 @@ pub struct CoverageData {
     pub run_id: Option<String>,
     #[serde(rename = "Instrument")]
     pub instrument: Option<String>,
+}
+
+/// Coverage struct
+#[derive(Serialize, Debug, Clone)]
+pub struct CoverageData {
+    #[serde(rename = "Sample")]
+    pub sample_id: String,
+    #[serde(rename = "Reference_Name")]
+    pub reference_name: String,
+    #[serde(rename = "Position")]
+    #[serde(deserialize_with = "string_to_int")]
+    pub position: i32,
+    #[serde(rename = "Coverage Depth")]
+    pub coverage_depth: i32,
+    #[serde(rename = "Consensus")]
+    pub consensus: String,
+    #[serde(rename = "Deletions")]
+    pub deletions: i32,
+    #[serde(rename = "Ambiguous")]
+    pub ambiguous: i32,
+    #[serde(rename = "Consensus_Count")]
+    pub consensus_count: i32,
+    #[serde(rename = "Consensus_Average_Quality")]
+    pub consensus_avg_quality: f64,
+    #[serde(rename = "HMM_Position")]
+    pub hmm_position: Option<i32>,
+    #[serde(rename = "Run_ID")]
+    pub run_id: Option<String>,
+    #[serde(rename = "Instrument")]
+    pub instrument: Option<String>,
+}
+
+impl DeserializeWithSampleId for CoverageData {
+    type NoId = CoverageDataNoId;
+
+    fn set_sample_id(no_id: Self::NoId, sample_id: &str) -> Self {
+        Self {
+            sample_id: sample_id.to_string(),
+            reference_name: no_id.reference_name,
+            position: no_id.position,
+            coverage_depth: no_id.coverage_depth,
+            consensus: no_id.consensus,
+            deletions: no_id.deletions,
+            ambiguous: no_id.ambiguous,
+            consensus_count: no_id.consensus_count,
+            consensus_avg_quality: no_id.consensus_avg_quality,
+            hmm_position: no_id.hmm_position,
+            run_id: no_id.run_id,
+            instrument: no_id.instrument,
+        }
+    }
 }
 
 /// Reads struct
@@ -316,6 +366,30 @@ pub struct NextcladeData {
     pub sample_id: Option<String>,
 }
 
+trait DeserializeWithSampleId: Sized {
+    type NoId: for<'de> Deserialize<'de>;
+
+    fn set_sample_id(no_id: Self::NoId, sample_id: &str) -> Self;
+
+    /// Read tab-delimited data and include the sample name
+    fn parse<R: Read>(
+        reader: R,
+        has_headers: bool,
+        sample_id: &str,
+    ) -> Result<Vec<Self>, csv::Error> {
+        let mut rdr = ReaderBuilder::new()
+            .has_headers(has_headers)
+            .delimiter(b'\t')
+            .from_reader(reader);
+
+        rdr.deserialize().process_results(|records| {
+            records
+                .map(|record| Self::set_sample_id(record, sample_id))
+                .collect::<Vec<_>>()
+        })
+    }
+}
+
 /////////////// Imp for the process_txt_with_sample_function ///////////////
 /// Define a trait for structs that have a `sample_id` field
 trait GetSampleId {
@@ -325,7 +399,7 @@ trait GetSampleId {
 // Implement the trait for CoverageData
 impl GetSampleId for CoverageData {
     fn set_sample_id(&mut self, sample_id: String) {
-        self.sample_id = Some(sample_id);
+        self.sample_id = sample_id;
     }
 }
 
@@ -510,8 +584,7 @@ pub fn coverage_data_collection(
                 let reader = BufReader::new(file);
 
                 // Read the data from the file and include the sample name
-                let mut records: Vec<CoverageData> =
-                    process_txt_with_sample(reader, true, &sample)?;
+                let mut records = CoverageData::parse(reader, true, &sample)?;
 
                 // If virus is "sc2-spike", replace position with hmm_position
                 if virus == "sc2-spike" {
