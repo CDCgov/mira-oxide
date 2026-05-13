@@ -79,7 +79,6 @@ pub struct ReportsArgs {
 
     #[arg(short = 'v', long, ignore_case = true)]
     /// The virus the the data was generated from.
-    /// Options: flu, sc2-wgs, sc2-spike or rsv
     virus: Virus,
 
     #[arg(short = 'r', long)]
