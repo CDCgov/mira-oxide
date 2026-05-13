@@ -8,7 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### `Changed`
 - [PR #88](https://github.com/CDCgov/mira-oxide/pull/88) - Internally, `DaisSeqData`, `DaisVarsData`, and `IRMASummary` now hold a non-optional sample ID
-- [PR #89](https://github.com/CDCgov/mira-oxide/pull/88) - Internally, filtering for the spike protein in `compute_cvv_dais_variants` happens sooner
+- [PR #89](https://github.com/CDCgov/mira-oxide/pull/89) - Internally, filtering for the spike protein in `compute_cvv_dais_variants` happens sooner
+- [PR #90](https://github.com/CDCgov/mira-oxide/pull/90) - Internally, reduce allocations inside `return_seg_data`
 
 ## [1.5.4] - 2026-04-13
 - [William Chettleburgh](https://github.com/willchet)
