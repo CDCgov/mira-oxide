@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use crate::{
-    processes::summary_report_update::UpdatedIRMASummary,
+    processes::{prepare_mira_reports::Virus, summary_report_update::UpdatedIRMASummary},
     utils::data_processing::{
         DaisVarsData, IRMASummary, NTSequences, ProcessedRecord, filter_struct_by_ids,
     },
@@ -200,7 +200,7 @@ pub fn write_out_all_json_files(
     neg_control_list: &[String],
     irma_summary: &[IRMASummary],
     nt_seq_vec: &[NTSequences],
-    virus: &str,
+    virus: Virus,
 ) -> Result<(), Box<dyn Error>> {
     // Writing out Coverage data
     let coverage_struct_values = vec![
@@ -269,7 +269,7 @@ pub fn write_out_all_json_files(
     )?;
 
     // Writing out minor variants
-    let minor_vars_columns = if virus == "sc2-spike" {
+    let minor_vars_columns = if virus == Virus::Sc2Spike {
         vec![
             "sample",
             "reference",
@@ -298,7 +298,7 @@ pub fn write_out_all_json_files(
             "instrument",
         ]
     };
-    let minor_vars_struct_values = if virus == "sc2-spike" {
+    let minor_vars_struct_values = if virus == Virus::Sc2Spike {
         vec![
             "Sample",
             "Reference_Name",
@@ -390,7 +390,7 @@ pub fn write_out_all_json_files(
     )?;
 
     // write out the summary.json
-    let summary_struct_values: Vec<&str> = if virus == "sc2-wgs" {
+    let summary_struct_values: Vec<&str> = if virus == Virus::Sc2Wgs {
         vec![
             "sample_id",
             "total_reads",
@@ -408,7 +408,7 @@ pub fn write_out_all_json_files(
             "runid",
             "instrument",
         ]
-    } else if virus == "flu" {
+    } else if virus == Virus::Flu {
         vec![
             "sample_id",
             "total_reads",
@@ -443,7 +443,7 @@ pub fn write_out_all_json_files(
         ]
     };
 
-    let summary_columns: Vec<&str> = if virus == "sc2-wgs" {
+    let summary_columns: Vec<&str> = if virus == Virus::Sc2Wgs {
         vec![
             "sample_id",
             "total_reads",
@@ -461,7 +461,7 @@ pub fn write_out_all_json_files(
             "runid",
             "instrument",
         ]
-    } else if virus == "flu" {
+    } else if virus == Virus::Flu {
         vec![
             "sample_id",
             "total_reads",
@@ -509,7 +509,7 @@ pub fn write_out_all_json_files(
     )?;
 
     // write out the nt_sequences.json
-    let nt_seq_columns: Vec<&str> = if virus == "flu" {
+    let nt_seq_columns: Vec<&str> = if virus == Virus::Flu {
         vec!["sample_id", "sequence", "target_ref", "reference"]
     } else {
         vec!["sample_id", "sequence", "reference"]

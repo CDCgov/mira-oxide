@@ -4,7 +4,7 @@ use serde_json::Value;
 use std::{error::Error, path::Path};
 
 use crate::{
-    processes::summary_report_update::UpdatedIRMASummary,
+    processes::{prepare_mira_reports::Virus, summary_report_update::UpdatedIRMASummary},
     utils::data_processing::{AASequences, DaisVarsData, IRMASummary, NTSequences},
 };
 
@@ -61,7 +61,7 @@ pub fn write_out_all_csv_mira_reports(
     aa_seq_vec: &[AASequences],
     run_info: &[RunInfo],
     runid: &str,
-    virus: &str,
+    virus: Virus,
 ) -> Result<(), Box<dyn Error>> {
     // Writing out Coverage data
     let coverage_struct_values = vec![
@@ -127,7 +127,7 @@ pub fn write_out_all_csv_mira_reports(
     )?;
 
     // Writing out minor variants data
-    let minor_variants_columns = if virus == "sc2-spike" {
+    let minor_variants_columns = if virus == Virus::Sc2Spike {
         vec![
             "sample",
             "reference",
@@ -157,7 +157,7 @@ pub fn write_out_all_csv_mira_reports(
         ]
     };
 
-    let minor_vars_struct_values = if virus == "sc2-spike" {
+    let minor_vars_struct_values = if virus == Virus::Sc2Spike {
         vec![
             "Sample",
             "Reference_Name",
@@ -246,7 +246,7 @@ pub fn write_out_all_csv_mira_reports(
     )?;
 
     // write out the mira_{runid}_summary.csv
-    let summary_struct_values: Vec<&str> = if virus == "sc2-wgs" {
+    let summary_struct_values: Vec<&str> = if virus == Virus::Sc2Wgs {
         vec![
             "sample_id",
             "total_reads",
@@ -264,7 +264,7 @@ pub fn write_out_all_csv_mira_reports(
             "runid",
             "instrument",
         ]
-    } else if virus == "flu" {
+    } else if virus == Virus::Flu {
         vec![
             "sample_id",
             "total_reads",
@@ -299,7 +299,7 @@ pub fn write_out_all_csv_mira_reports(
         ]
     };
 
-    let summary_columns: Vec<&str> = if virus == "sc2-wgs" {
+    let summary_columns: Vec<&str> = if virus == Virus::Sc2Wgs {
         vec![
             "sample_id",
             "total_reads",
@@ -317,7 +317,7 @@ pub fn write_out_all_csv_mira_reports(
             "runid",
             "instrument",
         ]
-    } else if virus == "flu" {
+    } else if virus == Virus::Flu {
         vec![
             "sample_id",
             "total_reads",

@@ -2,6 +2,7 @@
 use super::coverage_json_per_sample::SampleCoverageJson;
 use super::data_ingest::{IndelsData, MinorVariantsData};
 use super::reads_to_sankey_json::SampleSankeyJson;
+use crate::processes::prepare_mira_reports::Virus;
 use crate::processes::summary_report_update::UpdatedIRMASummary;
 use crate::utils::data_processing::{DaisVarsData, IRMASummary};
 use glob::glob;
@@ -210,10 +211,10 @@ pub fn plotly_table_script(div_id: &str, table_json: &str, table_title: &str) ->
 
 // functions to read in table data and render as HTML table
 #[allow(clippy::must_use_candidate)]
-pub fn irma_summary_to_plotly_json(summary: &[IRMASummary], virus: &str) -> String {
+pub fn irma_summary_to_plotly_json(summary: &[IRMASummary], virus: Virus) -> String {
     // Determine headers dynamically based on virus type
     let headers: Vec<&str> = match virus {
-        "sc2-wgs" => vec![
+        Virus::Sc2Wgs => vec![
             "Sample",
             "Total Reads",
             "Pass QC",
@@ -230,7 +231,7 @@ pub fn irma_summary_to_plotly_json(summary: &[IRMASummary], virus: &str) -> Stri
             "Run ID",
             "Instrument",
         ],
-        "flu" => vec![
+        Virus::Flu => vec![
             "Sample",
             "Total Reads",
             "Pass QC",
@@ -283,7 +284,7 @@ pub fn irma_summary_to_plotly_json(summary: &[IRMASummary], virus: &str) -> Stri
 
         // Virus-specific extra columns
         let mut col_index = 8;
-        if virus == "sc2-wgs" {
+        if virus == Virus::Sc2Wgs {
             columns[col_index].push(
                 row.spike_percent_coverage
                     .map_or(String::new(), |v| format!("{v:.2}")),
@@ -297,7 +298,7 @@ pub fn irma_summary_to_plotly_json(summary: &[IRMASummary], virus: &str) -> Stri
         }
 
         // Correct placement of DI Ratios for flu
-        if virus == "flu" {
+        if virus == Virus::Flu {
             columns[col_index].push(
                 row.di_ratios_5prime_3prime
                     .as_deref()
@@ -355,8 +356,8 @@ fn dais_vars_to_plotly_json(vars: &[DaisVarsData]) -> String {
     .to_string()
 }
 
-fn alleles_to_plotly_json(data: &[MinorVariantsData], virus: &str) -> String {
-    let headers = if virus == "sc2-spike" {
+fn alleles_to_plotly_json(data: &[MinorVariantsData], virus: Virus) -> String {
+    let headers = if virus == Virus::Sc2Spike {
         [
             "Sample",
             "Reference",
@@ -388,7 +389,7 @@ fn alleles_to_plotly_json(data: &[MinorVariantsData], virus: &str) -> String {
     let mut columns: Vec<Vec<String>> = vec![Vec::new(); headers.len()];
 
     for row in data {
-        if virus == "sc2-spike" {
+        if virus == Virus::Sc2Spike {
             columns[0].push(row.sample_id.as_deref().unwrap_or("").to_string());
             columns[1].push(row.reference.clone());
             columns[2].push(
@@ -425,8 +426,8 @@ fn alleles_to_plotly_json(data: &[MinorVariantsData], virus: &str) -> String {
     .to_string()
 }
 
-fn indels_to_plotly_json(data: &[IndelsData], virus: &str) -> String {
-    let headers = if virus == "sc2-spike" {
+fn indels_to_plotly_json(data: &[IndelsData], virus: Virus) -> String {
+    let headers = if virus == Virus::Sc2Spike {
         [
             "Sample",
             "Reference",
@@ -459,7 +460,7 @@ fn indels_to_plotly_json(data: &[IndelsData], virus: &str) -> String {
     let mut columns: Vec<Vec<String>> = vec![Vec::new(); headers.len()];
 
     for row in data {
-        if virus == "sc2-spike" {
+        if virus == Virus::Sc2Spike {
             columns[0].push(row.sample_id.as_deref().unwrap_or("").to_string());
             columns[1].push(row.reference_name.clone());
             columns[2].push(
@@ -517,7 +518,7 @@ pub fn generate_html_report(
     sankey_json_per_sample: &[SampleSankeyJson],
     runid: &str,
     logo_path: Option<&Path>,
-    virus: &str,
+    virus: Virus,
 ) -> std::io::Result<()> {
     println!("Building static HTML file");
 

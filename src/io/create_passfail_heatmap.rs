@@ -1,4 +1,5 @@
 use crate::constants::heatmap_ref::get_references_for_virus;
+use crate::processes::prepare_mira_reports::Virus;
 use crate::utils::data_processing::IRMASummary;
 use serde_json::json;
 use std::fs::File;
@@ -17,9 +18,9 @@ fn assign_number(reason: &str) -> i32 {
     }
 }
 
-fn normalize_reference(reference: &str, virus: &str) -> String {
+fn normalize_reference(reference: &str, virus: Virus) -> String {
     match virus {
-        "flu" => {
+        Virus::Flu => {
             let parts: Vec<&str> = reference.split('_').collect();
             if parts.len() >= 2 {
                 parts[1].to_string()
@@ -27,7 +28,7 @@ fn normalize_reference(reference: &str, virus: &str) -> String {
                 reference.to_string()
             }
         }
-        "rsv" => reference
+        Virus::Rsv => reference
             .replace("_AD", "")
             .replace("_BD", "")
             .replace("_A", "")
@@ -61,7 +62,7 @@ fn build_records(
     summaries: &[IRMASummary],
     heatmap_refs: &[String],
     sample_list: &[String],
-    virus: &str,
+    virus: Virus,
 ) -> Vec<(String, String, String)> {
     let mut records = Vec::new();
 
@@ -290,7 +291,7 @@ fn plotly_template(colorscale: &Vec<(f64, &str)>) -> serde_json::Value {
 pub fn create_passfail_heatmap(
     summaries: &[IRMASummary],
     sample_list: &[String],
-    virus: &str,
+    virus: Virus,
     output_path: &str,
 ) -> serde_json::Value {
     println!("Building pass_fail_heatmap as JSON");
