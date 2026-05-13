@@ -347,8 +347,12 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
         (Virus::Sc2Wgs, Platform::Illumina) => qc_config.illumina_sc2,
         (Virus::Sc2Wgs, Platform::Ont) => qc_config.ont_sc2,
         (Virus::Sc2Spike, Platform::Illumina) => {
-            // This case is not supported, TODO ensure this
-            QCSettings::default()
+            return Err(format!(
+                "Unhandled case for platform '{platform}' and virus '{virus}'",
+                platform = args.platform,
+                virus = args.virus
+            )
+            .into());
         }
         (Virus::Sc2Spike, Platform::Ont) => qc_config.ont_sc2_spike,
         (Virus::Rsv, Platform::Illumina) => qc_config.illumina_rsv,

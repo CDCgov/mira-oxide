@@ -17,7 +17,7 @@ use crate::processes::prepare_mira_reports::{Platform, Virus};
 /////////////// Structs to hold IRMA data ///////////////
 ///
 ///QC structs
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct QCSettings {
     pub med_cov: u32,
     pub minor_vars: u32,
