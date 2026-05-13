@@ -440,6 +440,11 @@ pub fn compute_cvv_dais_variants(
 ) -> Result<Vec<DaisVarsData>, Box<dyn Error>> {
     let mut merged_data = merge_sequences(ref_seqs_data, sample_seqs_data);
 
+    // Filter dais var data based on virus type
+    if virus == "sc2-spike" {
+        merged_data.retain(|entry| entry.protein == "S");
+    }
+
     // Compute AA Variants
     for entry in &mut merged_data {
         entry.insertion = compute_aa_variants(&entry.aa_aln, &entry.aa_seq);
@@ -471,19 +476,9 @@ pub fn compute_cvv_dais_variants(
         unique_data.entry(key).or_insert((entry, num_variants));
     }
 
-    // Filter dais var data based on virus type
-    let filtered_data: Vec<(DaisSeqData, usize)> = if virus == "sc2-spike" {
-        unique_data
-            .into_values()
-            .filter(|(entry, _num_variants)| entry.protein == "S")
-            .collect()
-    } else {
-        unique_data.into_values().collect()
-    };
-
     // Convert DaisSeqData to DaisVarsData and collect into a Vec
-    let result: Vec<DaisVarsData> = filtered_data
-        .into_iter()
+    let result: Vec<DaisVarsData> = unique_data
+        .into_values()
         .map(|(entry, num_variants)| DaisVarsData {
             sample_id: entry.sample_id,
             ctype: entry.ctype,
