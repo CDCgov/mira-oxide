@@ -1,5 +1,5 @@
 use crate::io::data_ingest::{AllAllelesData, ReadsData};
-use crate::processes::prepare_mira_reports::{Samplesheet, Virus};
+use crate::processes::prepare_mira_reports::{Platform, Samplesheet, Virus};
 use crate::processes::summary_report_update::UpdatedIRMASummary;
 use crate::utils::data_processing::{AASequences, IRMASummary, NTSequences, extract_field};
 use arrow::array::Float64Array;
@@ -796,7 +796,7 @@ pub fn write_samplesheet_to_parquet(
     samplesheet: Samplesheet,
     output_file: &str,
     runid: &str,
-    instrument: &str,
+    instrument: Platform,
 ) -> Result<(), Box<dyn Error>> {
     match samplesheet {
         Samplesheet::Illumina(data) => {

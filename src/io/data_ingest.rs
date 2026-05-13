@@ -12,12 +12,12 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use crate::processes::prepare_mira_reports::Virus;
+use crate::processes::prepare_mira_reports::{Platform, Virus};
 
 /////////////// Structs to hold IRMA data ///////////////
 ///
 ///QC structs
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Default, Deserialize)]
 pub struct QCSettings {
     pub med_cov: u32,
     pub minor_vars: u32,
@@ -486,7 +486,7 @@ pub fn split_by_comma(input: &str) -> Vec<String> {
 /// Read in the coverage files made by IRMA and save to a vector of `CoverageData`
 pub fn coverage_data_collection(
     irma_path: impl AsRef<Path>,
-    platform: &str,
+    platform: Platform,
     runid: &str,
     virus: Virus,
 ) -> Result<Vec<CoverageData>, Box<dyn std::error::Error>> {
@@ -539,7 +539,7 @@ pub fn coverage_data_collection(
 ///  Collect read data created by IRMA and save to vector of `ReadsData`
 pub fn reads_data_collection(
     irma_path: impl AsRef<Path>,
-    platform: &str,
+    platform: Platform,
     runid: &str,
 ) -> Result<Vec<ReadsData>, Box<dyn std::error::Error>> {
     let pattern = format!(
@@ -578,7 +578,7 @@ pub fn reads_data_collection(
 /// One vector contains filtered minor variants (frequency >= 0.05), and the other contains all minor variants.
 pub fn minor_variant_data_collection(
     irma_path: &Path,
-    platform: &str,
+    platform: Platform,
     runid: &str,
 ) -> Result<MinorVariantDataCollection, Box<dyn std::error::Error>> {
     let pattern = format!(
@@ -633,7 +633,7 @@ pub fn minor_variant_data_collection(
 /// Note that insertions and deletions are being added  to the same Vec<Indelsdata>
 pub fn indels_data_collection(
     irma_path: impl AsRef<Path>,
-    platform: &str,
+    platform: Platform,
     runid: &str,
 ) -> Result<Vec<IndelsData>, Box<dyn std::error::Error>> {
     let pattern1 = format!(
@@ -694,7 +694,7 @@ pub fn indels_data_collection(
 /// Collecting allele data created by IRMA and save to a vector of `AllAllelesData`
 pub fn all_alleles_data_collection(
     irma_path: &Path,
-    platform: &str,
+    platform: Platform,
     runid: &str,
 ) -> Result<Vec<AllAllelesData>, Box<dyn std::error::Error>> {
     let pattern = format!(
@@ -935,7 +935,7 @@ fn days_in_year(year: u64) -> u64 {
 /// Collect read info created by IRMA and save to struct of `RunInfo`
 pub fn run_info_collection(
     irma_path: impl AsRef<Path>,
-    platform: &str,
+    platform: Platform,
     runid: &str,
 ) -> Result<Vec<RunInfo>, Box<dyn std::error::Error>> {
     let pattern = format!(
