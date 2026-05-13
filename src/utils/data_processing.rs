@@ -9,7 +9,7 @@ use std::{
     path::Path,
 };
 
-use crate::processes::prepare_mira_reports::{SamplesheetO, Virus};
+use crate::processes::prepare_mira_reports::{Platform, SamplesheetO, Virus};
 use crate::{io::data_ingest::DIStatData, processes::prepare_mira_reports::SamplesheetI};
 
 use crate::io::data_ingest::{
@@ -359,7 +359,7 @@ pub fn compute_dais_variants(
     ref_seqs_data: &[DaisSeqData],
     sample_seqs_data: &[DaisSeqData],
     runid: &str,
-    instrument: &str,
+    instrument: Platform,
 ) -> Result<Vec<DaisVarsData>, Box<dyn Error>> {
     let mut dais_vars_data: Vec<DaisVarsData> = Vec::new();
 
@@ -395,7 +395,7 @@ pub fn compute_dais_variants(
                     aa_variant_count: var_aa_count,
                     aa_variants: aa_vars,
                     runid: runid.to_owned(),
-                    instrument: instrument.to_owned(),
+                    instrument: instrument.to_string(),
                 };
                 dais_vars_data.push(dais_vars_entry);
             }
@@ -431,7 +431,7 @@ pub fn compute_cvv_dais_variants(
     ref_seqs_data: &[DaisSeqData],
     sample_seqs_data: &[DaisSeqData],
     runid: &str,
-    instrument: &str,
+    instrument: Platform,
     virus: Virus,
 ) -> Result<Vec<DaisVarsData>, Box<dyn Error>> {
     let mut merged_data = merge_sequences(ref_seqs_data, sample_seqs_data);
@@ -485,7 +485,7 @@ pub fn compute_cvv_dais_variants(
             aa_variant_count: num_variants as i32,
             aa_variants: entry.insertion.clone(),
             runid: runid.to_owned(),
-            instrument: instrument.to_owned(),
+            instrument: instrument.to_string(),
         })
         .collect();
 
@@ -924,7 +924,7 @@ pub fn count_minor_variants(data: &[MinorVariantsData]) -> Vec<VariantCountData>
 
 pub fn collect_analysis_metadata(
     work_path: &Path,
-    platform: &str,
+    platform: Platform,
     virus: Virus,
     irma_config: &String,
     qc_template: &String,
@@ -959,7 +959,7 @@ pub fn collect_analysis_metadata(
     let analysis_metadata = Metadata {
         module: modulestring,
         runid: input_runid.to_owned(),
-        instrument: platform.to_owned(),
+        instrument: platform.to_string(),
     };
     Ok(analysis_metadata)
 }
@@ -1214,7 +1214,7 @@ pub fn create_nt_seq_vec(
     irma_summary_vec: &[IRMASummary],
     virus: Virus,
     runid: &str,
-    instrument: &str,
+    instrument: Platform,
 ) -> Result<Vec<NTSequences>, Box<dyn Error>> {
     let mut nt_seq_vec: Vec<NTSequences> = Vec::new();
 
@@ -1282,7 +1282,7 @@ pub fn create_nt_seq_vec(
                                     .clone()
                                     .unwrap_or_else(String::new),
                                 runid: runid.to_owned(),
-                                instrument: instrument.to_owned(),
+                                instrument: instrument.to_string(),
                             });
                         }
                     }
@@ -1300,7 +1300,7 @@ pub fn create_nt_seq_vec(
                         reference: record.reference.clone().unwrap_or(String::new()),
                         qc_decision: record.pass_fail_reason.clone().unwrap_or_else(String::new),
                         runid: runid.to_owned(),
-                        instrument: instrument.to_owned(),
+                        instrument: instrument.to_string(),
                     });
                 }
             }
@@ -1313,7 +1313,7 @@ pub fn create_nt_seq_vec(
 //Pre step for printing the pass/fail amended concensus
 pub fn divide_nt_into_pass_fail_vec(
     nt_seq_vec: &[NTSequences],
-    platform: &str,
+    platform: Platform,
     virus: Virus,
     no_premature_stop_codon_proteins: &[String],
 ) -> Result<ProcessedSequences, Box<dyn Error>> {
@@ -1330,12 +1330,13 @@ pub fn divide_nt_into_pass_fail_vec(
             false
         } else {
             match (platform, virus) {
-                ("illumina", Virus::Flu | Virus::Sc2Wgs | Virus::Rsv) | ("ont", _) => {
+                (Platform::Illumina, Virus::Flu | Virus::Sc2Wgs | Virus::Rsv)
+                | (Platform::Ont, _) => {
                     entry.qc_decision == "Pass"
                         || (entry.qc_decision.contains("Premature stop codon")
                             && !entry.qc_decision.contains(';'))
                 }
-                _ => {
+                (Platform::Illumina, Virus::Sc2Spike) => {
                     return Err(format!(
                         "Unhandled case for platform '{platform}' and virus '{virus}'"
                     )
@@ -1373,7 +1374,7 @@ pub fn create_aa_seq_vec(
     irma_summary_vec: &[IRMASummary],
     virus: Virus,
     runid: &str,
-    instrument: &str,
+    instrument: Platform,
 ) -> Result<Vec<AASequences>, Box<dyn Error>> {
     let mut aa_seq_vec: Vec<AASequences> = Vec::new();
 
@@ -1395,7 +1396,7 @@ pub fn create_aa_seq_vec(
                         reference: sample.reference.clone().unwrap_or_else(String::new),
                         qc_decision: sample.pass_fail_reason.clone().unwrap_or_else(String::new),
                         runid: runid.to_owned(),
-                        instrument: instrument.to_owned(),
+                        instrument: instrument.to_string(),
                     });
                 }
             }
@@ -1413,7 +1414,7 @@ pub fn create_aa_seq_vec(
                         reference: sample.reference.clone().unwrap_or_else(String::new),
                         qc_decision: sample.pass_fail_reason.clone().unwrap_or_else(String::new),
                         runid: runid.to_owned(),
-                        instrument: instrument.to_owned(),
+                        instrument: instrument.to_string(),
                     });
                 }
             }
@@ -1426,7 +1427,7 @@ pub fn create_aa_seq_vec(
 //Pre step for printing the pass/fail amino acid concensus
 pub fn divide_aa_into_pass_fail_vec(
     nt_seq_vec: &[AASequences],
-    platform: &str,
+    platform: Platform,
     virus: Virus,
     no_premature_stop_codon_proteins: &[String],
 ) -> Result<ProcessedSequences, Box<dyn Error>> {
@@ -1443,12 +1444,13 @@ pub fn divide_aa_into_pass_fail_vec(
             false
         } else {
             match (platform, virus) {
-                ("illumina", Virus::Flu | Virus::Sc2Wgs | Virus::Rsv) | ("ont", _) => {
+                (Platform::Illumina, Virus::Flu | Virus::Sc2Wgs | Virus::Rsv)
+                | (Platform::Ont, _) => {
                     entry.qc_decision == "Pass"
                         || (entry.qc_decision.contains("Premature stop codon")
                             && !entry.qc_decision.contains(';'))
                 }
-                _ => {
+                (Platform::Illumina, Virus::Sc2Spike) => {
                     return Err(format!(
                         "Unhandled case for platform '{platform}' and virus '{virus}'"
                     )
@@ -1490,7 +1492,7 @@ pub fn divide_aa_into_pass_fail_vec(
 // Creating seq vecs for nextclade fastas
 pub fn divide_nt_into_nextclade_vec(
     nt_seq_vec: &[NTSequences],
-    platform: &str,
+    platform: Platform,
     virus: Virus,
     no_premature_stop_codon_proteins: &[String],
 ) -> Result<NextcladeSequences, Box<dyn Error>> {
@@ -1516,32 +1518,32 @@ pub fn divide_nt_into_nextclade_vec(
             false
         } else {
             match (platform, virus) {
-                ("illumina", Virus::Flu) => {
+                (Platform::Illumina, Virus::Flu) => {
                     entry.qc_decision == "Pass"
                         || (entry.qc_decision.contains("Premature stop codon")
                             && !entry.qc_decision.contains(';')
                             && !entry.reference.contains("HA")
                             && !entry.reference.contains("NA"))
                 }
-                ("illumina", Virus::Sc2Wgs) => {
+                (Platform::Illumina, Virus::Sc2Wgs) => {
                     entry.qc_decision == "Pass"
                         || (entry.qc_decision.contains("Premature stop codon")
                             && !entry.qc_decision.contains(';')
                             && !entry.qc_decision.contains("Premature stop codon 'S'"))
                 }
-                ("illumina", Virus::Rsv) => {
+                (Platform::Illumina, Virus::Rsv) => {
                     entry.qc_decision == "Pass"
                         || (entry.qc_decision.contains("Premature stop codon")
                             && !entry.qc_decision.contains(';')
                             && !entry.reference.contains('F')
                             && !entry.reference.contains('G'))
                 }
-                ("ont", _) => {
+                (Platform::Ont, _) => {
                     entry.qc_decision == "Pass"
                         || (entry.qc_decision.contains("Premature stop codon")
                             && !entry.qc_decision.contains(';'))
                 }
-                _ => {
+                (Platform::Illumina, Virus::Sc2Spike) => {
                     return Err(format!(
                         "Unhandled case for platform '{platform}' and virus '{virus}'"
                     )
