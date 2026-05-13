@@ -24,10 +24,7 @@ pub fn create_sample_coverage_fig(
     let mut plot = Plot::new();
 
     // Filter data for the given sample
-    let sample_data: Vec<&CoverageData> = data
-        .iter()
-        .filter(|d| d.sample_id.as_deref() == Some(sample))
-        .collect();
+    let sample_data: Vec<&CoverageData> = data.iter().filter(|d| d.sample_id == sample).collect();
 
     if sample_data.is_empty() {
         return Ok(plot);
@@ -260,7 +257,7 @@ pub fn create_coverage_plot(
 ) -> Result<Vec<SampleCoverageJson>, Box<dyn Error>> {
     let samples: Vec<String> = data
         .iter()
-        .filter_map(|d| d.sample_id.clone())
+        .map(|d| d.sample_id.clone())
         .collect::<std::collections::HashSet<_>>()
         .into_iter()
         .collect();
