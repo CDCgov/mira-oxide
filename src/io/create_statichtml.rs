@@ -583,9 +583,8 @@ pub fn generate_html_report(
             write_sample_plot_html(output_path, sample, &coverage_json.json, &sankey_json.json)?;
 
             // Add the link to the main HTML (relative path)
-            let link = format!(
-                r#"<a href="MIRA_{sample}_coverage.html" target="_blank">{sample}</a><br>"#
-            );
+            let link =
+                format!(r#"<a href="mira_{sample}_coverage.html" target="_blank">{sample}</a><br>");
             coverage_links_html.push_str(&link);
         }
     }
