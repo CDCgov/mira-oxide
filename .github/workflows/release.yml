@@ -174,7 +174,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   publish-release:
-    name: Create Integrated Package
+    name: Publish Release
     needs:
       [build-release-image-and-linux-artifacts, create-image-manifest, build-mac-artifacts]
     runs-on: ubuntu-latest
