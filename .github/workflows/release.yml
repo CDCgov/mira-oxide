@@ -38,6 +38,7 @@ jobs:
           gh release create "${{ github.ref_name }}" \
             --title "${RELEASE_BIN} ${{ github.ref_name }}" \
             --notes-file "$RUNNER_TEMP/release_notes.md" \
+            --draft \
             $latest
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -169,5 +170,23 @@ jobs:
         shell: bash
         run: |
           gh release upload "${{ github.ref_name }}" ${{ env.RELEASE_BIN }}-apple-universal-${{ github.ref_name }}.*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  publish-release:
+    name: Create Integrated Package
+    needs:
+      [build-release-image-and-linux-artifacts, create-image-manifest, build-mac-artifacts]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Publish Release
+        if: github.ref_name != 'test'
+        shell: bash
+        run: |
+          gh release edit "${{ github.ref_name }}" --draft=false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
