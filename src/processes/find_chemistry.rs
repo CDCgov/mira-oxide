@@ -34,7 +34,7 @@ pub struct FindChemArgs {
 
     #[arg(short = 'i', long, ignore_case = true, default_value = "None")]
     /// Alternative IRMA config. To use Sensitive, Secondary, or UTR, the
-    /// experiment type must be Flu-Illumina or Flu-ONT.
+    /// experiment type must be Flu-Illumina, Flu-ONT, or Flu-AD.
     pub irma_config: IRMAConfig,
 
     #[arg(short = 'g', long)]
@@ -50,7 +50,8 @@ impl FindChemArgs {
         match self.irma_config {
             IRMAConfig::Sensitive | IRMAConfig::Secondary | IRMAConfig::UTR
                 if self.experiment == Experiment::FluIllumina
-                    || self.experiment == Experiment::FluONT =>
+                    || self.experiment == Experiment::FluONT
+                    || self.experiment == Experiment::FluAD =>
             {
                 Ok(())
             }
@@ -73,6 +74,7 @@ pub enum Experiment {
     SC2SpikeOnlyONT,
     SC2WholeGenomeONT,
     RSVONT,
+    FluAD,
 }
 
 impl ValueEnum for Experiment {
@@ -86,6 +88,7 @@ impl ValueEnum for Experiment {
             Self::SC2SpikeOnlyONT,
             Self::SC2WholeGenomeONT,
             Self::RSVONT,
+            Self::FluAD,
         ]
     }
 
@@ -111,6 +114,7 @@ impl ValueEnum for Experiment {
                 Some(PossibleValue::new("SC2-Whole-Genome-ONT").alias("SC2WholeGenomeONT"))
             }
             Experiment::RSVONT => Some(PossibleValue::new("RSV-ONT").alias("RSVONT")),
+            Experiment::FluAD => Some(PossibleValue::new("Flu-AD").alias("FluAD")),
         }
     }
 }
@@ -120,6 +124,7 @@ impl Experiment {
     fn get_module(self) -> IrmaModule {
         match self {
             Self::FluIllumina => IrmaModule::FLU,
+            Self::FluAD => IrmaModule::FluAd,
             Self::RSVIllumina | Self::RSVONT => IrmaModule::RSV,
             Self::SC2WholeGenomeIllumina | Self::SC2WholeGenomeONT => IrmaModule::CoV,
             Self::FluONT => IrmaModule::FLUMinion,
@@ -187,6 +192,7 @@ fn get_config_path(args: &FindChemArgs, seq_len: Option<usize>) -> String {
                 "/bin/irma_config/FLU-2x75.sh"
             }
         }
+        (Experiment::FluAD, _, IRMAConfig::NoConfig) => "/bin/irma_config/FLU-AD.sh",
         (Experiment::SC2WholeGenomeIllumina, Some(seq_len), IRMAConfig::NoConfig) => {
             if seq_len > 80 {
                 "/bin/irma_config/CoV.sh"
@@ -221,6 +227,7 @@ fn get_config_path(args: &FindChemArgs, seq_len: Option<usize>) -> String {
 #[derive(Debug)]
 pub enum IrmaModule {
     FLU,
+    FluAd,
     CoV,
     RSV,
     FLUMinion,
@@ -231,6 +238,7 @@ impl fmt::Display for IrmaModule {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             IrmaModule::FLU => write!(f, "FLU"),
+            IrmaModule::FluAd => write!(f, "FLU_AD"),
             IrmaModule::CoV => write!(f, "CoV"),
             IrmaModule::RSV => write!(f, "RSV"),
             IrmaModule::FLUMinion => write!(f, "FLU-minion"),
