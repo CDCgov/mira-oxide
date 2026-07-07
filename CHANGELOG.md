@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [Amanda Sullivan](https://github.com/mandysulli)
 
 ### `Added`
-- [PR #](https://github.com/CDCgov/mira-oxide/pull/) - Add fluad as an input for findchemistry process
+- [PR #97](https://github.com/CDCgov/mira-oxide/pull/97) - Add FLU-AD as experiemnt and ad as irma_config as inputs for findchemistry process
 
 ## [1.5.6] - 2026-06-22
 - [Amanda Sullivan](https://github.com/mandysulli)
