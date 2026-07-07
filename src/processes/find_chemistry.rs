@@ -53,7 +53,7 @@ impl FindChemArgs {
             {
                 Ok(())
             }
-            IRMAConfig::FluAd if self.experiment == Experiment::FluAD => Ok(()),
+            IRMAConfig::Ad if self.experiment == Experiment::FluAD => Ok(()),
             IRMAConfig::Custom | IRMAConfig::NoConfig => Ok(()),
             _ => Err(format!(
                 "Invalid combination: {:?} cannot be used with {:?}",
@@ -139,7 +139,7 @@ pub enum IRMAConfig {
     UTR,
     Custom,
     NoConfig,
-    FluAd,
+    Ad,
 }
 
 impl ValueEnum for IRMAConfig {
@@ -151,7 +151,7 @@ impl ValueEnum for IRMAConfig {
             Self::UTR,
             Self::Custom,
             Self::NoConfig,
-            Self::FluAd,
+            Self::Ad,
         ]
     }
 
@@ -161,7 +161,7 @@ impl ValueEnum for IRMAConfig {
             IRMAConfig::Sensitive => Some(PossibleValue::new("Sensitive")),
             IRMAConfig::Secondary => Some(PossibleValue::new("Secondary")),
             IRMAConfig::UTR => Some(PossibleValue::new("UTR")),
-            IRMAConfig::FluAd => Some(PossibleValue::new("FluAd")),
+            IRMAConfig::Ad => Some(PossibleValue::new("Ad")),
             IRMAConfig::Custom => Some(PossibleValue::new("Custom")),
             IRMAConfig::NoConfig => Some(PossibleValue::new("NoConfig").alias("None")),
         }
@@ -186,7 +186,7 @@ fn get_config_path(args: &FindChemArgs, seq_len: Option<usize>) -> String {
         (_, _, IRMAConfig::Sensitive) => "/bin/irma_config/FLU-sensitive.sh",
         (_, _, IRMAConfig::Secondary) => "/bin/irma_config/FLU-secondary.sh",
         (_, _, IRMAConfig::UTR) => "/bin/irma_config/FLU-utr.sh",
-        (_, _, IRMAConfig::FluAd) | (Experiment::FluAD, Some(_), IRMAConfig::NoConfig) => {
+        (_, _, IRMAConfig::Ad) | (Experiment::FluAD, Some(_), IRMAConfig::NoConfig) => {
             "/bin/irma_config/FLU-AD.sh"
         }
         (_, _, IRMAConfig::Custom) => unreachable!(),
