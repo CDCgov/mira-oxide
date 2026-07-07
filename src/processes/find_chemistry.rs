@@ -45,16 +45,15 @@ pub struct FindChemArgs {
 impl FindChemArgs {
     /// Function for ensuring that specific IRMA configs are only used with the
     /// proper experiment. Secondary, Sensitive, and UTR must be matched with a
-    /// Flu experiment.
+    /// Flu experiment. Flu-AD config must be matched with the Flu-AD experiment.
     fn validate(&self) -> Result<(), String> {
         match self.irma_config {
             IRMAConfig::Sensitive | IRMAConfig::Secondary | IRMAConfig::UTR
-                if self.experiment == Experiment::FluIllumina
-                    || self.experiment == Experiment::FluONT
-                    || self.experiment == Experiment::FluAD =>
+                if self.experiment == Experiment::FluIllumina =>
             {
                 Ok(())
             }
+            IRMAConfig::FluAd if self.experiment == Experiment::FluAD => Ok(()),
             IRMAConfig::Custom | IRMAConfig::NoConfig => Ok(()),
             _ => Err(format!(
                 "Invalid combination: {:?} cannot be used with {:?}",
@@ -140,6 +139,7 @@ pub enum IRMAConfig {
     UTR,
     Custom,
     NoConfig,
+    FluAd,
 }
 
 impl ValueEnum for IRMAConfig {
@@ -151,6 +151,7 @@ impl ValueEnum for IRMAConfig {
             Self::UTR,
             Self::Custom,
             Self::NoConfig,
+            Self::FluAd,
         ]
     }
 
@@ -160,6 +161,7 @@ impl ValueEnum for IRMAConfig {
             IRMAConfig::Sensitive => Some(PossibleValue::new("Sensitive")),
             IRMAConfig::Secondary => Some(PossibleValue::new("Secondary")),
             IRMAConfig::UTR => Some(PossibleValue::new("UTR")),
+            IRMAConfig::FluAd => Some(PossibleValue::new("FluAd")),
             IRMAConfig::Custom => Some(PossibleValue::new("Custom")),
             IRMAConfig::NoConfig => Some(PossibleValue::new("NoConfig").alias("None")),
         }
@@ -184,6 +186,9 @@ fn get_config_path(args: &FindChemArgs, seq_len: Option<usize>) -> String {
         (_, _, IRMAConfig::Sensitive) => "/bin/irma_config/FLU-sensitive.sh",
         (_, _, IRMAConfig::Secondary) => "/bin/irma_config/FLU-secondary.sh",
         (_, _, IRMAConfig::UTR) => "/bin/irma_config/FLU-utr.sh",
+        (_, _, IRMAConfig::FluAd) | (Experiment::FluAD, Some(_), IRMAConfig::NoConfig) => {
+            "/bin/irma_config/FLU-AD.sh"
+        }
         (_, _, IRMAConfig::Custom) => unreachable!(),
         (Experiment::FluIllumina, Some(seq_len), IRMAConfig::NoConfig) => {
             if seq_len >= 145 {
@@ -192,7 +197,6 @@ fn get_config_path(args: &FindChemArgs, seq_len: Option<usize>) -> String {
                 "/bin/irma_config/FLU-2x75.sh"
             }
         }
-        (Experiment::FluAD, _, IRMAConfig::NoConfig) => "/bin/irma_config/FLU-AD.sh",
         (Experiment::SC2WholeGenomeIllumina, Some(seq_len), IRMAConfig::NoConfig) => {
             if seq_len > 80 {
                 "/bin/irma_config/CoV.sh"
