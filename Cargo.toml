@@ -1,6 +1,6 @@
 [package]
 name = "mira-oxide"
-version = "1.5.6"
+version = "1.5.7"
 edition = "2024"
 description = "A set of rusty tools for use in MIRA"
 

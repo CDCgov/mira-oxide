@@ -34,7 +34,7 @@ pub struct FindChemArgs {
 
     #[arg(short = 'i', long, ignore_case = true, default_value = "None")]
     /// Alternative IRMA config. To use Sensitive, Secondary, or UTR, the
-    /// experiment type must be Flu-Illumina or Flu-ONT.
+    /// experiment type must be Flu-Illumina, Flu-ONT, or Flu-AD.
     pub irma_config: IRMAConfig,
 
     #[arg(short = 'g', long)]
@@ -45,15 +45,15 @@ pub struct FindChemArgs {
 impl FindChemArgs {
     /// Function for ensuring that specific IRMA configs are only used with the
     /// proper experiment. Secondary, Sensitive, and UTR must be matched with a
-    /// Flu experiment.
+    /// Flu experiment. Flu-AD config must be matched with the Flu-AD experiment.
     fn validate(&self) -> Result<(), String> {
         match self.irma_config {
             IRMAConfig::Sensitive | IRMAConfig::Secondary | IRMAConfig::UTR
-                if self.experiment == Experiment::FluIllumina
-                    || self.experiment == Experiment::FluONT =>
+                if self.experiment == Experiment::FluIllumina =>
             {
                 Ok(())
             }
+            IRMAConfig::Ad if self.experiment == Experiment::FluAD => Ok(()),
             IRMAConfig::Custom | IRMAConfig::NoConfig => Ok(()),
             _ => Err(format!(
                 "Invalid combination: {:?} cannot be used with {:?}",
@@ -73,6 +73,7 @@ pub enum Experiment {
     SC2SpikeOnlyONT,
     SC2WholeGenomeONT,
     RSVONT,
+    FluAD,
 }
 
 impl ValueEnum for Experiment {
@@ -86,6 +87,7 @@ impl ValueEnum for Experiment {
             Self::SC2SpikeOnlyONT,
             Self::SC2WholeGenomeONT,
             Self::RSVONT,
+            Self::FluAD,
         ]
     }
 
@@ -111,6 +113,7 @@ impl ValueEnum for Experiment {
                 Some(PossibleValue::new("SC2-Whole-Genome-ONT").alias("SC2WholeGenomeONT"))
             }
             Experiment::RSVONT => Some(PossibleValue::new("RSV-ONT").alias("RSVONT")),
+            Experiment::FluAD => Some(PossibleValue::new("Flu-AD").alias("FluAD")),
         }
     }
 }
@@ -120,6 +123,7 @@ impl Experiment {
     fn get_module(self) -> IrmaModule {
         match self {
             Self::FluIllumina => IrmaModule::FLU,
+            Self::FluAD => IrmaModule::FluAd,
             Self::RSVIllumina | Self::RSVONT => IrmaModule::RSV,
             Self::SC2WholeGenomeIllumina | Self::SC2WholeGenomeONT => IrmaModule::CoV,
             Self::FluONT => IrmaModule::FLUMinion,
@@ -135,6 +139,7 @@ pub enum IRMAConfig {
     UTR,
     Custom,
     NoConfig,
+    Ad,
 }
 
 impl ValueEnum for IRMAConfig {
@@ -146,6 +151,7 @@ impl ValueEnum for IRMAConfig {
             Self::UTR,
             Self::Custom,
             Self::NoConfig,
+            Self::Ad,
         ]
     }
 
@@ -155,6 +161,7 @@ impl ValueEnum for IRMAConfig {
             IRMAConfig::Sensitive => Some(PossibleValue::new("Sensitive")),
             IRMAConfig::Secondary => Some(PossibleValue::new("Secondary")),
             IRMAConfig::UTR => Some(PossibleValue::new("UTR")),
+            IRMAConfig::Ad => Some(PossibleValue::new("Ad")),
             IRMAConfig::Custom => Some(PossibleValue::new("Custom")),
             IRMAConfig::NoConfig => Some(PossibleValue::new("NoConfig").alias("None")),
         }
@@ -179,6 +186,9 @@ fn get_config_path(args: &FindChemArgs, seq_len: Option<usize>) -> String {
         (_, _, IRMAConfig::Sensitive) => "/bin/irma_config/FLU-sensitive.sh",
         (_, _, IRMAConfig::Secondary) => "/bin/irma_config/FLU-secondary.sh",
         (_, _, IRMAConfig::UTR) => "/bin/irma_config/FLU-utr.sh",
+        (_, _, IRMAConfig::Ad) | (Experiment::FluAD, Some(_), IRMAConfig::NoConfig) => {
+            "/bin/irma_config/FLU-AD.sh"
+        }
         (_, _, IRMAConfig::Custom) => unreachable!(),
         (Experiment::FluIllumina, Some(seq_len), IRMAConfig::NoConfig) => {
             if seq_len >= 145 {
@@ -221,6 +231,7 @@ fn get_config_path(args: &FindChemArgs, seq_len: Option<usize>) -> String {
 #[derive(Debug)]
 pub enum IrmaModule {
     FLU,
+    FluAd,
     CoV,
     RSV,
     FLUMinion,
@@ -231,6 +242,7 @@ impl fmt::Display for IrmaModule {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             IrmaModule::FLU => write!(f, "FLU"),
+            IrmaModule::FluAd => write!(f, "FLU_AD"),
             IrmaModule::CoV => write!(f, "CoV"),
             IrmaModule::RSV => write!(f, "RSV"),
             IrmaModule::FLUMinion => write!(f, "FLU-minion"),
