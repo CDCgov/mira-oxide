@@ -95,10 +95,6 @@ pub struct ReportsArgs {
     #[arg(short = 'c', long, default_value = "default-config")]
     /// (Optional) The name of the IRMA configuration that was used for running IRMA.
     irma_config: String,
-
-    #[arg(short = 't', long, default_value = "")]
-    /// (Optional) if a custom qc template is used for QC.
-    qc_template: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -257,7 +253,6 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
         &args.platform,
         &args.virus,
         &args.irma_config,
-        &args.qc_template,
         &args.runid,
     )?;
 
