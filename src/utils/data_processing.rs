@@ -926,6 +926,7 @@ pub fn collect_analysis_metadata(
     platform: &str,
     virus: &str,
     irma_config: &String,
+    qc_template: &String,
     input_runid: &str,
 ) -> Result<Metadata, Box<dyn Error>> {
     let mut descript_dict = HashMap::new();
@@ -948,7 +949,11 @@ pub fn collect_analysis_metadata(
         .get("Version")
         .ok_or("Version key not found in DESCRIPTION file")?;
 
-    let modulestring = format!("MIRA-NF-v{version};{platform}-{virus};{irma_config}");
+    let modulestring = if qc_template.is_empty() {
+        format!("MIRA-NF-v{version};{platform}-{virus};{irma_config}")
+    } else {
+        format!("MIRA-NF-v{version};{platform}-{virus}-{qc_template};{irma_config}")
+    };
 
     let analysis_metadata = Metadata {
         module: modulestring,
