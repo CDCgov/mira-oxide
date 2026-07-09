@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [Amanda Sullivan](https://github.com/mandysulli)
 
 ### `Added`
-- [PR #](https://github.com/CDCgov/mira-oxide/pull/) - Add custom-qc to summary if a custom qc yaml is used. 
+- [PR #98](https://github.com/CDCgov/mira-oxide/pull/98) - Add custom-qc to summary if a custom qc yaml is used. 
 
 ## [1.5.7] - 2026-07-07
 - [Amanda Sullivan](https://github.com/mandysulli)
