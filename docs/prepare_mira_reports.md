@@ -107,6 +107,10 @@ Building pass_fail_heatmap as JSON
 Building barcode distribution pie figure as JSON
   -> barcode distribution pie figure saved to ./test/barcode_distribution.json
 Building static HTML file
+  -> Barcode Assignment HTML saved to "./test/mira_run_id_test_barcode_distribution.html"
+  -> Automatic Quality Control Decisions HTML saved to "./test/mira_run_id_test_pass_fail_heatmap.html"
+  -> Median Coverage HTML saved to "./test/mira_run_id_test_coverage_heatmap.html"
+  -> coverge and sankey HTML saved to "./test/mira_sample_id_coverage.html"
   -> static HTML saved to "./test/mira_run_id_test_summary.html"
 ```
 
