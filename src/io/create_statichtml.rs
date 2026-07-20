@@ -503,6 +503,95 @@ fn indels_to_plotly_json(data: &[IndelsData], virus: &str) -> String {
     .to_string()
 }
 
+// helper funciton for creating html for each plotly fig
+// `div_id` is used as both the DOM id and, by default, part of the file name.
+fn write_plot_html(
+    output_path: &Path,
+    file_stem: &str,
+    div_id: &str,
+    title: &str,
+    plotly_json: &serde_json::Value,
+) -> std::io::Result<PathBuf> {
+    let plotly_json_str = plotly_json.to_string();
+
+    let html = format!(
+        r#"
+<html>
+<head>
+    <style>
+        body {{
+            font-family: Helvetica;
+            margin-bottom: 20px;
+            margin-left: 100px;
+            margin-right: 100px;
+        }}
+    </style>
+    <title>{title}</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+    <h2>{title}</h2>
+    <div style="display:flex; justify-content:center; width:100%;">
+        <div id="{div_id}" style="
+            width:85vw;
+            max-width:1200px;
+            margin:0 auto;
+        "></div>
+    </div>
+
+    <script type="text/javascript">
+    (function() {{
+        var fig = {plotly_json_str};
+        Plotly.newPlot('{div_id}', fig.data, fig.layout, {{displayModeBar: false}});
+    }})();
+    </script>
+</body>
+</html>
+"#
+    );
+
+    let out_path = output_path.join(format!("{file_stem}.html"));
+    write(&out_path, html)?;
+    println!("  -> {title} HTML saved to {:?}", out_path.display());
+    Ok(out_path)
+}
+
+// Convenience wrapper for the three summary-level plots (barcode distribution,
+// pass/fail heatmap, coverage heatmap). Returns the output paths in order.
+fn write_summary_plots_html(
+    output_path: &Path,
+    runid: &str,
+    barcode_distribution_json: &serde_json::Value,
+    pass_fail_heatmap_json: &serde_json::Value,
+    cov_heatmap_json: &serde_json::Value,
+) -> std::io::Result<(PathBuf, PathBuf, PathBuf)> {
+    let bdp_path = write_plot_html(
+        output_path,
+        &format!("mira_{runid}_barcode_distribution"),
+        "barcode_distribution_plot",
+        "Barcode Assignment",
+        barcode_distribution_json,
+    )?;
+
+    let pfhm_path = write_plot_html(
+        output_path,
+        &format!("mira_{runid}_pass_fail_heatmap"),
+        "pass_fail_heatmap_plot",
+        "Automatic Quality Control Decisions",
+        pass_fail_heatmap_json,
+    )?;
+
+    let chm_path = write_plot_html(
+        output_path,
+        &format!("mira_{runid}_coverage_heatmap"),
+        "cov_heatmap_plot",
+        "Median Coverage",
+        cov_heatmap_json,
+    )?;
+
+    Ok((bdp_path, pfhm_path, chm_path))
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn generate_html_report(
     output_path: &Path,
@@ -545,6 +634,14 @@ pub fn generate_html_report(
 
     let cov_heatmap_json_str = cov_heatmap_json.to_string();
     let chm_html = plotly_json_script("cov_heatmap_plot", &cov_heatmap_json_str);
+
+    write_summary_plots_html(
+        output_path,
+        runid,
+        barcode_distribution_json,
+        pass_fail_heatmap_json,
+        cov_heatmap_json,
+    )?;
 
     // Pull in data tables for htmls
     let irma_summary_json = irma_summary_to_plotly_json(irma_summary, virus);
