@@ -433,60 +433,56 @@ pub fn compute_cvv_dais_variants(
     instrument: &str,
     virus: &str,
 ) -> Result<Vec<DaisVarsData>, Box<dyn Error>> {
-    let mut merged_data = merge_sequences(ref_seqs_data, sample_seqs_data);
-
-    // Filter dais var data based on virus type
-    if virus == "sc2-spike" {
-        merged_data.retain(|entry| entry.protein == "S");
-    }
-
-    // Compute AA Variants
-    for entry in &mut merged_data {
-        entry.insertion = compute_aa_variants(&entry.aa_aln, &entry.aa_seq);
-    }
-
-    let mut merged_data_with_num_variants = merged_data
+    let mut merged_data = merge_sequences(ref_seqs_data, sample_seqs_data)
         .into_iter()
+        .filter(|entry| {
+            // Filter dais var data based on virus type
+            if virus == "sc2-spike" {
+                entry.protein == "S"
+            } else {
+                true
+            }
+        })
         .map(|entry| {
-            let num_variants = if entry.insertion.is_empty() {
+            let aa_variants = compute_aa_variants(&entry.aa_aln, &entry.aa_seq);
+
+            let num_variants = if aa_variants.is_empty() {
                 0
             } else {
-                entry.insertion.split(',').count()
+                aa_variants.split(',').count()
             };
-            (entry, num_variants)
+
+            DaisVarsData {
+                sample_id: entry.sample_id,
+                ctype: entry.ctype,
+                aa_reference_id: entry.aa_reference_id,
+                positional_reference_id: entry.reference,
+                protein: entry.protein,
+                // TODO: Eventually, we can change this field to be a usize perhaps
+                aa_variant_count: num_variants as i32,
+                aa_variants,
+                runid: runid.to_string(),
+                instrument: instrument.to_string(),
+            }
         })
         .collect::<Vec<_>>();
 
     // Filter and sort the data - keep first
-    merged_data_with_num_variants.sort_by(|(a, a_num_variants), (b, b_num_variants)| {
+    merged_data.sort_by(|a, b| {
         a.protein
             .cmp(&b.protein)
             .then(a.sample_id.cmp(&b.sample_id))
-            .then(a_num_variants.cmp(b_num_variants))
+            .then(a.aa_variant_count.cmp(&b.aa_variant_count))
     });
 
     let mut unique_data = HashMap::new();
-    for (entry, num_variants) in merged_data_with_num_variants {
+    for entry in merged_data {
         let key = (entry.sample_id.clone(), entry.protein.clone());
-        unique_data.entry(key).or_insert((entry, num_variants));
+        unique_data.entry(key).or_insert(entry);
     }
 
     // Convert DaisSeqData to DaisVarsData and collect into a Vec
-    let result: Vec<DaisVarsData> = unique_data
-        .into_values()
-        .map(|(entry, num_variants)| DaisVarsData {
-            sample_id: entry.sample_id,
-            ctype: entry.ctype,
-            aa_reference_id: entry.aa_reference_id,
-            positional_reference_id: entry.reference.clone(),
-            protein: entry.protein.clone(),
-            // TODO: Eventually, we can change this field to be a usize perhaps
-            aa_variant_count: num_variants as i32,
-            aa_variants: entry.insertion.clone(),
-            runid: runid.to_owned(),
-            instrument: instrument.to_owned(),
-        })
-        .collect();
+    let result: Vec<DaisVarsData> = unique_data.into_values().collect();
 
     Ok(result)
 }
@@ -512,8 +508,8 @@ fn merge_sequences(
                     aa_seq: ref_entry.aa_seq.clone(),
                     aa_aln: sample_entry.aa_aln.clone(),
                     cds_id: sample_entry.cds_id.clone(),
-                    insertion: sample_entry.insertion.clone(),
-                    insertions_shift_frame: sample_entry.insertions_shift_frame.clone(),
+                    insertion: sample_entry.insertion,
+                    insertions_shift_frame: sample_entry.insertions_shift_frame,
                     cds_sequence: sample_entry.cds_sequence.clone(),
                     aligned_cds_sequence: sample_entry.aligned_cds_sequence.clone(),
                     reference_nt_positions: sample_entry.reference_nt_positions.clone(),

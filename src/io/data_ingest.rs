@@ -268,9 +268,9 @@ pub struct DaisSeqData {
     #[serde(rename = "CDS_ID")]
     pub cds_id: Option<String>,
     #[serde(rename = "Insertion")]
-    pub insertion: String,
+    pub insertion: bool,
     #[serde(rename = "Shift_Insert")]
-    pub insertions_shift_frame: String,
+    pub insertions_shift_frame: bool,
     #[serde(rename = "CDS_seq")]
     pub cds_sequence: String,
     #[serde(rename = "CDS_aln")]
