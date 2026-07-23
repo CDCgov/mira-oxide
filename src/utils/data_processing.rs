@@ -1554,7 +1554,7 @@ pub fn divide_nt_into_nextclade_vec(
         }
 
         let seq = SeqData {
-            name: format!("{} | {}", entry.sample_id, entry.reference),
+            name: entry.sample_id.clone(),
             sequence: entry.sequence.clone(),
         };
 
