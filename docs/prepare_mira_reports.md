@@ -115,7 +115,7 @@ Building static HTML file
 ```
 
 ### Potential FASTA files created by the nextclade flag
-Each FASTA header in these files uses the sample ID only (text before any `|` delimiter).
+Each FASTA header in these files contains only the sample ID.
 ```
 nextclade_<runid>_influenza-a-h3n2-ha.fasta
 nextclade_<runid>_influenza-a-h1n1pdm-ha.fasta
