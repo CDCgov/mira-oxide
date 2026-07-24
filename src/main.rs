@@ -17,6 +17,7 @@ use crate::processes::{
     samplesheet_check::{SamplesheetCheckArgs, samplesheet_check},
     summary_report_update::{SummaryUpdateArgs, summary_report_update_process},
     variants_of_interest::{VariantsArgs, variants_of_interest_process},
+    voi::{VoiArgs, voi_process},
 };
 use clap::{Parser, Subcommand};
 use zoe::prelude::OrFail;
@@ -33,6 +34,8 @@ struct Cli {
 enum Commands {
     /// Variants of Interest
     VariantsOfInterest(VariantsArgs),
+    /// Reference-vs-query positions of interest
+    Voi(VoiArgs),
     /// Positions of Interest
     PositionsOfInterest(PositionsArgs),
     /// Find Chemistry
@@ -65,6 +68,9 @@ fn main() {
         Commands::VariantsOfInterest(cmd_args) => {
             variants_of_interest_process(cmd_args)
                 .unwrap_or_else(|_| panic!("{module}::VariantsOfInterest"));
+        }
+        Commands::Voi(cmd_args) => {
+            voi_process(cmd_args).unwrap_or_else(|e| panic!("{module}::Voi: {e}"));
         }
         Commands::PositionsOfInterest(cmd_args) => {
             positions_of_interest_process(cmd_args)
