@@ -405,17 +405,20 @@ pub fn read_yaml<R: std::io::Read>(reader: R) -> Result<QCConfig, Box<dyn std::e
 
 /// Extract the sample name from the file path
 fn extract_sample_name(path: &Path) -> Result<String, Box<dyn Error>> {
-    let parent_dir = path.parent().and_then(|p| p.parent());
-    if let Some(parent_dir) = parent_dir {
-        let sample = parent_dir
-            .file_name()
-            .unwrap()
-            .to_string_lossy()
-            .to_string();
-        Ok(sample)
-    } else {
-        Err("Failed to extract sample name from path.".into())
+    let mut current = path;
+
+    // Go up three levels to get sample name
+    for _ in 0..3 {
+        current = current
+            .parent()
+            .ok_or("Failed to extract sample name from path.")?;
     }
+
+    Ok(current
+        .file_name()
+        .ok_or("No directory name found.")?
+        .to_string_lossy()
+        .into_owned())
 }
 
 /// Read tab-delimited data and include the sample name
@@ -488,15 +491,9 @@ pub fn coverage_data_collection(
     virus: &str,
 ) -> Result<Vec<CoverageData>, Box<dyn std::error::Error>> {
     let pattern = if virus.to_lowercase() == "sc2-spike" {
-        format!(
-            "{}/*/IRMA/*/tables/*coverage.a2m.txt",
-            irma_path.as_ref().display()
-        )
+        format!("{}/**/*coverage.a2m.txt", irma_path.as_ref().display())
     } else {
-        format!(
-            "{}/*/IRMA/*/tables/*coverage.txt",
-            irma_path.as_ref().display()
-        )
+        format!("{}/**/*coverage.txt", irma_path.as_ref().display())
     };
 
     let mut cov_data: Vec<CoverageData> = Vec::new();
@@ -539,10 +536,7 @@ pub fn reads_data_collection(
     platform: &str,
     runid: &str,
 ) -> Result<Vec<ReadsData>, Box<dyn std::error::Error>> {
-    let pattern = format!(
-        "{}/*/IRMA/*/tables/READ_COUNTS.txt",
-        irma_path.as_ref().display()
-    );
+    let pattern = format!("{}/**/READ_COUNTS.txt", irma_path.as_ref().display());
 
     let mut reads_data: Vec<ReadsData> = Vec::new();
 
@@ -578,10 +572,7 @@ pub fn minor_variant_data_collection(
     platform: &str,
     runid: &str,
 ) -> Result<MinorVariantDataCollection, Box<dyn std::error::Error>> {
-    let pattern = format!(
-        "{}/*/IRMA/*/tables/*variants.txt",
-        irma_path.to_string_lossy()
-    );
+    let pattern = format!("{}/**/*variants.txt", irma_path.to_string_lossy());
 
     let mut filtered_minor_variants: Vec<MinorVariantsData> = Vec::new();
     let mut all_minor_variants: Vec<MinorVariantsData> = Vec::new();
@@ -633,14 +624,8 @@ pub fn indels_data_collection(
     platform: &str,
     runid: &str,
 ) -> Result<Vec<IndelsData>, Box<dyn std::error::Error>> {
-    let pattern1 = format!(
-        "{}/*/IRMA/*/tables/*insertions.txt",
-        irma_path.as_ref().display()
-    );
-    let pattern2 = format!(
-        "{}/*/IRMA/*/tables/*deletions.txt",
-        irma_path.as_ref().display()
-    );
+    let pattern1 = format!("{}/**/*insertions.txt", irma_path.as_ref().display());
+    let pattern2 = format!("{}/**/*deletions.txt", irma_path.as_ref().display());
 
     let mut indels_data: Vec<IndelsData> = Vec::new();
 
@@ -694,10 +679,7 @@ pub fn all_alleles_data_collection(
     platform: &str,
     runid: &str,
 ) -> Result<Vec<AllAllelesData>, Box<dyn std::error::Error>> {
-    let pattern = format!(
-        "{}/*/IRMA/*/tables/*allAlleles.txt",
-        irma_path.to_string_lossy()
-    );
+    let pattern = format!("{}/**/*allAlleles.txt", irma_path.to_string_lossy());
 
     let mut all_alleles: Vec<AllAllelesData> = Vec::new();
 
@@ -736,15 +718,9 @@ pub fn amended_consensus_data_collection(
 ) -> Result<Vec<SeqData>, Box<dyn std::error::Error>> {
     // Determine the glob pattern based on the organism
     let pattern = if organism == "flu" || organism == "sc2-spike" {
-        format!(
-            "{}/*/IRMA/*/amended_consensus/*fa",
-            irma_path.as_ref().display()
-        )
+        format!("{}/**/*fa", irma_path.as_ref().display())
     } else {
-        format!(
-            "{}/*/IRMA/*/amended_consensus/*pad.fa",
-            irma_path.as_ref().display()
-        )
+        format!("{}/**/*pad.fa", irma_path.as_ref().display())
     };
 
     let mut seq_data: Vec<SeqData> = Vec::new();
@@ -798,10 +774,7 @@ pub fn amended_consensus_data_collection(
 pub fn get_reference_lens(
     irma_path: impl AsRef<Path>,
 ) -> Result<HashMap<String, usize>, Box<dyn std::error::Error>> {
-    let pattern = format!(
-        "{}/*/IRMA/*/intermediate/0-ITERATIVE-REFERENCES/R0*ref",
-        irma_path.as_ref().display()
-    );
+    let pattern = format!("{}/**/R0*ref", irma_path.as_ref().display());
 
     let mut ref_len_map: HashMap<String, usize> = HashMap::new();
 
@@ -935,10 +908,7 @@ pub fn run_info_collection(
     platform: &str,
     runid: &str,
 ) -> Result<Vec<RunInfo>, Box<dyn std::error::Error>> {
-    let pattern = format!(
-        "{}/*/IRMA/*/logs/run_info.txt",
-        irma_path.as_ref().display()
-    );
+    let pattern = format!("{}/**/run_info.txt", irma_path.as_ref().display());
 
     let mut run_info: Vec<RunInfo> = Vec::new();
 

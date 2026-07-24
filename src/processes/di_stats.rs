@@ -80,20 +80,17 @@ pub fn di_stat_assembly(
     run_id: &str,
     writer: &mut impl Write,
 ) -> Result<(), Box<dyn Error>> {
-    let path_pattern = format!("{}/*/IRMA/*", assembly_dir.to_str().unwrap_or_default());
+    let path_pattern = format!("{}/**/IRMA/", assembly_dir.to_str().unwrap_or_default());
 
     for entry in glob(&path_pattern)?.filter_map(Result::ok) {
         if entry.is_dir() {
             let sample_id = entry
-                .file_name()
-                .unwrap_or_default()
-                .to_str()
+                .parent()
+                .and_then(|p| p.file_name())
+                .and_then(|n| n.to_str())
                 .unwrap_or_default();
 
-            let cov_pattern = format!(
-                "{}/tables/*coverage.txt",
-                entry.to_str().unwrap_or_default()
-            );
+            let cov_pattern = format!("{}/**/*coverage.txt", entry.to_str().unwrap_or_default());
 
             for cov_path in glob(&cov_pattern)?.filter_map(Result::ok) {
                 let cov_str = cov_path.to_str().unwrap_or_default();
