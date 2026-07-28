@@ -1,14 +1,20 @@
-# VOI (Reference-vs-Query Positions of Interest) Package
+# Variants Package
 
-The `voi` package compares "query" samples against a set of "reference" strains using
-DAIS-ribosome protein-level output, and reports nucleotide / amino-acid / codon differences,
-flagging those that fall on user-supplied positions of interest.
+The `variants` command has two modes:
 
-Both the reference and query inputs are DAIS-ribosome output. Because the DAIS `cds_aln`
-column is already expressed in reference-coordinate space (deletions appear as `-`, padding
-as `.`, and insertions are stored separately in the `.ins` file), the comparison is performed
-position-by-position in that shared coordinate space. Insertions from the `.ins` files are
-spliced back in to recover the true, indel-adjusted isolate positions reported in the output.
+1. **Comparison** — compares "query" samples against a set of "reference" strains using
+   DAIS-ribosome protein-level output, reporting nucleotide / amino-acid / codon differences
+   and flagging those that fall on user-supplied positions of interest. Selected by supplying
+   `--positions`.
+2. **Annotation** — runs independently on a MIRA minor-variant CSV, appending `codon`,
+   `codon-position`, `consensus-aa` and `minority-aa` to each row using the query CDS. Selected
+   by supplying `--minor-variants` without `--positions`.
+
+In comparison mode, both the reference and query inputs are DAIS-ribosome output. Because the
+DAIS `cds_aln` column is already expressed in reference-coordinate space (deletions appear as
+`-`, padding as `.`, and insertions are stored separately in the `.ins` file), the comparison is
+performed position-by-position in that shared coordinate space. Insertions from the `.ins` files
+are spliced back in to recover the true, indel-adjusted isolate positions reported in the output.
 
 ## Inputs
 
@@ -62,8 +68,10 @@ CY009630	NA	294	S
 
 ## Usage
 
+### Comparison mode
+
 ```bash
-cargo run -p mira-oxide -- voi \
+cargo run -p mira-oxide -- variants \
   --ref-seq   <ref.seq.txt>   --ref-ins   <ref.ins.txt>   --ref-del   <ref.del.txt> \
   --query-seq <qry.seq.txt>   --query-ins <qry.ins.txt>   --query-del <qry.del.txt> \
   --positions <positions_of_interest.txt> \
@@ -74,7 +82,7 @@ cargo run -p mira-oxide -- voi \
 - `--minor-variants` (optional): a MIRA minor-variant CSV (`sample, reference, sample_position,
   depth, consensus_allele, minority_allele, consensus_count, minority_count, minority_frequency,
   ...`). When supplied, six annotation columns are appended to the output. Rows are joined by
-  sample (the CSV `sample` matches the VOI `query-name` with its trailing `_<segment>` stripped),
+  sample (the CSV `sample` matches the `query-name` with its trailing `_<segment>` stripped),
   `reference` (the full DAIS `ctype`), and `sample_position` (matched to `query-nt-position`).
 
 - `--filter` (default `all-diffs`):
@@ -84,6 +92,32 @@ cargo run -p mira-oxide -- voi \
     `amino-acid-of-interest` for that entry.
 - `-d`/`--delimiter`: single-character output delimiter (default TAB).
 - `-o`/`--output`: output file (defaults to stdout).
+
+### Annotation mode (standalone)
+
+Annotate a MIRA minor-variant CSV with codon / amino-acid data, using only the query CDS
+(no reference or positions files needed):
+
+```bash
+cargo run -p mira-oxide -- variants \
+  --query-seq <qry.seq.txt> \
+  --minor-variants <minor_variants.csv> \
+  [-o <output.csv> | --in-place]
+```
+
+- Appends four columns to every row of the CSV: `codon`, `codon-position`, `consensus-aa`,
+  `minority-aa`. `codon` is the query CDS codon containing `sample_position`; `codon-position`
+  is 1/2/3; `consensus-aa` / `minority-aa` are the amino acids for the consensus and
+  minor-allele codons.
+- `--in-place` overwrites the input CSV; otherwise `-o` writes a new file (or stdout).
+- The join is on the first columns: the CSV `sample` matches the DAIS query `query_id` (with its
+  trailing `_<segment>` stripped), and the CSV `reference` matches the DAIS `ctype`.
+- `sample_position` is a position in the sample's assembled sequence. It is mapped to the CDS
+  index via the DAIS record's `query_coordinates` (the ordered assembled positions that form
+  `cds_seq`), which correctly handles the 5' UTR offset, splicing (e.g. M2, NEP), and insertions.
+  For segments with multiple protein products, the CDS whose base is consistent with
+  `consensus_allele` is preferred (falling back to the longest CDS that spans the position). Rows
+  whose sample/reference/position cannot be resolved get blank annotation cells.
 
 ## Output
 

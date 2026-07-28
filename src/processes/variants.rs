@@ -1,10 +1,17 @@
-//! `voi` — reference-vs-query positions-of-interest comparison.
+//! `variants` — reference-vs-query positions-of-interest comparison and/or
+//! standalone MIRA minor-variant annotation.
 //!
-//! Reconstructs full-length sequences from DAIS-ribosome protein-level output
-//! (`.seq` / `.ins` / `.del`) for a set of "reference" strains and a set of "query"
-//! samples, then compares each query against its matching reference in the shared
-//! DAIS reference-coordinate space, reporting nucleotide / amino-acid / codon
-//! differences and flagging those that land on a user-supplied position of interest.
+//! Two modes:
+//! * **Comparison** (when `--positions` is supplied): reconstructs full-length sequences
+//!   from DAIS-ribosome protein-level output (`.seq` / `.ins` / `.del`) for a set of
+//!   "reference" strains and a set of "query" samples, then compares each query against
+//!   its matching reference in the shared DAIS reference-coordinate space, reporting
+//!   nucleotide / amino-acid / codon differences and flagging positions of interest.
+//!   Optionally annotates rows with MIRA minor-variant calls (`--minor-variants`).
+//! * **Annotation** (when `--minor-variants` is supplied without `--positions`): runs
+//!   independently, appending `codon`, `codon-position`, `consensus-aa` and `minority-aa`
+//!   to each row of the MIRA minor-variant CSV using the query CDS, written to a new file
+//!   (`-o`) or in place (`--in-place`).
 //!
 //! The DAIS `cds_aln` column (col 12) is already expressed in reference-coordinate
 //! space: deletions appear as `-`, out-of-span padding appears as `.`, and insertions
@@ -37,39 +44,46 @@ pub enum FilterMode {
 }
 
 #[derive(Debug, Parser)]
-#[command(about = "Compare query DAIS output against reference at positions of interest")]
-pub struct VoiArgs {
-    /// Reference `SEQUENCE_OUTPUT` (`.seq`) file
+#[command(
+    about = "Compare query DAIS output against reference and/or annotate MIRA minor variants"
+)]
+pub struct VariantsArgs {
+    /// Reference `SEQUENCE_OUTPUT` (`.seq`) file (comparison mode)
     #[arg(long)]
-    ref_seq: PathBuf,
-    /// Reference `INSERTION_OUTPUT` (`.ins`) file
+    ref_seq: Option<PathBuf>,
+    /// Reference `INSERTION_OUTPUT` (`.ins`) file (comparison mode)
     #[arg(long)]
-    ref_ins: PathBuf,
-    /// Reference `DELETION_OUTPUT` (`.del`) file
+    ref_ins: Option<PathBuf>,
+    /// Reference `DELETION_OUTPUT` (`.del`) file (comparison mode)
     #[arg(long)]
-    ref_del: PathBuf,
-    /// Query `SEQUENCE_OUTPUT` (`.seq`) file
+    ref_del: Option<PathBuf>,
+    /// Query `SEQUENCE_OUTPUT` (`.seq`) file (required)
     #[arg(long)]
     query_seq: PathBuf,
-    /// Query `INSERTION_OUTPUT` (`.ins`) file
+    /// Query `INSERTION_OUTPUT` (`.ins`) file (comparison mode)
     #[arg(long)]
-    query_ins: PathBuf,
-    /// Query `DELETION_OUTPUT` (`.del`) file
+    query_ins: Option<PathBuf>,
+    /// Query `DELETION_OUTPUT` (`.del`) file (comparison mode)
     #[arg(long)]
-    query_del: PathBuf,
-    /// Positions-of-interest file (ref-name, segment, aa-position, aa-of-interest)
+    query_del: Option<PathBuf>,
+    /// Positions-of-interest file (ref-name, segment, aa-position, aa-of-interest).
+    /// Presence selects comparison mode.
     #[arg(long)]
-    positions: PathBuf,
-    /// Optional MIRA minor-variant CSV; when supplied, adds minor-allele annotation columns
+    positions: Option<PathBuf>,
+    /// MIRA minor-variant CSV. In comparison mode it adds annotation columns; on its own
+    /// (without `--positions`) it runs standalone annotation of the CSV.
     #[arg(long)]
     minor_variants: Option<PathBuf>,
-    /// Row selection mode
+    /// Row selection mode (comparison mode)
     #[arg(long, value_enum, default_value_t = FilterMode::AllDiffs)]
     filter: FilterMode,
-    /// Optional output file (defaults to stdout)
+    /// Output file (defaults to stdout; ignored when `--in-place` is set)
     #[arg(short = 'o', long)]
     output: Option<PathBuf>,
-    /// Single-character output delimiter (defaults to TAB)
+    /// Annotation mode: overwrite the input `--minor-variants` file in place
+    #[arg(long)]
+    in_place: bool,
+    /// Single-character output delimiter for comparison mode (defaults to TAB)
     #[arg(short = 'd', long)]
     delimiter: Option<String>,
 }
@@ -491,7 +505,10 @@ fn compare_record(
 // ---------------------------------------------------------------------------
 
 fn read_tsv<T: DeserializeOwned>(path: &PathBuf) -> Result<Vec<T>, Box<dyn Error>> {
-    let file = OpenOptions::new().read(true).open(path)?;
+    let file = OpenOptions::new()
+        .read(true)
+        .open(path)
+        .map_err(|e| format!("failed to open {}: {e}", path.display()))?;
     let reader = BufReader::new(file);
     let mut rdr = ReaderBuilder::new()
         .has_headers(false)
@@ -504,6 +521,20 @@ fn read_tsv<T: DeserializeOwned>(path: &PathBuf) -> Result<Vec<T>, Box<dyn Error
         records.push(result?);
     }
     Ok(records)
+}
+
+/// A closed downstream pipe (e.g. piping into `head`) is a normal, clean exit, not an error.
+fn is_broken_pipe(e: &std::io::Error) -> bool {
+    e.kind() == std::io::ErrorKind::BrokenPipe
+}
+
+/// Write bytes to stdout, treating a broken pipe as a clean exit.
+fn write_stdout(bytes: &[u8]) -> Result<(), Box<dyn Error>> {
+    match std::io::stdout().write_all(bytes) {
+        Ok(()) => Ok(()),
+        Err(e) if is_broken_pipe(&e) => Ok(()),
+        Err(e) => Err(e.into()),
+    }
 }
 
 /// Build `(query_id, protein) -> Vec<(upstream_nt_pos, inserted_nt)>`.
@@ -555,13 +586,17 @@ fn parse_positions_str(contents: &str) -> Result<Vec<PosRecord>, Box<dyn Error>>
 
 /// Read a positions-of-interest file (whitespace-separated, optional 4th column).
 fn read_positions(path: &PathBuf) -> Result<Vec<PosRecord>, Box<dyn Error>> {
-    let contents = std::fs::read_to_string(path)?;
+    let contents = std::fs::read_to_string(path)
+        .map_err(|e| format!("failed to open {}: {e}", path.display()))?;
     parse_positions_str(&contents)
 }
 
 /// Read a MIRA minor-variant CSV into an index keyed by (sample, reference, position).
 fn read_minor_variants(path: &PathBuf) -> Result<MinorIndex, Box<dyn Error>> {
-    let file = OpenOptions::new().read(true).open(path)?;
+    let file = OpenOptions::new()
+        .read(true)
+        .open(path)
+        .map_err(|e| format!("failed to open {}: {e}", path.display()))?;
     let reader = BufReader::new(file);
     let mut rdr = ReaderBuilder::new()
         .has_headers(true)
@@ -586,6 +621,201 @@ fn read_minor_variants(path: &PathBuf) -> Result<MinorIndex, Box<dyn Error>> {
     Ok(index)
 }
 
+/// Whether an IUPAC nucleotide `code` (possibly ambiguous) can represent `base`.
+fn iupac_contains(code: u8, base: u8) -> bool {
+    let base = base.to_ascii_uppercase();
+    let set: &[u8] = match code.to_ascii_uppercase() {
+        b'A' => b"A",
+        b'C' => b"C",
+        b'G' => b"G",
+        b'T' | b'U' => b"T",
+        b'R' => b"AG",
+        b'Y' => b"CT",
+        b'S' => b"GC",
+        b'W' => b"AT",
+        b'K' => b"GT",
+        b'M' => b"AC",
+        b'B' => b"CGT",
+        b'D' => b"AGT",
+        b'H' => b"ACT",
+        b'V' => b"ACG",
+        b'N' => b"ACGT",
+        _ => b"",
+    };
+    set.contains(&base)
+}
+
+/// Map a 1-based position in the sample's assembled sequence to its 1-based CDS index,
+/// using the DAIS `query_coordinates` (the ordered assembled position ranges that form
+/// `cds_seq`). Returns `None` if the position is not covered (e.g. UTR or an intron).
+fn map_assembled_to_cds(query_coordinates: &str, p: usize) -> Option<usize> {
+    let mut cds_offset = 0usize;
+    for token in query_coordinates.split(';') {
+        let token = token.trim();
+        if token.is_empty() {
+            continue;
+        }
+        let (start, end) = if let Some((s, e)) = token.split_once("..") {
+            (
+                s.trim().parse::<usize>().ok()?,
+                e.trim().parse::<usize>().ok()?,
+            )
+        } else {
+            let v = token.parse::<usize>().ok()?;
+            (v, v)
+        };
+        if end < start {
+            return None;
+        }
+        if p >= start && p <= end {
+            return Some(cds_offset + (p - start) + 1);
+        }
+        cds_offset += end - start + 1;
+    }
+    None
+}
+
+/// Standalone annotation: append `codon`, `codon-position`, `consensus-aa` and `minority-aa`
+/// to each row of a MIRA minor-variant CSV, using the query CDS to resolve the codon.
+///
+/// `sample_position` is a position in the sample's assembled sequence; it is mapped to the CDS
+/// index via the record's `query_coordinates`. When a segment has multiple protein products, the
+/// candidate whose CDS base is consistent with `consensus_allele` is preferred (falling back to
+/// the longest CDS that spans the position).
+#[allow(clippy::too_many_lines)]
+fn run_annotation(
+    query_seq_path: &PathBuf,
+    minor_path: &PathBuf,
+    output: Option<&PathBuf>,
+    in_place: bool,
+) -> Result<(), Box<dyn Error>> {
+    let query_seq: Vec<SeqRecord> = read_tsv(query_seq_path)?;
+
+    // (sample, ctype) -> query records (per protein), longest CDS first.
+    let mut by_sample_ctype: HashMap<(String, String), Vec<&SeqRecord>> = HashMap::new();
+    for r in &query_seq {
+        by_sample_ctype
+            .entry((sample_base(&r.query_id).to_string(), r.ctype.clone()))
+            .or_default()
+            .push(r);
+    }
+    for candidates in by_sample_ctype.values_mut() {
+        candidates.sort_by_key(|c| std::cmp::Reverse(c.cds_seq.len()));
+    }
+
+    let file = OpenOptions::new().read(true).open(minor_path)?;
+    let mut rdr = ReaderBuilder::new()
+        .has_headers(true)
+        .flexible(true)
+        .delimiter(b',')
+        .from_reader(BufReader::new(file));
+
+    let headers = rdr.headers()?.clone();
+    let col = |name: &str| headers.iter().position(|h| h == name);
+    let sample_i = col("sample").ok_or("minor-variants CSV missing 'sample' column")?;
+    let ref_i = col("reference").ok_or("minor-variants CSV missing 'reference' column")?;
+    let pos_i =
+        col("sample_position").ok_or("minor-variants CSV missing 'sample_position' column")?;
+    let cons_i =
+        col("consensus_allele").ok_or("minor-variants CSV missing 'consensus_allele' column")?;
+    let minor_i =
+        col("minority_allele").ok_or("minor-variants CSV missing 'minority_allele' column")?;
+
+    let mut out_lines: Vec<String> = Vec::new();
+    let mut header: Vec<String> = headers.iter().map(str::to_string).collect();
+    header.extend(
+        ["codon", "codon-position", "consensus-aa", "minority-aa"]
+            .iter()
+            .map(|s| (*s).to_string()),
+    );
+    out_lines.push(header.join(","));
+
+    for result in rdr.records() {
+        let rec = result?;
+        let mut fields: Vec<String> = rec.iter().map(str::to_string).collect();
+
+        let sample = rec.get(sample_i).unwrap_or_default();
+        let reference = rec.get(ref_i).unwrap_or_default();
+        let pos: Option<usize> = rec.get(pos_i).and_then(|s| s.parse().ok());
+        let consensus = rec.get(cons_i).and_then(|s| s.bytes().next());
+        let minor_nt = rec
+            .get(minor_i)
+            .and_then(|s| s.bytes().next())
+            .unwrap_or(b'N');
+
+        let annotation = pos.and_then(|p| {
+            let candidates = by_sample_ctype.get(&(sample.to_string(), reference.to_string()))?;
+
+            // `sample_position` is a position in the sample's assembled sequence. Map it to the
+            // CDS index via the record's `query_coordinates` (the assembled positions, in order,
+            // that form `cds_seq`). This handles UTR offset, splicing, and insertions.
+            //
+            // Prefer a CDS whose base at the mapped position is consistent with the consensus
+            // allele; otherwise fall back to the longest CDS that spans the position.
+            let mut fallback: Option<(&SeqRecord, usize)> = None;
+            let mut chosen: Option<(&SeqRecord, usize)> = None;
+            for &c in candidates {
+                let Some(cds_index) = map_assembled_to_cds(&c.query_coordinates, p) else {
+                    continue;
+                };
+                let cds = c.cds_seq.as_bytes();
+                let start = (cds_index - 1) / 3 * 3;
+                if start + 3 > cds.len() {
+                    continue;
+                }
+                if fallback.is_none() {
+                    fallback = Some((c, cds_index));
+                }
+                let codon_pos0 = (cds_index - 1) % 3;
+                if consensus.is_some_and(|cons| iupac_contains(cds[start + codon_pos0], cons)) {
+                    chosen = Some((c, cds_index));
+                    break;
+                }
+            }
+
+            let (record, cds_index) = chosen.or(fallback)?;
+            let cds = record.cds_seq.as_bytes();
+            let start = (cds_index - 1) / 3 * 3;
+            let codon_pos = (cds_index - 1) % 3 + 1;
+            let raw = &cds[start..start + 3];
+
+            // Resolve the codon to the consensus allele at the variant site (the CDS may carry an
+            // IUPAC het code there), then translate the consensus and minor-allele codons.
+            let mut consensus_codon = raw.to_vec();
+            if let Some(cons) = consensus {
+                consensus_codon[codon_pos - 1] = cons;
+            }
+            let consensus_aa = translate(&consensus_codon) as char;
+            let mut minor_codon = raw.to_vec();
+            minor_codon[codon_pos - 1] = minor_nt;
+            let minority_aa = translate(&minor_codon) as char;
+            Some((
+                String::from_utf8_lossy(&consensus_codon).to_string(),
+                codon_pos.to_string(),
+                consensus_aa.to_string(),
+                minority_aa.to_string(),
+            ))
+        });
+
+        let (codon, codon_pos, consensus_aa, minority_aa) = annotation.unwrap_or_default();
+        fields.push(codon);
+        fields.push(codon_pos);
+        fields.push(consensus_aa);
+        fields.push(minority_aa);
+        out_lines.push(fields.join(","));
+    }
+
+    let content = format!("{}\n", out_lines.join("\n"));
+    if in_place {
+        std::fs::write(minor_path, content)?;
+    } else if let Some(path) = output {
+        std::fs::write(path, content)?;
+    } else {
+        write_stdout(content.as_bytes())?;
+    }
+    Ok(())
+}
+
 // ---------------------------------------------------------------------------
 // Entry point
 // ---------------------------------------------------------------------------
@@ -599,20 +829,40 @@ struct Target<'a> {
 }
 
 #[allow(clippy::too_many_lines)]
-pub fn voi_process(args: VoiArgs) -> Result<(), Box<dyn Error>> {
-    let VoiArgs {
-        ref_seq: ref_seq_path,
-        ref_ins: ref_ins_path,
-        ref_del: ref_del_path,
+pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
+    let VariantsArgs {
+        ref_seq,
+        ref_ins,
+        ref_del,
         query_seq: query_seq_path,
-        query_ins: query_ins_path,
-        query_del: query_del_path,
-        positions: positions_path,
+        query_ins,
+        query_del,
+        positions,
         minor_variants: minor_variants_path,
         filter,
         output,
+        in_place,
         delimiter,
     } = args;
+
+    // Standalone annotation mode: annotate the MIRA minor-variant CSV using the query CDS.
+    if positions.is_none() {
+        let Some(minor_path) = minor_variants_path else {
+            return Err(
+                "provide --positions for comparison mode, or --minor-variants for annotation mode"
+                    .into(),
+            );
+        };
+        return run_annotation(&query_seq_path, &minor_path, output.as_ref(), in_place);
+    }
+
+    // Comparison mode requires the reference set and the query indel files.
+    let positions_path = positions.expect("checked above");
+    let ref_seq_path = ref_seq.ok_or("comparison mode (--positions) requires --ref-seq")?;
+    let ref_ins_path = ref_ins.ok_or("comparison mode (--positions) requires --ref-ins")?;
+    let ref_del_path = ref_del.ok_or("comparison mode (--positions) requires --ref-del")?;
+    let query_ins_path = query_ins.ok_or("comparison mode (--positions) requires --query-ins")?;
+    let query_del_path = query_del.ok_or("comparison mode (--positions) requires --query-del")?;
 
     let delim = delimiter
         .as_deref()
@@ -701,7 +951,12 @@ pub fn voi_process(args: VoiArgs) -> Result<(), Box<dyn Error>> {
     if include_minor {
         header.extend_from_slice(&MINOR_HEADER);
     }
-    writeln!(&mut writer, "{}", header.join(&delim_str))?;
+    if let Err(e) = writeln!(&mut writer, "{}", header.join(&delim_str)) {
+        if is_broken_pipe(&e) {
+            return Ok(());
+        }
+        return Err(e.into());
+    }
 
     for q in &query_seq {
         let Some(tgts) = targets.get(&(q.reference_id.clone(), q.protein.clone())) else {
@@ -734,12 +989,23 @@ pub fn voi_process(args: VoiArgs) -> Result<(), Box<dyn Error>> {
             );
 
             for row in rows {
-                writeln!(&mut writer, "{}", row.to_delimited(delim, include_minor))?;
+                if let Err(e) = writeln!(&mut writer, "{}", row.to_delimited(delim, include_minor))
+                {
+                    if is_broken_pipe(&e) {
+                        return Ok(());
+                    }
+                    return Err(e.into());
+                }
             }
         }
     }
 
-    writer.flush()?;
+    if let Err(e) = writer.flush() {
+        if is_broken_pipe(&e) {
+            return Ok(());
+        }
+        return Err(e.into());
+    }
     Ok(())
 }
 
@@ -916,6 +1182,37 @@ mod tests {
         assert_eq!(sample_base("046435d3_4"), "046435d3");
         assert_eq!(sample_base("CY019971"), "CY019971");
         assert_eq!(sample_base("weird_name"), "weird_name");
+    }
+
+    #[test]
+    fn iupac_contains_resolves_ambiguity_codes() {
+        assert!(iupac_contains(b'A', b'A'));
+        assert!(!iupac_contains(b'A', b'C'));
+        assert!(iupac_contains(b'Y', b'C')); // Y = C/T
+        assert!(iupac_contains(b'Y', b'T'));
+        assert!(!iupac_contains(b'Y', b'A'));
+        assert!(iupac_contains(b'R', b'G')); // R = A/G
+        assert!(iupac_contains(b'n', b'g')); // case-insensitive, N = any
+    }
+
+    #[test]
+    fn assembled_to_cds_handles_offset_splice_and_gaps() {
+        // Simple UTR offset: assembled 11..61 -> CDS 1..51.
+        assert_eq!(map_assembled_to_cds("11..61", 11), Some(1));
+        assert_eq!(map_assembled_to_cds("11..61", 61), Some(51));
+        assert_eq!(map_assembled_to_cds("11..61", 10), None); // before CDS
+        assert_eq!(map_assembled_to_cds("11..61", 62), None); // after CDS
+
+        // Spliced product (e.g. M2): assembled 15..40;729..996 -> CDS 1..26;27..294.
+        let spliced = "15..40;729..996";
+        assert_eq!(map_assembled_to_cds(spliced, 15), Some(1));
+        assert_eq!(map_assembled_to_cds(spliced, 40), Some(26));
+        assert_eq!(map_assembled_to_cds(spliced, 729), Some(27));
+        assert_eq!(map_assembled_to_cds(spliced, 996), Some(294));
+        assert_eq!(map_assembled_to_cds(spliced, 400), None); // intron
+
+        // Singleton token (insertion position).
+        assert_eq!(map_assembled_to_cds("1..3;5", 5), Some(4));
     }
 
     #[test]
