@@ -26,11 +26,11 @@ use crate::utils::alignment::align_sequences;
 #[command(about = "Tool for observing codon and amino acid differences at a given poistion")]
 pub struct PositionsArgs {
     #[arg(short = 'i', long)]
-    /// Optional input fasta
+    /// Input dais-ribosome file
     input_file: PathBuf,
 
     #[arg(short = 'r', long)]
-    /// Optional input fasta
+    /// Reference fasta
     ref_file: PathBuf,
 
     #[arg(short = 'm', long)]
@@ -139,7 +139,6 @@ impl Entry<'_> {
                 && self.protein == muts_entry.protein
                 && self.aa_position.to_string() == muts_entry.aa_position
             {
-                // Use match for cleaner handling of `hold_aa_mut` cases
                 self.phenotypic_consequences = match hold_aa_mut.as_str() {
                     "~" => "partial amino acid".to_string(),
                     "-" => "amino acid covered".to_string(),
@@ -337,126 +336,10 @@ pub fn positions_of_interest_process(args: PositionsArgs) -> Result<(), Box<dyn 
                         )?;
                     }
                 } else {
-                    let query = dais_entry.cds_aln.as_bytes();
-                    let reference = ref_entry.cds_aln.as_bytes();
-                    let (aligned_1, aligned_2) = {
-                        let (a1, a2) = align_sequences(query, reference);
-                        (Nucleotides::from(a1), Nucleotides::from(a2))
-                    };
-
-                    let mut entry = Entry {
-                        sample_id: &dais_entry.sample_id,
-                        ref_strain: &ref_entry.isolate_name,
-                        gisaid_accession: &ref_entry.isolate_id,
-                        subtype: &dais_entry.subtype,
-                        dais_ref: &dais_entry.ref_strain,
-                        protein: &dais_entry.protein,
-                        ref_codon: "NNN".to_string(),
-                        mut_codon: "NNN".to_string(),
-                        aa_position: 0,
-                        aa_ref: 'X',
-                        aa_mut: 'X',
-                        phenotypic_consequences: String::new(),
-                    };
-
-                    let mut tail_index = 0;
-                    let (codons1, tail1) = aligned_1.as_codons();
-                    let (codons2, tail2) = aligned_2.as_codons();
-
-                    for (index, (ref_codon, query_codon)) in
-                        codons1.iter().zip(codons2.iter()).enumerate()
-                    {
-                        let aa_index = index + 1;
-                        tail_index = aa_index;
-                        let ref_aa = StdGeneticCode::translate_codon(ref_codon);
-                        let query_aa = StdGeneticCode::translate_codon(query_codon);
-
-                        entry.ref_codon = std::str::from_utf8(ref_codon)
-                            .expect("Invalid UTF-8 sequence")
-                            .to_string();
-                        entry.mut_codon = std::str::from_utf8(query_codon)
-                            .expect("Invalid UTF-8 sequence")
-                            .to_string();
-                        entry.aa_position = aa_index;
-                        entry.aa_ref = ref_aa as char;
-                        entry.aa_mut = query_aa as char;
-
-                        if entry.update_entry_from_alignment(
-                            &ref_entry.subtype,
-                            ref_aa,
-                            query_aa,
-                            &muts_interest,
-                        ) {
-                            let Entry {
-                                sample_id,
-                                ref_strain,
-                                gisaid_accession,
-                                subtype,
-                                dais_ref,
-                                protein,
-                                ref_codon,
-                                mut_codon,
-                                aa_ref,
-                                aa_position,
-                                aa_mut,
-                                phenotypic_consequences,
-                            } = &entry;
-                            let d = &delim;
-
-                            writeln!(
-                                &mut writer,
-                                "{sample_id}{d}{ref_strain}{d}{gisaid_accession}{d}\
-                                        {subtype}{d}{dais_ref}{d}{protein}{d}\
-                                        {ref_codon}{d}{mut_codon}{d}\
-                                        {aa_ref}:{aa_position}:{aa_mut}{d}\
-                                        {phenotypic_consequences}",
-                            )?;
-                        }
-                    }
-
-                    if !tail1.is_empty() {
-                        let partial_codon = b'~';
-                        entry.ref_codon = std::str::from_utf8(tail1)
-                            .expect("Invalid UTF-8 sequence")
-                            .to_string();
-                        entry.mut_codon = std::str::from_utf8(tail2)
-                            .expect("Invalid UTF-8 sequence")
-                            .to_string();
-                        entry.aa_position = tail_index + 1;
-                        entry.aa_ref = '~';
-                        entry.aa_mut = '~';
-                        if entry.update_entry_from_alignment(
-                            &ref_entry.subtype,
-                            partial_codon,
-                            partial_codon,
-                            &muts_interest,
-                        ) {
-                            let Entry {
-                                sample_id,
-                                ref_strain,
-                                gisaid_accession,
-                                subtype,
-                                dais_ref,
-                                protein,
-                                ref_codon,
-                                mut_codon,
-                                aa_ref,
-                                aa_position,
-                                aa_mut,
-                                phenotypic_consequences,
-                            } = &entry;
-                            let d = &delim;
-
-                            writeln!(
-                                &mut writer,
-                                "{sample_id}{d}{ref_strain}{d}{gisaid_accession}{d}\
-                                        {subtype}{d}{dais_ref}{d}{protein}{d}\
-                                        {ref_codon}{d}{mut_codon}{d}\
-                                        {aa_ref}:{aa_position}:{aa_mut}{d}\
-                                        {phenotypic_consequences}",
-                            )?;
-                        }
-                    }
+                    println!(
+                        "Warning: Aligned sequences for sample {} and reference {} have different lengths. Skipping this pair.",
+                        dais_entry.sample_id, ref_entry.isolate_name
+                    );
                 }
             }
         }
