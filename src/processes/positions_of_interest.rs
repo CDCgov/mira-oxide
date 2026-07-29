@@ -66,7 +66,7 @@ fn read_tsv<T: DeserializeOwned, R: std::io::Read>(
 }
 
 #[derive(Deserialize, Debug)]
-pub struct DaisInput {
+pub struct QueryInput {
     sample_id: String,
     subtype: String,
     ref_strain: String,
@@ -166,25 +166,6 @@ fn create_reader(path: Option<&PathBuf>) -> std::io::Result<BufReader<Either<Fil
     Ok(reader)
 }
 
-pub fn lines_to_vec<R: BufRead>(reader: R) -> std::io::Result<Vec<Vec<String>>> {
-    let mut columns: Vec<Vec<String>> = Vec::new();
-
-    for line_result in reader.lines() {
-        let line = line_result?;
-        let values: Vec<_> = line.split('\t').map(str::to_owned).collect();
-
-        if columns.is_empty() {
-            columns.resize_with(values.len(), Vec::new);
-        }
-
-        for (col, val) in columns.iter_mut().zip(values) {
-            col.push(val);
-        }
-    }
-
-    Ok(columns)
-}
-//todo: abstract/split this up
 #[allow(clippy::too_many_lines)]
 pub fn positions_of_interest_process(args: PositionsArgs) -> Result<(), Box<dyn Error>> {
     let delim = args.output_delimiter;
@@ -193,7 +174,7 @@ pub fn positions_of_interest_process(args: PositionsArgs) -> Result<(), Box<dyn 
     let muts_interest: Vec<MutsOfInterestInput> = read_tsv(muts_reader, false)?;
 
     let dais_reader = create_reader(Some(&args.input_file))?;
-    let dais: Vec<DaisInput> = read_tsv(dais_reader, false)?;
+    let dais: Vec<QueryInput> = read_tsv(dais_reader, false)?;
 
     let ref_reader = create_reader(Some(&args.ref_file))?;
     let refs: Vec<RefInput> = read_tsv(ref_reader, true)?;
