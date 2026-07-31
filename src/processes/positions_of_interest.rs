@@ -30,7 +30,7 @@ pub struct PositionsArgs {
     input_file: PathBuf,
 
     #[arg(short = 'r', long)]
-    /// Reference fasta
+    /// Reference dais-ribosome file
     ref_file: PathBuf,
 
     #[arg(short = 'm', long)]
@@ -68,36 +68,48 @@ fn read_tsv<T: DeserializeOwned, R: std::io::Read>(
 #[derive(Deserialize, Debug)]
 pub struct QueryInput {
     sample_id: String,
-    subtype: String,
-    ref_strain: String,
+    ctype: String,
+    dais_ref_id: String,
     protein: String,
     nt_hash: String,
-    query_nt_seq: String,
+    query_aa_seq: String,
     query_aa_aln_seq: String,
     cds_id: String,
     insertion: String,
     inert_shift: String,
-    cds_seq: String,
-    cds_aln: String,
+    query_cds_seq: String,
+    query_cds_aln: String,
     query_nt_coordinates: String,
     cds_nt_coordinates: String,
 }
 
 #[derive(Deserialize, Debug)]
-pub struct RefInput {
-    isolate_id: String,
-    isolate_name: String,
-    subtype: String,
-    passage_history: String,
-    nt_id: String,
+pub struct RefDaisInput {
+    ref_id: String,
     ctype: String,
-    reference_id: String,
+    dais_ref_id: String,
     protein: String,
-    aa_aln: String,
-    cds_aln: String,
+    nt_hash: String,
+    ref_aa_seq: String,
+    ref_aa_aln_seq: String,
+    cds_id: String,
+    insertion: String,
+    inert_shift: String,
+    ref_cds_seq: String,
+    ref_cds_aln: String,
+    ref_nt_coordinates: String,
+    ref_cds_nt_coordinates: String,
 }
 
 #[derive(Deserialize, Debug)]
+pub struct UpdatedRefInput {
+    ref_id: String,
+    dais_ref_id: String,
+    protein: String,
+    ref_cds_aln: String,
+}
+
+#[derive(Deserialize, Debug, Clone)]
 pub struct MutsOfInterestInput {
     subtype: String,
     protein: String,
@@ -109,9 +121,7 @@ pub struct MutsOfInterestInput {
 pub struct Entry<'a> {
     sample_id: &'a str,
     ref_strain: &'a str,
-    gisaid_accession: &'a str,
-    subtype: &'a str,
-    dais_ref: &'a str,
+    dais_ref_id: &'a str,
     protein: &'a str,
     ref_codon: String,
     mut_codon: String,
@@ -122,9 +132,9 @@ pub struct Entry<'a> {
 }
 
 impl Entry<'_> {
-    fn update_entry_from_alignment(
+    fn update_entry(
         &mut self,
-        subtype: &str,
+        dais_ref_id: &str,
         aa_1: u8,
         aa_2: u8,
         muts_columns: &[MutsOfInterestInput],
@@ -135,7 +145,7 @@ impl Entry<'_> {
 
         for muts_entry in muts_columns {
             // Check if the mutation matches the entry
-            if subtype == muts_entry.subtype
+            if dais_ref_id == muts_entry.subtype
                 && self.protein == muts_entry.protein
                 && self.aa_position.to_string() == muts_entry.aa_position
             {
@@ -170,14 +180,28 @@ fn create_reader(path: Option<&PathBuf>) -> std::io::Result<BufReader<Either<Fil
 pub fn positions_of_interest_process(args: PositionsArgs) -> Result<(), Box<dyn Error>> {
     let delim = args.output_delimiter;
 
+    println!(
+        "Processing positions of interest for input file: {:?}, reference file: {:?}, and mutations file: {:?}",
+        &args.input_file, &args.ref_file, &args.muts_file
+    );
+
     let muts_reader = create_reader(Some(&args.muts_file))?;
     let muts_interest: Vec<MutsOfInterestInput> = read_tsv(muts_reader, false)?;
 
+    println!(
+        "Read {} entries from the mutations of interest file.",
+        muts_interest.len()
+    );
+
     let dais_reader = create_reader(Some(&args.input_file))?;
     let dais: Vec<QueryInput> = read_tsv(dais_reader, false)?;
+    println!(
+        "Read {} entries from the input dais-ribosome file.",
+        dais.len()
+    );
 
     let ref_reader = create_reader(Some(&args.ref_file))?;
-    let refs: Vec<RefInput> = read_tsv(ref_reader, true)?;
+    let refs: Vec<RefDaisInput> = read_tsv(ref_reader, false)?;
 
     let mut writer = if let Some(ref file_path) = args.output_xsv {
         let file = OpenOptions::new()
@@ -191,25 +215,23 @@ pub fn positions_of_interest_process(args: PositionsArgs) -> Result<(), Box<dyn 
     };
     writeln!(
         &mut writer,
-        "sample, reference_strain,gisaid_accession,ctype,dais_reference,protein,sample_codon,reference_codon,aa_mutation,phenotypic_consequence",
+        "sample, reference_strain,ctype,dais_reference,protein,sample_codon,reference_codon,aa_mutation,phenotypic_consequence",
     )?;
 
     for dais_entry in &dais {
         for ref_entry in &refs {
-            if dais_entry.subtype == ref_entry.ctype
-                && dais_entry.ref_strain == ref_entry.reference_id
+            if dais_entry.ctype == ref_entry.dais_ref_id
+                && dais_entry.dais_ref_id == ref_entry.dais_ref_id
                 && dais_entry.protein == ref_entry.protein
             {
-                let nt_seq1: Nucleotides = ref_entry.cds_aln.clone().into();
-                let nt_seq2: Nucleotides = dais_entry.cds_aln.clone().into();
+                let nt_seq1: Nucleotides = ref_entry.ref_cds_aln.clone().into();
+                let nt_seq2: Nucleotides = dais_entry.query_cds_aln.clone().into();
 
                 if nt_seq1.len() == nt_seq2.len() {
                     let mut entry = Entry {
                         sample_id: &dais_entry.sample_id,
-                        ref_strain: &ref_entry.isolate_name,
-                        gisaid_accession: &ref_entry.isolate_id,
-                        subtype: &dais_entry.subtype,
-                        dais_ref: &dais_entry.ref_strain,
+                        ref_strain: &ref_entry.ref_id,
+                        dais_ref_id: &dais_entry.dais_ref_id,
                         protein: &dais_entry.protein,
                         ref_codon: "NNN".to_string(),
                         mut_codon: "NNN".to_string(),
@@ -241,8 +263,8 @@ pub fn positions_of_interest_process(args: PositionsArgs) -> Result<(), Box<dyn 
                         entry.aa_ref = ref_aa as char;
                         entry.aa_mut = query_aa as char;
 
-                        if entry.update_entry_from_alignment(
-                            &ref_entry.subtype,
+                        if entry.update_entry(
+                            &ref_entry.dais_ref_id,
                             ref_aa,
                             query_aa,
                             &muts_interest,
@@ -250,9 +272,7 @@ pub fn positions_of_interest_process(args: PositionsArgs) -> Result<(), Box<dyn 
                             let Entry {
                                 sample_id,
                                 ref_strain,
-                                gisaid_accession,
-                                subtype,
-                                dais_ref,
+                                dais_ref_id: dais_ref,
                                 protein,
                                 ref_codon,
                                 mut_codon,
@@ -265,8 +285,8 @@ pub fn positions_of_interest_process(args: PositionsArgs) -> Result<(), Box<dyn 
 
                             writeln!(
                                 &mut writer,
-                                "{sample_id}{d}{ref_strain}{d}{gisaid_accession}{d}\
-                                        {subtype}{d}{dais_ref}{d}{protein}{d}\
+                                "{sample_id}{d}{ref_strain}{d}\
+                                        {dais_ref}{d}{protein}{d}\
                                         {ref_codon}{d}{mut_codon}{d}\
                                         {aa_ref}:{aa_position}:{aa_mut}{d}\
                                         {phenotypic_consequences}",
@@ -285,8 +305,8 @@ pub fn positions_of_interest_process(args: PositionsArgs) -> Result<(), Box<dyn 
                     entry.aa_ref = '~';
                     entry.aa_mut = '~';
 
-                    if entry.update_entry_from_alignment(
-                        &ref_entry.subtype,
+                    if entry.update_entry(
+                        &ref_entry.dais_ref_id,
                         partial_codon,
                         partial_codon,
                         &muts_interest,
@@ -294,9 +314,7 @@ pub fn positions_of_interest_process(args: PositionsArgs) -> Result<(), Box<dyn 
                         let Entry {
                             sample_id,
                             ref_strain,
-                            gisaid_accession,
-                            subtype,
-                            dais_ref,
+                            dais_ref_id: dais_ref,
                             protein,
                             ref_codon,
                             mut_codon,
@@ -309,8 +327,8 @@ pub fn positions_of_interest_process(args: PositionsArgs) -> Result<(), Box<dyn 
 
                         writeln!(
                             &mut writer,
-                            "{sample_id}{d}{ref_strain}{d}{gisaid_accession}{d}\
-                                    {subtype}{d}{dais_ref}{d}{protein}{d}\
+                            "{sample_id}{d}{ref_strain}{d}\
+                                    {dais_ref}{d}{protein}{d}\
                                     {ref_codon}{d}{mut_codon}{d}\
                                     {aa_ref}:{aa_position}:{aa_mut}{d}\
                                     {phenotypic_consequences}",
@@ -318,8 +336,11 @@ pub fn positions_of_interest_process(args: PositionsArgs) -> Result<(), Box<dyn 
                     }
                 } else {
                     println!(
-                        "Warning: Aligned sequences for sample {} and reference {} have different lengths. Skipping this pair.",
-                        dais_entry.sample_id, ref_entry.isolate_name
+                        "Warning: Aligned sequences for sample {} (length {}) and reference {} (length {}) have different lengths. Skipping this pair.",
+                        dais_entry.sample_id,
+                        nt_seq1.len(),
+                        ref_entry.ref_id,
+                        nt_seq2.len()
                     );
                 }
             }
