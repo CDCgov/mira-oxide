@@ -202,6 +202,10 @@ pub fn positions_of_interest_process(args: PositionsArgs) -> Result<(), Box<dyn 
 
     let ref_reader = create_reader(Some(&args.ref_file))?;
     let refs: Vec<RefDaisInput> = read_tsv(ref_reader, false)?;
+    println!(
+        "Read {} entries from the reference dais-ribosome file.",
+        refs.len()
+    );
 
     let mut writer = if let Some(ref file_path) = args.output_xsv {
         let file = OpenOptions::new()
@@ -220,7 +224,7 @@ pub fn positions_of_interest_process(args: PositionsArgs) -> Result<(), Box<dyn 
 
     for dais_entry in &dais {
         for ref_entry in &refs {
-            if dais_entry.ctype == ref_entry.dais_ref_id
+            if dais_entry.ctype == ref_entry.ctype
                 && dais_entry.dais_ref_id == ref_entry.dais_ref_id
                 && dais_entry.protein == ref_entry.protein
             {
