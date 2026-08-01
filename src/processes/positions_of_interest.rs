@@ -20,7 +20,7 @@ use zoe::{
     prelude::{Len, Nucleotides},
 };
 
-use crate::utils::alignment::align_sequences;
+use crate::utils::get_dais_refs::assign_dais_refs;
 
 #[derive(Debug, Parser)]
 #[command(about = "Tool for observing codon and amino acid differences at a given poistion")]
@@ -144,8 +144,10 @@ impl Entry<'_> {
         let hold_aa_mut = self.aa_mut.to_string();
 
         for muts_entry in muts_columns {
-            // Check if the mutation matches the entry
-            if dais_ref_id == muts_entry.subtype
+            // get subtype and protein, then compare against the passed-in dais_ref_id.
+            let assigned_ref = assign_dais_refs(&muts_entry.subtype, &muts_entry.protein);
+
+            if (assigned_ref == Some(dais_ref_id) || muts_entry.subtype.to_lowercase() == "all")
                 && self.protein == muts_entry.protein
                 && self.aa_position.to_string() == muts_entry.aa_position
             {
