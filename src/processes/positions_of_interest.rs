@@ -123,13 +123,12 @@ pub struct Entry<'a> {
     ref_strain: &'a str,
     dais_ref_id: &'a str,
     protein: &'a str,
-    aligned_codon_position: usize,
+    position_in_codon: usize,
     ref_codon: String,
     mut_codon: String,
     aa_ref: char,
     aa_position: usize,
     aa_mut: char,
-    phenotypic_consequences: String,
     variant_of_interest: bool,
 }
 
@@ -154,14 +153,6 @@ impl Entry<'_> {
                 && self.aa_position.to_string() == muts_entry.aa_position
             {
                 self.variant_of_interest = hold_aa_mut == muts_entry.aa;
-
-                self.phenotypic_consequences = match hold_aa_mut.as_str() {
-                    "~" => "partial amino acid".to_string(),
-                    "-" => "amino acid covered".to_string(),
-                    "." | "X" => "amino acid information missing".to_string(),
-                    aa if aa == muts_entry.aa => muts_entry.description.clone(),
-                    _ => String::new(),
-                };
 
                 return true;
             }
@@ -225,7 +216,7 @@ pub fn positions_of_interest_process(args: PositionsArgs) -> Result<(), Box<dyn 
     };
     writeln!(
         &mut writer,
-        "query_name,ref_name,ctype,dais_reference,protein,nt_position,query_nt,ref_nt,aligned_codon_position,query_codon,ref_codon,aa_mutation,variant_of_interest",
+        "query_name,ref_name,ctype,dais_reference,protein,nt_position,query_nt,ref_nt,position_in_codon,query_codon,ref_codon,aa_mutation,variant_of_interest",
     )?;
 
     for dais_entry in &dais {
@@ -243,13 +234,12 @@ pub fn positions_of_interest_process(args: PositionsArgs) -> Result<(), Box<dyn 
                         ref_strain: &ref_entry.ref_id,
                         dais_ref_id: &dais_entry.dais_ref_id,
                         protein: &dais_entry.protein,
-                        aligned_codon_position: 0,
+                        position_in_codon: 0,
                         ref_codon: "NNN".to_string(),
                         mut_codon: "NNN".to_string(),
                         aa_position: 0,
                         aa_ref: 'X',
                         aa_mut: 'X',
-                        phenotypic_consequences: String::new(),
                         variant_of_interest: false,
                     };
 
@@ -272,7 +262,6 @@ pub fn positions_of_interest_process(args: PositionsArgs) -> Result<(), Box<dyn 
                             .expect("Invalid UTF-8 sequence")
                             .to_string();
                         entry.aa_position = aa_index;
-                        entry.aligned_codon_position = aa_index;
                         entry.aa_ref = ref_aa as char;
                         entry.aa_mut = query_aa as char;
 
@@ -287,13 +276,12 @@ pub fn positions_of_interest_process(args: PositionsArgs) -> Result<(), Box<dyn 
                                 ref_strain,
                                 dais_ref_id: dais_ref,
                                 protein,
-                                aligned_codon_position,
+                                position_in_codon: _,
                                 ref_codon,
                                 mut_codon,
                                 aa_ref,
                                 aa_position,
                                 aa_mut,
-                                phenotypic_consequences: _,
                                 variant_of_interest,
                             } = &entry;
                             let d = &delim;
@@ -304,12 +292,13 @@ pub fn positions_of_interest_process(args: PositionsArgs) -> Result<(), Box<dyn 
                                 ref_codon.bytes().zip(mut_codon.bytes()).enumerate()
                             {
                                 let nt_position = codon_nt_start + offset + 1;
+                                let position_in_codon = offset + 1;
                                 writeln!(
                                     &mut writer,
                                     "{sample_id}{d}{ref_strain}{d}\
                                             {ctype}{d}{dais_ref}{d}{protein}{d}\
                                             {nt_position}{d}{}{d}{}{d}\
-                                            {aligned_codon_position}{d}\
+                                            {position_in_codon}{d}\
                                             {mut_codon}{d}{ref_codon}{d}\
                                             {aa_ref}:{aa_position}:{aa_mut}{d}\
                                             {variant_of_interest}",
@@ -327,7 +316,6 @@ pub fn positions_of_interest_process(args: PositionsArgs) -> Result<(), Box<dyn 
                         .expect("Invalid UTF-8 sequence")
                         .to_string();
                     entry.aa_position = tail_index + 1;
-                    entry.aligned_codon_position = tail_index + 1;
                     entry.aa_ref = '~';
                     entry.aa_mut = '~';
 
@@ -342,13 +330,12 @@ pub fn positions_of_interest_process(args: PositionsArgs) -> Result<(), Box<dyn 
                             ref_strain,
                             dais_ref_id: dais_ref,
                             protein,
-                            aligned_codon_position,
+                            position_in_codon: _,
                             ref_codon,
                             mut_codon,
                             aa_ref,
                             aa_position,
                             aa_mut,
-                            phenotypic_consequences: _,
                             variant_of_interest,
                         } = &entry;
                         let d = &delim;
@@ -359,12 +346,13 @@ pub fn positions_of_interest_process(args: PositionsArgs) -> Result<(), Box<dyn 
                             tail1.iter().zip(tail2.iter()).enumerate()
                         {
                             let nt_position = codon_nt_start + offset + 1;
+                            let position_in_codon = offset + 1;
                             writeln!(
                                 &mut writer,
                                 "{sample_id}{d}{ref_strain}{d}\
                                         {ctype}{d}{dais_ref}{d}{protein}{d}\
                                         {nt_position}{d}{}{d}{}{d}\
-                                        {aligned_codon_position}{d}\
+                                        {position_in_codon}{d}\
                                         {mut_codon}{d}{ref_codon}{d}\
                                         {aa_ref}:{aa_position}:{aa_mut}{d}\
                                         {variant_of_interest}",
