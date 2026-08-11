@@ -402,12 +402,13 @@ pub fn compute_dais_variants(
         }
     }
 
-    // Sort by protein, sample_id, and aa_variant_count
+    // Sort by protein, sample_id, and aa_variant_count --> have to also sort by positional_reference_id to get Brisbane60 to be first in the list for BVIC
     dais_vars_data.sort_by(|a, b| {
         a.protein
             .cmp(&b.protein)
             .then(a.sample_id.cmp(&b.sample_id))
             .then(a.aa_variant_count.cmp(&b.aa_variant_count))
+            .then(a.positional_reference_id.cmp(&b.positional_reference_id))
     });
 
     // Remove duplicates based on sample_id and protein, keeping the first entry
