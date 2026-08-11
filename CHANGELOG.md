@@ -3,6 +3,13 @@
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.10] - 2026-08-11
+- [Amanda Sullivan](https://github.com/mandysulli)
+- [William Chettleburgh](https://github.com/willchet)
+
+### `Fixed`
+- [PR #104](https://github.com/CDCgov/mira-oxide/pull/104) - Fixed sorting to work with new dais-ribosome alignments
+
 ## [1.5.9] - 2026-07-24
 - [Amanda Sullivan](https://github.com/mandysulli)
 - [William Chettleburgh](https://github.com/willchet)
