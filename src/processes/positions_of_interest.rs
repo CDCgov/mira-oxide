@@ -20,28 +20,49 @@ use zoe::{
     prelude::{Len, Nucleotides},
 };
 
+use crate::io::data_ingest::read_csv;
 use crate::utils::get_dais_refs::assign_dais_refs;
 
 #[derive(Debug, Parser)]
 #[command(about = "Tool for observing codon and amino acid differences at a given poistion")]
 pub struct PositionsArgs {
-    #[arg(short = 'i', long)]
+    #[arg(short = 'q', long)]
     /// Input dais-ribosome file
-    input_file: PathBuf,
+    query_dais_file: PathBuf,
 
     #[arg(short = 'r', long)]
     /// Reference dais-ribosome file
-    ref_file: PathBuf,
+    ref_dais_file: PathBuf,
 
-    #[arg(short = 'm', long)]
+    #[arg(short = 'v', long)]
     /// Optional input fasta
     muts_file: PathBuf,
+
+    #[arg(short = 'i', long)]
+    /// Insertion (.ins) file
+    query_insertion_file: PathBuf,
+
+    #[arg(short = 'd', long)]
+    /// Deletion (.del) file
+    query_deletion_file: PathBuf,
+
+    #[arg(short = 'j', long)]
+    /// Reference insertion (.ins) file
+    ref_insertion_file: PathBuf,
+
+    #[arg(short = 'e', long)]
+    /// Reference deletion (.del) file
+    ref_deletion_file: PathBuf,
+
+    #[arg(short = 'm', long)]
+    /// Minor variants (.csv, with headers) file
+    minor_variants_file: Option<PathBuf>,
 
     #[arg(short = 'o', long)]
     /// Optional output delimited file
     output_xsv: Option<PathBuf>,
 
-    #[arg(short = 'd', long, default_value = ",")]
+    #[arg(short = 's', long, default_value = ",")]
     /// Use the provider delimiter for separating fields. Default is ','
     output_delimiter: String,
 }
@@ -118,6 +139,54 @@ pub struct MutsOfInterestInput {
     description: String,
 }
 
+/// Insertion file.
+#[derive(Deserialize, Debug, Clone)]
+pub struct InsertionInput {
+    query_id: String,
+    ctype: String,
+    reference_id: String,
+    product_name: String,
+    upstream_aa_pos: i64,
+    inserted_nt: String,
+    inserted_aa: String,
+    upstream_nt_pos: i64,
+    codon_shift: i64,
+}
+
+// Deletion file.
+#[derive(Deserialize, Debug, Clone)]
+pub struct DeletionInput {
+    query_id: String,
+    ctype: String,
+    reference_id: String,
+    product_name: String,
+    variant_hash: String,
+    del_aa_start: i64,
+    del_aa_end: i64,
+    del_aa_len: i64,
+    in_frame: bool,
+    cds_id: String,
+    del_cds_start: i64,
+    del_cds_end: i64,
+    del_cds_len: i64,
+}
+
+/// Minor_variants,csv
+#[derive(Deserialize, Debug, Clone)]
+pub struct MinorVariantInput {
+    sample: String,
+    reference: String,
+    sample_position: i64,
+    depth: i64,
+    consensus_allele: String,
+    minority_allele: String,
+    consensus_count: i64,
+    minority_count: i64,
+    minority_frequency: f64,
+    run_id: String,
+    instrument: String,
+}
+
 pub struct Entry<'a> {
     sample_id: &'a str,
     ref_strain: &'a str,
@@ -179,7 +248,9 @@ pub fn positions_of_interest_process(args: PositionsArgs) -> Result<(), Box<dyn 
 
     println!(
         "Processing positions of interest for input file: {:?}, reference file: {:?}, and mutations file: {:?}",
-        &args.input_file, &args.ref_file, &args.muts_file
+        &args.query_dais_file.display(),
+        &args.ref_dais_file.display(),
+        &args.muts_file.display()
     );
 
     let muts_reader = create_reader(Some(&args.muts_file))?;
@@ -190,19 +261,69 @@ pub fn positions_of_interest_process(args: PositionsArgs) -> Result<(), Box<dyn 
         muts_interest.len()
     );
 
-    let dais_reader = create_reader(Some(&args.input_file))?;
+    let dais_reader = create_reader(Some(&args.query_dais_file))?;
     let dais: Vec<QueryInput> = read_tsv(dais_reader, false)?;
     println!(
         "Read {} entries from the input dais-ribosome file.",
         dais.len()
     );
 
-    let ref_reader = create_reader(Some(&args.ref_file))?;
+    let ref_reader = create_reader(Some(&args.ref_dais_file))?;
     let refs: Vec<RefDaisInput> = read_tsv(ref_reader, false)?;
     println!(
         "Read {} entries from the reference dais-ribosome file.",
         refs.len()
     );
+
+    // Insertions (.ins)
+    let ins_reader = create_reader(Some(&args.query_insertion_file))?;
+    let insertions: Vec<InsertionInput> = read_tsv(ins_reader, false)?;
+    println!(
+        "Read {} entries from the insertion file: {:?}",
+        insertions.len(),
+        &args.query_insertion_file.display()
+    );
+
+    // Deletions (.del)
+    let del_reader = create_reader(Some(&args.query_deletion_file))?;
+    let deletions: Vec<DeletionInput> = read_tsv(del_reader, false)?;
+    println!(
+        "Read {} entries from the deletion file: {:?}",
+        deletions.len(),
+        &args.query_deletion_file.display()
+    );
+
+    // Reference insertions (.ins)
+    let ref_ins_reader = create_reader(Some(&args.ref_insertion_file))?;
+    let ref_insertions: Vec<InsertionInput> = read_tsv(ref_ins_reader, false)?;
+    println!(
+        "Read {} entries from the reference insertion file: {:?}",
+        ref_insertions.len(),
+        &args.ref_insertion_file.display()
+    );
+
+    // Reference deletions (.del)
+    let ref_del_reader = create_reader(Some(&args.ref_deletion_file))?;
+    let ref_deletions: Vec<DeletionInput> = read_tsv(ref_del_reader, false)?;
+    println!(
+        "Read {} entries from the reference deletion file: {:?}",
+        ref_deletions.len(),
+        &args.ref_deletion_file.display()
+    );
+
+    // Optional: minor variants (.csv, with headers)
+    let minor_variants: Vec<MinorVariantInput> = if let Some(mv_path) = &args.minor_variants_file {
+        let mv_reader = create_reader(Some(mv_path))?;
+        let parsed: Vec<MinorVariantInput> = read_csv(mv_reader, true)?;
+        println!(
+            "Read {} entries from the minor variants file: {:?}",
+            parsed.len(),
+            mv_path.display()
+        );
+        parsed
+    } else {
+        Vec::new()
+    };
 
     let mut writer = if let Some(ref file_path) = args.output_xsv {
         let file = OpenOptions::new()
