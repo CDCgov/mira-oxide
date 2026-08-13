@@ -231,6 +231,92 @@ impl Entry<'_> {
     }
 }
 
+/// Computes an insertion/deletion-adjusted nucleotide position on the query side.
+///
+/// Matches insertion/deletion rows strictly on all four keys:
+/// query_id == sample_id, ctype, reference_id == dais_ref_id, product_name == protein.
+/// Insertion offsets are applied first (adding the length of each inserted_nt
+/// occurring upstream of the raw position), followed by deletion offsets
+/// (subtracting del_cds_len for each deletion whose deleted region ends at or
+/// before the already-adjusted position).
+fn calc_query_nt_position(
+    raw_position: usize,
+    sample_id: &str,
+    ctype: &str,
+    dais_ref_id: &str,
+    protein: &str,
+    insertions: &[InsertionInput],
+    deletions: &[DeletionInput],
+) -> usize {
+    let mut position = raw_position as i64;
+
+    for ins in insertions {
+        if ins.query_id == sample_id
+            && ins.ctype == ctype
+            && ins.reference_id == dais_ref_id
+            && ins.product_name == protein
+            && (ins.upstream_nt_pos as i64) < raw_position as i64
+        {
+            position += ins.inserted_nt.len() as i64;
+        }
+    }
+
+    for del in deletions {
+        if del.query_id == sample_id
+            && del.ctype == ctype
+            && del.reference_id == dais_ref_id
+            && del.product_name == protein
+            && (del.del_cds_start + del.del_cds_len) <= position
+        {
+            position -= del.del_cds_len;
+        }
+    }
+
+    position.max(0) as usize
+}
+
+/// Computes an insertion/deletion-adjusted nucleotide position on the reference side.
+///
+/// Matches insertion/deletion rows strictly on all four keys:
+/// query_id == ref_strain, ctype, reference_id == dais_ref_id, product_name == protein.
+/// Insertion offsets are applied first, followed by deletion offsets, mirroring
+/// calc_query_nt_position but against the reference-side insertion/deletion files.
+fn calc_ref_nt_position(
+    raw_position: usize,
+    ref_strain: &str,
+    ctype: &str,
+    dais_ref_id: &str,
+    protein: &str,
+    ref_insertions: &[InsertionInput],
+    ref_deletions: &[DeletionInput],
+) -> usize {
+    let mut position = raw_position as i64;
+
+    for ins in ref_insertions {
+        if ins.query_id == ref_strain
+            && ins.ctype == ctype
+            && ins.reference_id == dais_ref_id
+            && ins.product_name == protein
+            && (ins.upstream_nt_pos as i64) < raw_position as i64
+        {
+            position += ins.inserted_nt.len() as i64;
+        }
+    }
+
+    for del in ref_deletions {
+        if del.query_id == ref_strain
+            && del.ctype == ctype
+            && del.reference_id == dais_ref_id
+            && del.product_name == protein
+            && (del.del_cds_start + del.del_cds_len) <= position
+        {
+            position -= del.del_cds_len;
+        }
+    }
+
+    position.max(0) as usize
+}
+
 fn create_reader(path: Option<&PathBuf>) -> std::io::Result<BufReader<Either<File, Stdin>>> {
     let reader = if let Some(ref file_path) = path {
         let file = OpenOptions::new().read(true).open(file_path)?;
@@ -337,7 +423,7 @@ pub fn positions_of_interest_process(args: PositionsArgs) -> Result<(), Box<dyn 
     };
     writeln!(
         &mut writer,
-        "query_name,ref_name,ctype,dais_reference,protein,nt_position,query_nt,ref_nt,position_in_codon,query_codon,ref_codon,aa_mutation,variant_of_interest",
+        "query_name,ref_name,ctype,dais_reference,protein,nt_position,ref_nt_position,query_nt_position,query_nt,ref_nt,position_in_codon,query_codon,ref_codon,aa_mutation,variant_of_interest",
     )?;
 
     for dais_entry in &dais {
@@ -414,11 +500,29 @@ pub fn positions_of_interest_process(args: PositionsArgs) -> Result<(), Box<dyn 
                             {
                                 let nt_position = codon_nt_start + offset + 1;
                                 let position_in_codon = offset + 1;
+                                let query_nt_position = calc_query_nt_position(
+                                    nt_position,
+                                    sample_id,
+                                    ctype,
+                                    dais_ref,
+                                    protein,
+                                    &insertions,
+                                    &deletions,
+                                );
+                                let ref_nt_position = calc_ref_nt_position(
+                                    nt_position,
+                                    ref_strain,
+                                    ctype,
+                                    dais_ref,
+                                    protein,
+                                    &ref_insertions,
+                                    &ref_deletions,
+                                );
                                 writeln!(
                                     &mut writer,
                                     "{sample_id}{d}{ref_strain}{d}\
                                             {ctype}{d}{dais_ref}{d}{protein}{d}\
-                                            {nt_position}{d}{}{d}{}{d}\
+                                            {nt_position}{d}{ref_nt_position}{d}{query_nt_position}{d}{}{d}{}{d}\
                                             {position_in_codon}{d}\
                                             {mut_codon}{d}{ref_codon}{d}\
                                             {aa_ref}:{aa_position}:{aa_mut}{d}\
@@ -468,11 +572,29 @@ pub fn positions_of_interest_process(args: PositionsArgs) -> Result<(), Box<dyn 
                         {
                             let nt_position = codon_nt_start + offset + 1;
                             let position_in_codon = offset + 1;
+                            let query_nt_position = calc_query_nt_position(
+                                nt_position,
+                                sample_id,
+                                ctype,
+                                dais_ref,
+                                protein,
+                                &insertions,
+                                &deletions,
+                            );
+                            let ref_nt_position = calc_ref_nt_position(
+                                nt_position,
+                                ref_strain,
+                                ctype,
+                                dais_ref,
+                                protein,
+                                &ref_insertions,
+                                &ref_deletions,
+                            );
                             writeln!(
                                 &mut writer,
                                 "{sample_id}{d}{ref_strain}{d}\
                                         {ctype}{d}{dais_ref}{d}{protein}{d}\
-                                        {nt_position}{d}{}{d}{}{d}\
+                                        {nt_position}{d}{ref_nt_position}{d}{query_nt_position}{d}{}{d}{}{d}\
                                         {position_in_codon}{d}\
                                         {mut_codon}{d}{ref_codon}{d}\
                                         {aa_ref}:{aa_position}:{aa_mut}{d}\
