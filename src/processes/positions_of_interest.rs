@@ -385,6 +385,22 @@ fn calc_ref_aa_position(
     position.max(0) as usize
 }
 
+/// Looks up a minor variant row matching the given sample, ctype, and query nt position.
+/// Matches on reference==ctype, sample_position==query_nt_position, and sample_id containing
+/// sample as a substring (e.g. sample "sample_1" should match sample_id "sample_1_4").
+fn find_minor_variant<'a>(
+    minor_variants: &'a [MinorVariantInput],
+    sample_id: &str,
+    ctype: &str,
+    query_nt_position: usize,
+) -> Option<&'a MinorVariantInput> {
+    minor_variants.iter().find(|mv| {
+        sample_id.contains(mv.sample.as_str())
+            && mv.reference == ctype
+            && mv.sample_position as usize == query_nt_position
+    })
+}
+
 fn create_reader(path: Option<&PathBuf>) -> std::io::Result<BufReader<Either<File, Stdin>>> {
     let reader = if let Some(ref file_path) = path {
         let file = OpenOptions::new().read(true).open(file_path)?;
@@ -478,6 +494,7 @@ pub fn positions_of_interest_process(args: PositionsArgs) -> Result<(), Box<dyn 
     } else {
         Vec::new()
     };
+    let include_minor_variants = args.minor_variants_file.is_some();
 
     let mut writer = if let Some(ref file_path) = args.output_xsv {
         let file = OpenOptions::new()
@@ -489,10 +506,13 @@ pub fn positions_of_interest_process(args: PositionsArgs) -> Result<(), Box<dyn 
     } else {
         BufWriter::new(Either::Right(stdout()))
     };
-    writeln!(
-        &mut writer,
+    let mut header = String::from(
         "query_name,ref_name,ctype,dais_reference,protein,aln_nt_position,ref_nt_position,query_nt_position,query_nt,ref_nt,position_in_codon,query_codon,ref_codon,aa_mutation,aln_aa_position,ref_aa_position,query_aa_position,variant_of_interest",
-    )?;
+    );
+    if include_minor_variants {
+        header.push_str(",depth,consensus_allele,minority_allele,consensus_count,minority_count,minority_frequency");
+    }
+    writeln!(&mut writer, "{header}")?;
 
     for dais_entry in &dais {
         for ref_entry in &refs {
@@ -605,6 +625,28 @@ pub fn positions_of_interest_process(args: PositionsArgs) -> Result<(), Box<dyn 
                                     &ref_insertions,
                                     &ref_deletions,
                                 );
+                                let mv_match = find_minor_variant(
+                                    &minor_variants,
+                                    sample_id,
+                                    ctype,
+                                    query_nt_position,
+                                );
+                                let mv_suffix = if include_minor_variants {
+                                    match mv_match {
+                                        Some(mv) => format!(
+                                            "{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}",
+                                            mv.depth,
+                                            mv.consensus_allele,
+                                            mv.minority_allele,
+                                            mv.consensus_count,
+                                            mv.minority_count,
+                                            mv.minority_frequency
+                                        ),
+                                        None => format!("{d}{d}{d}{d}{d}{d}"),
+                                    }
+                                } else {
+                                    String::new()
+                                };
                                 writeln!(
                                     &mut writer,
                                     "{sample_id}{d}{ref_strain}{d}\
@@ -614,7 +656,7 @@ pub fn positions_of_interest_process(args: PositionsArgs) -> Result<(), Box<dyn 
                                             {mut_codon}{d}{ref_codon}{d}\
                                             {aa_ref}:{aa_position}:{aa_mut}{d}\
                                             {aln_aa_position}{d}{ref_aa_position}{d}{query_aa_position}{d}\
-                                            {variant_of_interest}",
+                                            {variant_of_interest}{mv_suffix}",
                                     query_nt as char, ref_nt as char,
                                 )?;
                             }
@@ -697,6 +739,28 @@ pub fn positions_of_interest_process(args: PositionsArgs) -> Result<(), Box<dyn 
                                 &ref_insertions,
                                 &ref_deletions,
                             );
+                            let mv_match = find_minor_variant(
+                                &minor_variants,
+                                sample_id,
+                                ctype,
+                                query_nt_position,
+                            );
+                            let mv_suffix = if include_minor_variants {
+                                match mv_match {
+                                    Some(mv) => format!(
+                                        "{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}",
+                                        mv.depth,
+                                        mv.consensus_allele,
+                                        mv.minority_allele,
+                                        mv.consensus_count,
+                                        mv.minority_count,
+                                        mv.minority_frequency
+                                    ),
+                                    None => format!("{d}{d}{d}{d}{d}{d}"),
+                                }
+                            } else {
+                                String::new()
+                            };
                             writeln!(
                                 &mut writer,
                                 "{sample_id}{d}{ref_strain}{d}\
@@ -706,7 +770,7 @@ pub fn positions_of_interest_process(args: PositionsArgs) -> Result<(), Box<dyn 
                                         {mut_codon}{d}{ref_codon}{d}\
                                         {aa_ref}:{aa_position}:{aa_mut}{d}\
                                         {aln_aa_position}{d}{ref_aa_position}{d}{query_aa_position}{d}\
-                                        {variant_of_interest}",
+                                        {variant_of_interest}{mv_suffix}",
                                 *query_nt as char, *ref_nt as char,
                             )?;
                         }
