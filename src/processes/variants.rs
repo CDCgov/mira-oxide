@@ -590,7 +590,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
             "query_name,ref_name,ctype,dais_reference,protein,aln_nt_position,ref_nt_position,query_nt_position,query_nt,ref_nt,position_in_codon,query_codon,ref_codon,aa_mutation,aln_aa_position,ref_aa_position,query_aa_position,variant_of_interest",
         );
         if include_minor_variants {
-            header.push_str(",depth,consensus_allele,minority_allele,consensus_count,minority_count,minority_frequency,minor_variant_codon,minor_variant_aa");
+            header.push_str(",depth,consensus_allele,minority_allele,consensus_count,minority_count,minority_frequency,consensus_codon,consensus_aa,minor_variant_codon,minor_variant_aa");
         }
         writeln!(&mut writer, "{header}")?;
 
@@ -848,11 +848,22 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                                 );
                                 let mv_suffixes: Vec<String> = if include_minor_variants {
                                     if mv_matches.is_empty() {
-                                        vec![format!("{d}{d}{d}{d}{d}{d}{d}{d}")]
+                                        vec![format!("{d}{d}{d}{d}{d}{d}{d}{d}{d}{d}")]
                                     } else {
                                         mv_matches
                                             .iter()
                                             .map(|mv| {
+                                                let (consensus_codon, consensus_aa) =
+                                                    match build_minor_variant_codon(
+                                                        mut_codon,
+                                                        position_in_codon,
+                                                        &mv.consensus_allele,
+                                                    ) {
+                                                        Some((codon, aa)) => {
+                                                            (codon, aa.to_string())
+                                                        }
+                                                        None => (String::new(), String::new()),
+                                                    };
                                                 let (mv_codon, mv_aa) =
                                                     match build_minor_variant_codon(
                                                         mut_codon,
@@ -865,14 +876,16 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                                                         None => (String::new(), String::new()),
                                                     };
                                                 format!(
-                                                    "{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}",
+                                                    "{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}",
                                                     mv.depth,
                                                     mv.consensus_allele,
                                                     mv.minority_allele,
                                                     mv.consensus_count,
                                                     mv.minority_count,
                                                     mv.minority_frequency,
+                                                    consensus_codon,
                                                     mv_codon,
+                                                    consensus_aa,
                                                     mv_aa
                                                 )
                                             })
@@ -925,7 +938,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
 
         writeln!(
             &mut writer,
-            "sample,reference,sample_position,depth,consensus_allele,minority_allele,consensus_count,minority_count,minority_frequency,run_id,instrument,minor_variant_codon,minor_variant_aa"
+            "sample,reference,sample_position,depth,consensus_allele,minority_allele,consensus_count,minority_count,minority_frequency,run_id,instrument,consensus_codon,consensus_aa,minor_variant_codon,minor_variant_aa"
         )?;
 
         for mv in &minor_variants {
@@ -938,7 +951,9 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                 .filter(|d| d.sample_id.contains(mv.sample.as_str()) && d.ctype == mv.reference)
                 .max_by_key(|d| d.query_cds_aln.len());
 
-            let (mv_codon, mv_aa) = if let Some(dais_entry) = matching_dais_entry {
+            let (consensus_codon, consensus_aa, mv_codon, mv_aa) = if let Some(dais_entry) =
+                matching_dais_entry
+            {
                 let nt_seq: Nucleotides = dais_entry.query_cds_aln.clone().into();
                 let aln_len = nt_seq.len();
                 let raw_pos = find_raw_query_position(
@@ -967,27 +982,37 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                                 let codon_str = std::str::from_utf8(codon_bytes)
                                     .unwrap_or_default()
                                     .to_string();
-                                match build_minor_variant_codon(
+                                let (consensus_codon, consensus_aa) =
+                                    match build_minor_variant_codon(
+                                        &codon_str,
+                                        position_in_codon,
+                                        &mv.consensus_allele,
+                                    ) {
+                                        Some((codon, aa)) => (codon, aa.to_string()),
+                                        None => (String::new(), String::new()),
+                                    };
+                                let (mv_codon, mv_aa) = match build_minor_variant_codon(
                                     &codon_str,
                                     position_in_codon,
                                     &mv.minority_allele,
                                 ) {
                                     Some((codon, aa)) => (codon, aa.to_string()),
                                     None => (String::new(), String::new()),
-                                }
+                                };
+                                (consensus_codon, consensus_aa, mv_codon, mv_aa)
                             }
-                            None => (String::new(), String::new()),
+                            None => (String::new(), String::new(), String::new(), String::new()),
                         }
                     }
-                    None => (String::new(), String::new()),
+                    None => (String::new(), String::new(), String::new(), String::new()),
                 }
             } else {
-                (String::new(), String::new())
+                (String::new(), String::new(), String::new(), String::new())
             };
 
             writeln!(
                 &mut writer,
-                "{}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{mv_codon}{delim}{mv_aa}",
+                "{}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{consensus_codon}{delim}{consensus_aa}{delim}{mv_codon}{delim}{mv_aa}",
                 mv.sample,
                 mv.reference,
                 mv.sample_position,
