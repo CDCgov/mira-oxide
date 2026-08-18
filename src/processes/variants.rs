@@ -31,12 +31,14 @@ pub struct VariantsArgs {
     query_dais_file: PathBuf,
 
     #[arg(short = 'r', long)]
-    /// Reference dais-ribosome file
-    ref_dais_file: PathBuf,
+    /// Reference dais-ribosome file (required if --positions-of-interest is used)
+    ref_dais_file: Option<PathBuf>,
 
     #[arg(short = 'v', long)]
-    /// Optional input fasta
-    muts_file: PathBuf,
+    /// Optional positions-of-interest (mutations) file. If provided, the full codon/amino-acid
+    /// diff report is produced. If omitted (and --minor-variants-file is provided instead), only
+    /// the minor variants file is annotated with minor_variant_codon/minor_variant_aa columns.
+    positions_of_interest: Option<PathBuf>,
 
     #[arg(short = 'i', long)]
     /// Insertion (.ins) file
@@ -47,12 +49,12 @@ pub struct VariantsArgs {
     query_deletion_file: PathBuf,
 
     #[arg(short = 'j', long)]
-    /// Reference insertion (.ins) file
-    ref_insertion_file: PathBuf,
+    /// Reference insertion (.ins) file (required if --positions-of-interest is used)
+    ref_insertion_file: Option<PathBuf>,
 
     #[arg(short = 'e', long)]
-    /// Reference deletion (.del) file
-    ref_deletion_file: PathBuf,
+    /// Reference deletion (.del) file (required if --positions-of-interest is used)
+    ref_deletion_file: Option<PathBuf>,
 
     #[arg(short = 'm', long)]
     /// Minor variants (.csv, with headers) file
@@ -425,6 +427,44 @@ fn build_minor_variant_codon(
     Some((codon_str, aa))
 }
 
+/// Finds the raw (aln) nucleotide position within query_cds_aln that maps to the given
+/// adjusted query_nt_position, by searching raw positions 1..=len and adjusting each with
+/// calc_query_nt_position until one matches. Returns None if no raw position maps to it.
+/// Does not filter insertions/deletions by protein, since minor-variants-only mode has no
+/// protein context to match against.
+fn find_raw_query_position(
+    aln_len: usize,
+    target_query_nt_position: usize,
+    sample_id: &str,
+    ctype: &str,
+    insertions: &[InsertionInput],
+    deletions: &[DeletionInput],
+) -> Option<usize> {
+    (1..=aln_len).find(|&raw_pos| {
+        let mut position = raw_pos as i64;
+
+        for ins in insertions {
+            if ins.query_id == sample_id
+                && ins.ctype == ctype
+                && (ins.upstream_nt_pos as i64) < raw_pos as i64
+            {
+                position += ins.inserted_nt.len() as i64;
+            }
+        }
+
+        for del in deletions {
+            if del.query_id == sample_id
+                && del.ctype == ctype
+                && (del.del_cds_start + del.del_cds_len) <= position
+            {
+                position -= del.del_cds_len;
+            }
+        }
+
+        position.max(0) as usize == target_query_nt_position
+    })
+}
+
 fn create_reader(path: Option<&PathBuf>) -> std::io::Result<BufReader<Either<File, Stdin>>> {
     let reader = if let Some(ref file_path) = path {
         let file = OpenOptions::new().read(true).open(file_path)?;
@@ -438,23 +478,16 @@ fn create_reader(path: Option<&PathBuf>) -> std::io::Result<BufReader<Either<Fil
 
 #[allow(clippy::too_many_lines)]
 pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
+    if args.positions_of_interest.is_none() && args.minor_variants_file.is_none() {
+        return Err(
+            "At least one of --positions-of-interest or --minor-variants-file must be provided."
+                .into(),
+        );
+    }
+
     let delim = args.output_delimiter;
 
-    println!(
-        "Processing positions of interest for input file: {:?}, reference file: {:?}, and mutations file: {:?}",
-        &args.query_dais_file.display(),
-        &args.ref_dais_file.display(),
-        &args.muts_file.display()
-    );
-
-    let muts_reader = create_reader(Some(&args.muts_file))?;
-    let muts_interest: Vec<MutsOfInterestInput> = read_tsv(muts_reader, false)?;
-
-    println!(
-        "Read {} entries from the mutations of interest file.",
-        muts_interest.len()
-    );
-
+    // Query dais-ribosome file is always required.
     let dais_reader = create_reader(Some(&args.query_dais_file))?;
     let dais: Vec<QueryInput> = read_tsv(dais_reader, false)?;
     println!(
@@ -462,14 +495,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
         dais.len()
     );
 
-    let ref_reader = create_reader(Some(&args.ref_dais_file))?;
-    let refs: Vec<RefDaisInput> = read_tsv(ref_reader, false)?;
-    println!(
-        "Read {} entries from the reference dais-ribosome file.",
-        refs.len()
-    );
-
-    // Insertions (.ins)
+    // Query insertions/deletions are always required.
     let ins_reader = create_reader(Some(&args.query_insertion_file))?;
     let insertions: Vec<InsertionInput> = read_tsv(ins_reader, false)?;
     println!(
@@ -478,31 +504,12 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
         &args.query_insertion_file.display()
     );
 
-    // Deletions (.del)
     let del_reader = create_reader(Some(&args.query_deletion_file))?;
     let deletions: Vec<DeletionInput> = read_tsv(del_reader, false)?;
     println!(
         "Read {} entries from the deletion file: {:?}",
         deletions.len(),
         &args.query_deletion_file.display()
-    );
-
-    // Reference insertions (.ins)
-    let ref_ins_reader = create_reader(Some(&args.ref_insertion_file))?;
-    let ref_insertions: Vec<InsertionInput> = read_tsv(ref_ins_reader, false)?;
-    println!(
-        "Read {} entries from the reference insertion file: {:?}",
-        ref_insertions.len(),
-        &args.ref_insertion_file.display()
-    );
-
-    // Reference deletions (.del)
-    let ref_del_reader = create_reader(Some(&args.ref_deletion_file))?;
-    let ref_deletions: Vec<DeletionInput> = read_tsv(ref_del_reader, false)?;
-    println!(
-        "Read {} entries from the reference deletion file: {:?}",
-        ref_deletions.len(),
-        &args.ref_deletion_file.display()
     );
 
     // Optional: minor variants (.csv, with headers)
@@ -520,74 +527,258 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
     };
     let include_minor_variants = args.minor_variants_file.is_some();
 
-    let mut writer = if let Some(ref file_path) = args.output_xsv {
-        let file = OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .open(file_path)?;
-        BufWriter::new(Either::Left(file))
-    } else {
-        BufWriter::new(Either::Right(stdout()))
-    };
-    let mut header = String::from(
-        "query_name,ref_name,ctype,dais_reference,protein,aln_nt_position,ref_nt_position,query_nt_position,query_nt,ref_nt,position_in_codon,query_codon,ref_codon,aa_mutation,aln_aa_position,ref_aa_position,query_aa_position,variant_of_interest",
-    );
-    if include_minor_variants {
-        header.push_str(",depth,consensus_allele,minority_allele,consensus_count,minority_count,minority_frequency,minor_variant_codon,minor_variant_aa");
-    }
-    writeln!(&mut writer, "{header}")?;
+    if let Some(muts_path) = &args.positions_of_interest {
+        // Full positions-of-interest mode: requires ref dais/insertion/deletion files.
+        let ref_dais_file = args
+            .ref_dais_file
+            .ok_or("--ref-dais-file is required when --positions-of-interest is used.")?;
+        let ref_insertion_file = args
+            .ref_insertion_file
+            .ok_or("--ref-insertion-file is required when --positions-of-interest is used.")?;
+        let ref_deletion_file = args
+            .ref_deletion_file
+            .ok_or("--ref-deletion-file is required when --positions-of-interest is used.")?;
 
-    for dais_entry in &dais {
-        for ref_entry in &refs {
-            if dais_entry.ctype == ref_entry.ctype
-                && dais_entry.dais_ref_id == ref_entry.dais_ref_id
-                && dais_entry.protein == ref_entry.protein
-            {
-                let nt_seq1: Nucleotides = ref_entry.ref_cds_aln.clone().into();
-                let nt_seq2: Nucleotides = dais_entry.query_cds_aln.clone().into();
+        println!(
+            "Processing positions of interest for input file: {:?}, reference file: {:?}, and mutations file: {:?}",
+            &args.query_dais_file.display(),
+            &ref_dais_file.display(),
+            &muts_path.display()
+        );
 
-                if nt_seq1.len() == nt_seq2.len() {
-                    let mut entry = Entry {
-                        sample_id: &dais_entry.sample_id,
-                        ref_strain: &ref_entry.ref_id,
-                        dais_ref_id: &dais_entry.dais_ref_id,
-                        protein: &dais_entry.protein,
-                        position_in_codon: 0,
-                        ref_codon: "NNN".to_string(),
-                        mut_codon: "NNN".to_string(),
-                        aa_position: 0,
-                        aa_ref: 'X',
-                        aa_mut: 'X',
-                        variant_of_interest: false,
-                    };
+        let muts_reader = create_reader(Some(muts_path))?;
+        let muts_interest: Vec<MutsOfInterestInput> = read_tsv(muts_reader, false)?;
+        println!(
+            "Read {} entries from the mutations of interest file.",
+            muts_interest.len()
+        );
 
-                    let mut tail_index = 0;
-                    let (codons1, tail1) = nt_seq1.as_codons();
-                    let (codons2, tail2) = nt_seq2.as_codons();
+        let ref_reader = create_reader(Some(&ref_dais_file))?;
+        let refs: Vec<RefDaisInput> = read_tsv(ref_reader, false)?;
+        println!(
+            "Read {} entries from the reference dais-ribosome file.",
+            refs.len()
+        );
 
-                    for (index, (ref_codon, query_codon)) in
-                        codons1.iter().zip(codons2.iter()).enumerate()
-                    {
-                        let aa_index = index + 1;
-                        tail_index = aa_index;
-                        let ref_aa = StdGeneticCode::translate_codon(ref_codon);
-                        let query_aa = StdGeneticCode::translate_codon(query_codon);
+        let ref_ins_reader = create_reader(Some(&ref_insertion_file))?;
+        let ref_insertions: Vec<InsertionInput> = read_tsv(ref_ins_reader, false)?;
+        println!(
+            "Read {} entries from the reference insertion file: {:?}",
+            ref_insertions.len(),
+            &ref_insertion_file.display()
+        );
 
-                        entry.ref_codon = std::str::from_utf8(ref_codon)
+        let ref_del_reader = create_reader(Some(&ref_deletion_file))?;
+        let ref_deletions: Vec<DeletionInput> = read_tsv(ref_del_reader, false)?;
+        println!(
+            "Read {} entries from the reference deletion file: {:?}",
+            ref_deletions.len(),
+            &ref_deletion_file.display()
+        );
+
+        let mut writer = if let Some(ref file_path) = args.output_xsv {
+            let file = OpenOptions::new()
+                .write(true)
+                .create(true)
+                .truncate(true)
+                .open(file_path)?;
+            BufWriter::new(Either::Left(file))
+        } else {
+            BufWriter::new(Either::Right(stdout()))
+        };
+        let mut header = String::from(
+            "query_name,ref_name,ctype,dais_reference,protein,aln_nt_position,ref_nt_position,query_nt_position,query_nt,ref_nt,position_in_codon,query_codon,ref_codon,aa_mutation,aln_aa_position,ref_aa_position,query_aa_position,variant_of_interest",
+        );
+        if include_minor_variants {
+            header.push_str(",depth,consensus_allele,minority_allele,consensus_count,minority_count,minority_frequency,minor_variant_codon,minor_variant_aa");
+        }
+        writeln!(&mut writer, "{header}")?;
+
+        for dais_entry in &dais {
+            for ref_entry in &refs {
+                if dais_entry.ctype == ref_entry.ctype
+                    && dais_entry.dais_ref_id == ref_entry.dais_ref_id
+                    && dais_entry.protein == ref_entry.protein
+                {
+                    let nt_seq1: Nucleotides = ref_entry.ref_cds_aln.clone().into();
+                    let nt_seq2: Nucleotides = dais_entry.query_cds_aln.clone().into();
+
+                    if nt_seq1.len() == nt_seq2.len() {
+                        let mut entry = Entry {
+                            sample_id: &dais_entry.sample_id,
+                            ref_strain: &ref_entry.ref_id,
+                            dais_ref_id: &dais_entry.dais_ref_id,
+                            protein: &dais_entry.protein,
+                            position_in_codon: 0,
+                            ref_codon: "NNN".to_string(),
+                            mut_codon: "NNN".to_string(),
+                            aa_position: 0,
+                            aa_ref: 'X',
+                            aa_mut: 'X',
+                            variant_of_interest: false,
+                        };
+
+                        let mut tail_index = 0;
+                        let (codons1, tail1) = nt_seq1.as_codons();
+                        let (codons2, tail2) = nt_seq2.as_codons();
+
+                        for (index, (ref_codon, query_codon)) in
+                            codons1.iter().zip(codons2.iter()).enumerate()
+                        {
+                            let aa_index = index + 1;
+                            tail_index = aa_index;
+                            let ref_aa = StdGeneticCode::translate_codon(ref_codon);
+                            let query_aa = StdGeneticCode::translate_codon(query_codon);
+
+                            entry.ref_codon = std::str::from_utf8(ref_codon)
+                                .expect("Invalid UTF-8 sequence")
+                                .to_string();
+                            entry.mut_codon = std::str::from_utf8(query_codon)
+                                .expect("Invalid UTF-8 sequence")
+                                .to_string();
+                            entry.aa_position = aa_index;
+                            entry.aa_ref = ref_aa as char;
+                            entry.aa_mut = query_aa as char;
+
+                            if entry.update_entry(
+                                &ref_entry.dais_ref_id,
+                                ref_aa,
+                                query_aa,
+                                &muts_interest,
+                            ) {
+                                let Entry {
+                                    sample_id,
+                                    ref_strain,
+                                    dais_ref_id: dais_ref,
+                                    protein,
+                                    position_in_codon: _,
+                                    ref_codon,
+                                    mut_codon,
+                                    aa_ref,
+                                    aa_position,
+                                    aa_mut,
+                                    variant_of_interest,
+                                } = &entry;
+                                let d = &delim;
+                                let ctype = &dais_entry.ctype;
+
+                                let codon_nt_start = (aa_index - 1) * 3;
+                                let aln_aa_position = *aa_position;
+                                let query_aa_position = calc_query_aa_position(
+                                    aln_aa_position,
+                                    sample_id,
+                                    ctype,
+                                    dais_ref,
+                                    protein,
+                                    &insertions,
+                                    &deletions,
+                                );
+                                let ref_aa_position = calc_ref_aa_position(
+                                    aln_aa_position,
+                                    ref_strain,
+                                    ctype,
+                                    dais_ref,
+                                    protein,
+                                    &ref_insertions,
+                                    &ref_deletions,
+                                );
+                                for (offset, (ref_nt, query_nt)) in
+                                    ref_codon.bytes().zip(mut_codon.bytes()).enumerate()
+                                {
+                                    let nt_position = codon_nt_start + offset + 1;
+                                    let position_in_codon = offset + 1;
+                                    let query_nt_position = calc_query_nt_position(
+                                        nt_position,
+                                        sample_id,
+                                        ctype,
+                                        dais_ref,
+                                        protein,
+                                        &insertions,
+                                        &deletions,
+                                    );
+                                    let ref_nt_position = calc_ref_nt_position(
+                                        nt_position,
+                                        ref_strain,
+                                        ctype,
+                                        dais_ref,
+                                        protein,
+                                        &ref_insertions,
+                                        &ref_deletions,
+                                    );
+                                    let mv_matches = find_minor_variants(
+                                        &minor_variants,
+                                        sample_id,
+                                        ctype,
+                                        query_nt_position,
+                                    );
+                                    let mv_suffixes: Vec<String> = if include_minor_variants {
+                                        if mv_matches.is_empty() {
+                                            vec![format!("{d}{d}{d}{d}{d}{d}{d}{d}")]
+                                        } else {
+                                            mv_matches
+                                                .iter()
+                                                .map(|mv| {
+                                                    let (mv_codon, mv_aa) =
+                                                        match build_minor_variant_codon(
+                                                            mut_codon,
+                                                            position_in_codon,
+                                                            &mv.minority_allele,
+                                                        ) {
+                                                            Some((codon, aa)) => {
+                                                                (codon, aa.to_string())
+                                                            }
+                                                            None => (String::new(), String::new()),
+                                                        };
+                                                    format!(
+                                                        "{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}",
+                                                        mv.depth,
+                                                        mv.consensus_allele,
+                                                        mv.minority_allele,
+                                                        mv.consensus_count,
+                                                        mv.minority_count,
+                                                        mv.minority_frequency,
+                                                        mv_codon,
+                                                        mv_aa
+                                                    )
+                                                })
+                                                .collect()
+                                        }
+                                    } else {
+                                        vec![String::new()]
+                                    };
+                                    for mv_suffix in &mv_suffixes {
+                                        writeln!(
+                                            &mut writer,
+                                            "{sample_id}{d}{ref_strain}{d}\
+                                                    {ctype}{d}{dais_ref}{d}{protein}{d}\
+                                                    {nt_position}{d}{ref_nt_position}{d}{query_nt_position}{d}{}{d}{}{d}\
+                                                    {position_in_codon}{d}\
+                                                    {mut_codon}{d}{ref_codon}{d}\
+                                                    {aa_ref}:{aa_position}:{aa_mut}{d}\
+                                                    {aln_aa_position}{d}{ref_aa_position}{d}{query_aa_position}{d}\
+                                                    {variant_of_interest}{mv_suffix}",
+                                            query_nt as char, ref_nt as char,
+                                        )?;
+                                    }
+                                }
+                            }
+                        }
+
+                        let partial_codon = b'~';
+                        entry.ref_codon = std::str::from_utf8(tail1)
                             .expect("Invalid UTF-8 sequence")
                             .to_string();
-                        entry.mut_codon = std::str::from_utf8(query_codon)
+                        entry.mut_codon = std::str::from_utf8(tail2)
                             .expect("Invalid UTF-8 sequence")
                             .to_string();
-                        entry.aa_position = aa_index;
-                        entry.aa_ref = ref_aa as char;
-                        entry.aa_mut = query_aa as char;
+                        entry.aa_position = tail_index + 1;
+                        entry.aa_ref = '~';
+                        entry.aa_mut = '~';
 
                         if entry.update_entry(
                             &ref_entry.dais_ref_id,
-                            ref_aa,
-                            query_aa,
+                            partial_codon,
+                            partial_codon,
                             &muts_interest,
                         ) {
                             let Entry {
@@ -606,7 +797,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                             let d = &delim;
                             let ctype = &dais_entry.ctype;
 
-                            let codon_nt_start = (aa_index - 1) * 3;
+                            let codon_nt_start = tail_index * 3;
                             let aln_aa_position = *aa_position;
                             let query_aa_position = calc_query_aa_position(
                                 aln_aa_position,
@@ -627,7 +818,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                                 &ref_deletions,
                             );
                             for (offset, (ref_nt, query_nt)) in
-                                ref_codon.bytes().zip(mut_codon.bytes()).enumerate()
+                                tail1.iter().zip(tail2.iter()).enumerate()
                             {
                                 let nt_position = codon_nt_start + offset + 1;
                                 let position_in_codon = offset + 1;
@@ -701,154 +892,121 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                                                 {aa_ref}:{aa_position}:{aa_mut}{d}\
                                                 {aln_aa_position}{d}{ref_aa_position}{d}{query_aa_position}{d}\
                                                 {variant_of_interest}{mv_suffix}",
-                                        query_nt as char, ref_nt as char,
+                                        *query_nt as char, *ref_nt as char,
                                     )?;
                                 }
                             }
                         }
-                    }
-
-                    let partial_codon = b'~';
-                    entry.ref_codon = std::str::from_utf8(tail1)
-                        .expect("Invalid UTF-8 sequence")
-                        .to_string();
-                    entry.mut_codon = std::str::from_utf8(tail2)
-                        .expect("Invalid UTF-8 sequence")
-                        .to_string();
-                    entry.aa_position = tail_index + 1;
-                    entry.aa_ref = '~';
-                    entry.aa_mut = '~';
-
-                    if entry.update_entry(
-                        &ref_entry.dais_ref_id,
-                        partial_codon,
-                        partial_codon,
-                        &muts_interest,
-                    ) {
-                        let Entry {
-                            sample_id,
-                            ref_strain,
-                            dais_ref_id: dais_ref,
-                            protein,
-                            position_in_codon: _,
-                            ref_codon,
-                            mut_codon,
-                            aa_ref,
-                            aa_position,
-                            aa_mut,
-                            variant_of_interest,
-                        } = &entry;
-                        let d = &delim;
-                        let ctype = &dais_entry.ctype;
-
-                        let codon_nt_start = tail_index * 3;
-                        let aln_aa_position = *aa_position;
-                        let query_aa_position = calc_query_aa_position(
-                            aln_aa_position,
-                            sample_id,
-                            ctype,
-                            dais_ref,
-                            protein,
-                            &insertions,
-                            &deletions,
+                    } else {
+                        println!(
+                            "Warning: Aligned sequences for sample {} (length {}) and reference {} (length {}) have different lengths. Skipping this pair.",
+                            dais_entry.sample_id,
+                            nt_seq1.len(),
+                            ref_entry.ref_id,
+                            nt_seq2.len()
                         );
-                        let ref_aa_position = calc_ref_aa_position(
-                            aln_aa_position,
-                            ref_strain,
-                            ctype,
-                            dais_ref,
-                            protein,
-                            &ref_insertions,
-                            &ref_deletions,
-                        );
-                        for (offset, (ref_nt, query_nt)) in
-                            tail1.iter().zip(tail2.iter()).enumerate()
-                        {
-                            let nt_position = codon_nt_start + offset + 1;
-                            let position_in_codon = offset + 1;
-                            let query_nt_position = calc_query_nt_position(
-                                nt_position,
-                                sample_id,
-                                ctype,
-                                dais_ref,
-                                protein,
-                                &insertions,
-                                &deletions,
-                            );
-                            let ref_nt_position = calc_ref_nt_position(
-                                nt_position,
-                                ref_strain,
-                                ctype,
-                                dais_ref,
-                                protein,
-                                &ref_insertions,
-                                &ref_deletions,
-                            );
-                            let mv_matches = find_minor_variants(
-                                &minor_variants,
-                                sample_id,
-                                ctype,
-                                query_nt_position,
-                            );
-                            let mv_suffixes: Vec<String> = if include_minor_variants {
-                                if mv_matches.is_empty() {
-                                    vec![format!("{d}{d}{d}{d}{d}{d}{d}{d}")]
-                                } else {
-                                    mv_matches
-                                        .iter()
-                                        .map(|mv| {
-                                            let (mv_codon, mv_aa) = match build_minor_variant_codon(
-                                                mut_codon,
-                                                position_in_codon,
-                                                &mv.minority_allele,
-                                            ) {
-                                                Some((codon, aa)) => (codon, aa.to_string()),
-                                                None => (String::new(), String::new()),
-                                            };
-                                            format!(
-                                                "{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}",
-                                                mv.depth,
-                                                mv.consensus_allele,
-                                                mv.minority_allele,
-                                                mv.consensus_count,
-                                                mv.minority_count,
-                                                mv.minority_frequency,
-                                                mv_codon,
-                                                mv_aa
-                                            )
-                                        })
-                                        .collect()
-                                }
-                            } else {
-                                vec![String::new()]
-                            };
-                            for mv_suffix in &mv_suffixes {
-                                writeln!(
-                                    &mut writer,
-                                    "{sample_id}{d}{ref_strain}{d}\
-                                            {ctype}{d}{dais_ref}{d}{protein}{d}\
-                                            {nt_position}{d}{ref_nt_position}{d}{query_nt_position}{d}{}{d}{}{d}\
-                                            {position_in_codon}{d}\
-                                            {mut_codon}{d}{ref_codon}{d}\
-                                            {aa_ref}:{aa_position}:{aa_mut}{d}\
-                                            {aln_aa_position}{d}{ref_aa_position}{d}{query_aa_position}{d}\
-                                            {variant_of_interest}{mv_suffix}",
-                                    *query_nt as char, *ref_nt as char,
-                                )?;
-                            }
-                        }
                     }
-                } else {
-                    println!(
-                        "Warning: Aligned sequences for sample {} (length {}) and reference {} (length {}) have different lengths. Skipping this pair.",
-                        dais_entry.sample_id,
-                        nt_seq1.len(),
-                        ref_entry.ref_id,
-                        nt_seq2.len()
-                    );
                 }
             }
         }
+    } else {
+        // Minor-variants-only mode: annotate the minor variants CSV with minor_variant_codon
+        // and minor_variant_aa columns, computed from the query dais data.
+        let mut writer = if let Some(ref file_path) = args.output_xsv {
+            let file = OpenOptions::new()
+                .write(true)
+                .create(true)
+                .truncate(true)
+                .open(file_path)?;
+            BufWriter::new(Either::Left(file))
+        } else {
+            BufWriter::new(Either::Right(stdout()))
+        };
+
+        writeln!(
+            &mut writer,
+            "sample,reference,sample_position,depth,consensus_allele,minority_allele,consensus_count,minority_count,minority_frequency,run_id,instrument,minor_variant_codon,minor_variant_aa"
+        )?;
+
+        for mv in &minor_variants {
+            // Find the query dais row matching this minor variant: sample_id contains sample,
+            // ctype == reference. Multiple product rows (e.g. HA-signal, HA, HA1) can share the
+            // same sample_id/ctype, so prefer the one with the longest query_cds_aln, since
+            // shorter fragments (like signal peptides) can't contain large sample_positions.
+            let matching_dais_entry = dais
+                .iter()
+                .filter(|d| d.sample_id.contains(mv.sample.as_str()) && d.ctype == mv.reference)
+                .max_by_key(|d| d.query_cds_aln.len());
+
+            let (mv_codon, mv_aa) = if let Some(dais_entry) = matching_dais_entry {
+                let nt_seq: Nucleotides = dais_entry.query_cds_aln.clone().into();
+                let aln_len = nt_seq.len();
+                let raw_pos = find_raw_query_position(
+                    aln_len,
+                    mv.sample_position as usize,
+                    &dais_entry.sample_id,
+                    &dais_entry.ctype,
+                    &insertions,
+                    &deletions,
+                );
+
+                match raw_pos {
+                    Some(raw_pos) => {
+                        let (codons, tail) = nt_seq.as_codons();
+                        let codon_index = (raw_pos - 1) / 3;
+                        let position_in_codon = ((raw_pos - 1) % 3) + 1;
+                        let codon_bytes: Option<&[u8]> = if codon_index < codons.len() {
+                            Some(&codons[codon_index])
+                        } else if codon_index == codons.len() && !tail.is_empty() {
+                            Some(tail)
+                        } else {
+                            None
+                        };
+                        match codon_bytes {
+                            Some(codon_bytes) => {
+                                let codon_str = std::str::from_utf8(codon_bytes)
+                                    .unwrap_or_default()
+                                    .to_string();
+                                match build_minor_variant_codon(
+                                    &codon_str,
+                                    position_in_codon,
+                                    &mv.minority_allele,
+                                ) {
+                                    Some((codon, aa)) => (codon, aa.to_string()),
+                                    None => (String::new(), String::new()),
+                                }
+                            }
+                            None => (String::new(), String::new()),
+                        }
+                    }
+                    None => (String::new(), String::new()),
+                }
+            } else {
+                (String::new(), String::new())
+            };
+
+            writeln!(
+                &mut writer,
+                "{}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{mv_codon}{delim}{mv_aa}",
+                mv.sample,
+                mv.reference,
+                mv.sample_position,
+                mv.depth,
+                mv.consensus_allele,
+                mv.minority_allele,
+                mv.consensus_count,
+                mv.minority_count,
+                mv.minority_frequency,
+                mv.run_id,
+                mv.instrument,
+            )?;
+        }
+
+        println!(
+            "Wrote {} annotated minor variant entries.",
+            minor_variants.len()
+        );
     }
+
     Ok(())
 }
