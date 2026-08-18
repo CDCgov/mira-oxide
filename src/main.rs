@@ -16,8 +16,7 @@ use crate::processes::{
     prepare_mira_reports::{ReportsArgs, prepare_mira_reports_process},
     samplesheet_check::{SamplesheetCheckArgs, samplesheet_check},
     summary_report_update::{SummaryUpdateArgs, summary_report_update_process},
-    variants::{VariantsArgs as VariantsCmdArgs, variants_process},
-    variants_of_interest::{VariantsArgs, variants_of_interest_process},
+    variants::{VariantsArgs, variants_process},
 };
 use clap::{Parser, Subcommand};
 use zoe::prelude::OrFail;
@@ -32,10 +31,8 @@ struct Cli {
 
 #[derive(Subcommand, Debug)]
 enum Commands {
-    /// Variants of Interest
-    VariantsOfInterest(VariantsArgs),
-    /// Annotate/compare variants (reference-vs-query positions of interest and/or minor-variant annotation)
-    Variants(VariantsCmdArgs),
+    /// Variants subprocess (reference-vs-query positions of interest and/or minor-variant annotation)
+    Variants(VariantsArgs),
     /// Positions of Interest
     PositionsOfInterest(PositionsArgs),
     /// Find Chemistry
@@ -65,10 +62,6 @@ fn main() {
     let module = module_path!();
 
     match args.command {
-        Commands::VariantsOfInterest(cmd_args) => {
-            variants_of_interest_process(cmd_args)
-                .unwrap_or_else(|_| panic!("{module}::VariantsOfInterest"));
-        }
         Commands::Variants(cmd_args) => {
             variants_process(cmd_args).unwrap_or_else(|e| panic!("{module}::Variants: {e}"));
         }
