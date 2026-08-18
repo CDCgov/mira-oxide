@@ -386,9 +386,10 @@ fn calc_ref_aa_position(
 }
 
 /// Looks up all minor variant rows matching the given sample, ctype, and query nt position.
-/// Matches on reference==ctype, `sample_position==query_nt_position`, and `sample_id` containing
-/// sample as a substring (e.g. if sample is `sample_1` then it should match `sample_id` that is `sample_1_4`).
+/// Matches on reference==ctype, sample_position==query_nt_position, and sample_id containing
+/// sample as a substring (e.g. sample "sample_1" should match sample_id "sample_1_4").
 /// Returns every matching row, since a single position can have more than one minor variant
+/// (e.g. two different minority alleles reported at the same position).
 fn find_minor_variants<'a>(
     minor_variants: &'a [MinorVariantInput],
     sample_id: &str,
@@ -403,6 +404,25 @@ fn find_minor_variants<'a>(
                 && mv.sample_position as usize == query_nt_position
         })
         .collect()
+}
+
+/// Substitutes a minor variant's minority_allele into the query codon at the given
+/// 1-indexed position_in_codon, returning the resulting codon and its translated amino acid.
+/// Returns None if the codon isn't exactly 3 bytes or position_in_codon is out of range.
+fn build_minor_variant_codon(
+    query_codon: &str,
+    position_in_codon: usize,
+    minority_allele: &str,
+) -> Option<(String, char)> {
+    let mut codon_bytes = query_codon.as_bytes().to_vec();
+    if codon_bytes.len() != 3 || position_in_codon == 0 || position_in_codon > 3 {
+        return None;
+    }
+    let allele_byte = *minority_allele.as_bytes().first()?;
+    codon_bytes[position_in_codon - 1] = allele_byte;
+    let aa = StdGeneticCode::translate_codon(&codon_bytes) as char;
+    let codon_str = std::str::from_utf8(&codon_bytes).ok()?.to_string();
+    Some((codon_str, aa))
 }
 
 fn create_reader(path: Option<&PathBuf>) -> std::io::Result<BufReader<Either<File, Stdin>>> {
@@ -514,7 +534,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
         "query_name,ref_name,ctype,dais_reference,protein,aln_nt_position,ref_nt_position,query_nt_position,query_nt,ref_nt,position_in_codon,query_codon,ref_codon,aa_mutation,aln_aa_position,ref_aa_position,query_aa_position,variant_of_interest",
     );
     if include_minor_variants {
-        header.push_str(",depth,consensus_allele,minority_allele,consensus_count,minority_count,minority_frequency");
+        header.push_str(",depth,consensus_allele,minority_allele,consensus_count,minority_count,minority_frequency,minor_variant_codon,minor_variant_aa");
     }
     writeln!(&mut writer, "{header}")?;
 
@@ -637,19 +657,32 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                                 );
                                 let mv_suffixes: Vec<String> = if include_minor_variants {
                                     if mv_matches.is_empty() {
-                                        vec![format!("{d}{d}{d}{d}{d}{d}")]
+                                        vec![format!("{d}{d}{d}{d}{d}{d}{d}{d}")]
                                     } else {
                                         mv_matches
                                             .iter()
                                             .map(|mv| {
+                                                let (mv_codon, mv_aa) =
+                                                    match build_minor_variant_codon(
+                                                        mut_codon,
+                                                        position_in_codon,
+                                                        &mv.minority_allele,
+                                                    ) {
+                                                        Some((codon, aa)) => {
+                                                            (codon, aa.to_string())
+                                                        }
+                                                        None => (String::new(), String::new()),
+                                                    };
                                                 format!(
-                                                    "{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}",
+                                                    "{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}",
                                                     mv.depth,
                                                     mv.consensus_allele,
                                                     mv.minority_allele,
                                                     mv.consensus_count,
                                                     mv.minority_count,
-                                                    mv.minority_frequency
+                                                    mv.minority_frequency,
+                                                    mv_codon,
+                                                    mv_aa
                                                 )
                                             })
                                             .collect()
@@ -759,19 +792,29 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                             );
                             let mv_suffixes: Vec<String> = if include_minor_variants {
                                 if mv_matches.is_empty() {
-                                    vec![format!("{d}{d}{d}{d}{d}{d}")]
+                                    vec![format!("{d}{d}{d}{d}{d}{d}{d}{d}")]
                                 } else {
                                     mv_matches
                                         .iter()
                                         .map(|mv| {
+                                            let (mv_codon, mv_aa) = match build_minor_variant_codon(
+                                                mut_codon,
+                                                position_in_codon,
+                                                &mv.minority_allele,
+                                            ) {
+                                                Some((codon, aa)) => (codon, aa.to_string()),
+                                                None => (String::new(), String::new()),
+                                            };
                                             format!(
-                                                "{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}",
+                                                "{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}",
                                                 mv.depth,
                                                 mv.consensus_allele,
                                                 mv.minority_allele,
                                                 mv.consensus_count,
                                                 mv.minority_count,
-                                                mv.minority_frequency
+                                                mv.minority_frequency,
+                                                mv_codon,
+                                                mv_aa
                                             )
                                         })
                                         .collect()
