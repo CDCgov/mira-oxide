@@ -385,20 +385,24 @@ fn calc_ref_aa_position(
     position.max(0) as usize
 }
 
-/// Looks up a minor variant row matching the given sample, ctype, and query nt position.
-/// Matches on reference==ctype, sample_position==query_nt_position, and sample_id containing
-/// sample as a substring (e.g. sample "sample_1" should match sample_id "sample_1_4").
-fn find_minor_variant<'a>(
+/// Looks up all minor variant rows matching the given sample, ctype, and query nt position.
+/// Matches on reference==ctype, `sample_position==query_nt_position`, and `sample_id` containing
+/// sample as a substring (e.g. if sample is `sample_1` then it should match `sample_id` that is `sample_1_4`).
+/// Returns every matching row, since a single position can have more than one minor variant
+fn find_minor_variants<'a>(
     minor_variants: &'a [MinorVariantInput],
     sample_id: &str,
     ctype: &str,
     query_nt_position: usize,
-) -> Option<&'a MinorVariantInput> {
-    minor_variants.iter().find(|mv| {
-        sample_id.contains(mv.sample.as_str())
-            && mv.reference == ctype
-            && mv.sample_position as usize == query_nt_position
-    })
+) -> Vec<&'a MinorVariantInput> {
+    minor_variants
+        .iter()
+        .filter(|mv| {
+            sample_id.contains(mv.sample.as_str())
+                && mv.reference == ctype
+                && mv.sample_position as usize == query_nt_position
+        })
+        .collect()
 }
 
 fn create_reader(path: Option<&PathBuf>) -> std::io::Result<BufReader<Either<File, Stdin>>> {
@@ -625,40 +629,48 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                                     &ref_insertions,
                                     &ref_deletions,
                                 );
-                                let mv_match = find_minor_variant(
+                                let mv_matches = find_minor_variants(
                                     &minor_variants,
                                     sample_id,
                                     ctype,
                                     query_nt_position,
                                 );
-                                let mv_suffix = if include_minor_variants {
-                                    match mv_match {
-                                        Some(mv) => format!(
-                                            "{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}",
-                                            mv.depth,
-                                            mv.consensus_allele,
-                                            mv.minority_allele,
-                                            mv.consensus_count,
-                                            mv.minority_count,
-                                            mv.minority_frequency
-                                        ),
-                                        None => format!("{d}{d}{d}{d}{d}{d}"),
+                                let mv_suffixes: Vec<String> = if include_minor_variants {
+                                    if mv_matches.is_empty() {
+                                        vec![format!("{d}{d}{d}{d}{d}{d}")]
+                                    } else {
+                                        mv_matches
+                                            .iter()
+                                            .map(|mv| {
+                                                format!(
+                                                    "{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}",
+                                                    mv.depth,
+                                                    mv.consensus_allele,
+                                                    mv.minority_allele,
+                                                    mv.consensus_count,
+                                                    mv.minority_count,
+                                                    mv.minority_frequency
+                                                )
+                                            })
+                                            .collect()
                                     }
                                 } else {
-                                    String::new()
+                                    vec![String::new()]
                                 };
-                                writeln!(
-                                    &mut writer,
-                                    "{sample_id}{d}{ref_strain}{d}\
-                                            {ctype}{d}{dais_ref}{d}{protein}{d}\
-                                            {nt_position}{d}{ref_nt_position}{d}{query_nt_position}{d}{}{d}{}{d}\
-                                            {position_in_codon}{d}\
-                                            {mut_codon}{d}{ref_codon}{d}\
-                                            {aa_ref}:{aa_position}:{aa_mut}{d}\
-                                            {aln_aa_position}{d}{ref_aa_position}{d}{query_aa_position}{d}\
-                                            {variant_of_interest}{mv_suffix}",
-                                    query_nt as char, ref_nt as char,
-                                )?;
+                                for mv_suffix in &mv_suffixes {
+                                    writeln!(
+                                        &mut writer,
+                                        "{sample_id}{d}{ref_strain}{d}\
+                                                {ctype}{d}{dais_ref}{d}{protein}{d}\
+                                                {nt_position}{d}{ref_nt_position}{d}{query_nt_position}{d}{}{d}{}{d}\
+                                                {position_in_codon}{d}\
+                                                {mut_codon}{d}{ref_codon}{d}\
+                                                {aa_ref}:{aa_position}:{aa_mut}{d}\
+                                                {aln_aa_position}{d}{ref_aa_position}{d}{query_aa_position}{d}\
+                                                {variant_of_interest}{mv_suffix}",
+                                        query_nt as char, ref_nt as char,
+                                    )?;
+                                }
                             }
                         }
                     }
@@ -739,40 +751,48 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                                 &ref_insertions,
                                 &ref_deletions,
                             );
-                            let mv_match = find_minor_variant(
+                            let mv_matches = find_minor_variants(
                                 &minor_variants,
                                 sample_id,
                                 ctype,
                                 query_nt_position,
                             );
-                            let mv_suffix = if include_minor_variants {
-                                match mv_match {
-                                    Some(mv) => format!(
-                                        "{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}",
-                                        mv.depth,
-                                        mv.consensus_allele,
-                                        mv.minority_allele,
-                                        mv.consensus_count,
-                                        mv.minority_count,
-                                        mv.minority_frequency
-                                    ),
-                                    None => format!("{d}{d}{d}{d}{d}{d}"),
+                            let mv_suffixes: Vec<String> = if include_minor_variants {
+                                if mv_matches.is_empty() {
+                                    vec![format!("{d}{d}{d}{d}{d}{d}")]
+                                } else {
+                                    mv_matches
+                                        .iter()
+                                        .map(|mv| {
+                                            format!(
+                                                "{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}",
+                                                mv.depth,
+                                                mv.consensus_allele,
+                                                mv.minority_allele,
+                                                mv.consensus_count,
+                                                mv.minority_count,
+                                                mv.minority_frequency
+                                            )
+                                        })
+                                        .collect()
                                 }
                             } else {
-                                String::new()
+                                vec![String::new()]
                             };
-                            writeln!(
-                                &mut writer,
-                                "{sample_id}{d}{ref_strain}{d}\
-                                        {ctype}{d}{dais_ref}{d}{protein}{d}\
-                                        {nt_position}{d}{ref_nt_position}{d}{query_nt_position}{d}{}{d}{}{d}\
-                                        {position_in_codon}{d}\
-                                        {mut_codon}{d}{ref_codon}{d}\
-                                        {aa_ref}:{aa_position}:{aa_mut}{d}\
-                                        {aln_aa_position}{d}{ref_aa_position}{d}{query_aa_position}{d}\
-                                        {variant_of_interest}{mv_suffix}",
-                                *query_nt as char, *ref_nt as char,
-                            )?;
+                            for mv_suffix in &mv_suffixes {
+                                writeln!(
+                                    &mut writer,
+                                    "{sample_id}{d}{ref_strain}{d}\
+                                            {ctype}{d}{dais_ref}{d}{protein}{d}\
+                                            {nt_position}{d}{ref_nt_position}{d}{query_nt_position}{d}{}{d}{}{d}\
+                                            {position_in_codon}{d}\
+                                            {mut_codon}{d}{ref_codon}{d}\
+                                            {aa_ref}:{aa_position}:{aa_mut}{d}\
+                                            {aln_aa_position}{d}{ref_aa_position}{d}{query_aa_position}{d}\
+                                            {variant_of_interest}{mv_suffix}",
+                                    *query_nt as char, *ref_nt as char,
+                                )?;
+                            }
                         }
                     }
                 } else {
