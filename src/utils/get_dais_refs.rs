@@ -1,5 +1,7 @@
 /// Returns the DAIS reference ID for a given influenza subtype and protein,
 /// or `None` if no mapping exists.
+#[allow(clippy::match_same_arms, clippy::too_many_lines)]
+#[must_use]
 pub fn assign_dais_refs(subtype: &str, protein: &str) -> Option<&'static str> {
     match (subtype, protein) {
         // H1N1
