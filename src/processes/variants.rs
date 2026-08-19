@@ -34,10 +34,9 @@ pub struct VariantsArgs {
     /// Reference dais-ribosome file (required if --positions-of-interest is used)
     ref_dais_file: Option<PathBuf>,
 
-    #[arg(short = 'v', long)]
-    /// Optional positions-of-interest (mutations) file. If provided, the full codon/amino-acid
-    /// diff report is produced. If omitted (and --minor-variants-file is provided instead), only
-    /// the minor variants file is annotated with minor_variant_codon/minor_variant_aa columns.
+    #[arg(short = 'p', long)]
+    /// Optional positions-of-interest (mutations) file. If provided, the full codon/amino-acid diff report is produced.
+    /// If omitted and --minor-variants-file falg is provided alone, the minor variants file is annotated with `minor_variant_codon`/`minor_variant_aa` columns.
     positions_of_interest: Option<PathBuf>,
 
     #[arg(short = 'i', long)]
@@ -173,7 +172,7 @@ pub struct DeletionInput {
     del_cds_len: i64,
 }
 
-/// Minor_variants,csv
+/// Minor variants file
 #[derive(Deserialize, Debug, Clone)]
 pub struct MinorVariantInput {
     sample: String,
@@ -234,8 +233,8 @@ impl Entry<'_> {
 }
 
 /// Computes an insertion/deletion-adjusted nucleotide position on the query side.
-/// Insertions applied first (adding the length of each inserted_nt occurring upstream of the raw position), then deletions
-/// (subtracting del_cds_len for each deletion whose deleted region ends at or before the already-adjusted position).
+/// Insertions applied first (adding the length of each `inserted_nt` occurring upstream of the raw position), then deletions
+/// (subtracting `del_cds_len` for each deletion whose deleted region ends at or before the already-adjusted position).
 fn calc_query_nt_position(
     raw_position: usize,
     sample_id: &str,
@@ -245,16 +244,16 @@ fn calc_query_nt_position(
     insertions: &[InsertionInput],
     deletions: &[DeletionInput],
 ) -> usize {
-    let mut position = raw_position as i64;
+    let mut position = i64::try_from(raw_position).unwrap_or(i64::MAX);
 
     for ins in insertions {
         if ins.query_id == sample_id
             && ins.ctype == ctype
             && ins.reference_id == dais_ref_id
             && ins.product_name == protein
-            && (ins.upstream_nt_pos as i64) < raw_position as i64
+            && ins.upstream_nt_pos < raw_position.try_into().unwrap()
         {
-            position += ins.inserted_nt.len() as i64;
+            position += i64::try_from(ins.inserted_nt.len()).unwrap_or(i64::MAX);
         }
     }
 
@@ -269,11 +268,11 @@ fn calc_query_nt_position(
         }
     }
 
-    position.max(0) as usize
+    usize::try_from(position.max(0)).unwrap_or(usize::MAX)
 }
 
 /// Computes an insertion/deletion-adjusted nucleotide position on the reference side.
-/// Insertion applied first, then deletions, mirroring calc_query_nt_position but against the reference-side insertion/deletion files.
+/// Insertion applied first, then deletions, mirroring `calc_query_nt_position` but against the reference-side insertion/deletion files.
 fn calc_ref_nt_position(
     raw_position: usize,
     ref_strain: &str,
@@ -283,16 +282,17 @@ fn calc_ref_nt_position(
     ref_insertions: &[InsertionInput],
     ref_deletions: &[DeletionInput],
 ) -> usize {
-    let mut position = raw_position as i64;
+    let raw_position_i64 = i64::try_from(raw_position).unwrap_or(i64::MAX);
+    let mut position = raw_position_i64;
 
     for ins in ref_insertions {
         if ins.query_id == ref_strain
             && ins.ctype == ctype
             && ins.reference_id == dais_ref_id
             && ins.product_name == protein
-            && (ins.upstream_nt_pos as i64) < raw_position as i64
+            && ins.upstream_nt_pos < raw_position_i64
         {
-            position += ins.inserted_nt.len() as i64;
+            position += i64::try_from(ins.inserted_nt.len()).unwrap_or(i64::MAX);
         }
     }
 
@@ -307,12 +307,12 @@ fn calc_ref_nt_position(
         }
     }
 
-    position.max(0) as usize
+    usize::try_from(position.max(0)).unwrap_or(usize::MAX)
 }
 
 /// Computes an insertion/deletion-adjusted amino acid position on the query side.
-/// Insertion applied first (adding the length of each inserted_aa occurring upstream of the raw position), then deletions
-/// (subtracting del_aa_len for each deletion whose deleted region ends at or before the already-adjusted position).
+/// Insertion applied first (adding the length of each `inserted_aa` occurring upstream of the raw position), then deletions
+/// (subtracting `del_aa_len` for each deletion whose deleted region ends at or before the already-adjusted position).
 fn calc_query_aa_position(
     raw_position: usize,
     sample_id: &str,
@@ -322,16 +322,18 @@ fn calc_query_aa_position(
     insertions: &[InsertionInput],
     deletions: &[DeletionInput],
 ) -> usize {
-    let mut position = raw_position as i64;
+    let raw_position_i64 = i64::try_from(raw_position).unwrap_or(i64::MAX);
+    let mut position = raw_position_i64;
 
     for ins in insertions {
         if ins.query_id == sample_id
             && ins.ctype == ctype
             && ins.reference_id == dais_ref_id
             && ins.product_name == protein
-            && (ins.upstream_aa_pos as i64) < raw_position as i64
+            && ins.upstream_aa_pos < raw_position_i64
         {
-            position += ins.inserted_aa.len() as i64;
+            position =
+                position.saturating_add(i64::try_from(ins.inserted_aa.len()).unwrap_or(i64::MAX));
         }
     }
 
@@ -346,11 +348,11 @@ fn calc_query_aa_position(
         }
     }
 
-    position.max(0) as usize
+    usize::try_from(position.max(0)).unwrap_or(usize::MAX)
 }
 
 /// Computes an insertion/deletion-adjusted amino acid position on the reference side.
-/// Insertion  applied first, then deletion, mirroring calc_query_aa_position but against the reference-side insertion/deletion files.
+/// Insertion  applied first, then deletion, mirroring `calc_query_aa_position` but against the reference-side insertion/deletion files.
 fn calc_ref_aa_position(
     raw_position: usize,
     ref_strain: &str,
@@ -360,16 +362,17 @@ fn calc_ref_aa_position(
     ref_insertions: &[InsertionInput],
     ref_deletions: &[DeletionInput],
 ) -> usize {
-    let mut position = raw_position as i64;
+    let raw_position_i64 = i64::try_from(raw_position).unwrap_or(i64::MAX);
+    let mut position = raw_position_i64;
 
     for ins in ref_insertions {
         if ins.query_id == ref_strain
             && ins.ctype == ctype
             && ins.reference_id == dais_ref_id
             && ins.product_name == protein
-            && (ins.upstream_aa_pos as i64) < raw_position as i64
+            && ins.upstream_aa_pos < raw_position_i64
         {
-            position += ins.inserted_aa.len() as i64;
+            position += i64::try_from(ins.inserted_aa.len()).unwrap_or(i64::MAX);
         }
     }
 
@@ -384,12 +387,12 @@ fn calc_ref_aa_position(
         }
     }
 
-    position.max(0) as usize
+    usize::try_from(position.max(0)).unwrap_or(usize::MAX)
 }
 
 /// Looks up all minor variant rows matching the given sample, ctype, and query nt position.
-/// Matches on reference==ctype, sample_position==query_nt_position, and sample_id containing
-/// sample as a substring (e.g. sample "sample_1" should match sample_id "sample_1_4").
+/// Matches on reference==ctype, `sample_position`==`query_nt_position`, and `sample_id` containing
+/// sample as a substring (e.g. sample `sample_1` should match `sample_id` "`sample_1_4`).
 /// Returns every matching row, since a single position can have more than one minor variant
 /// (e.g. two different minority alleles reported at the same position).
 fn find_minor_variants<'a>(
@@ -403,14 +406,14 @@ fn find_minor_variants<'a>(
         .filter(|mv| {
             sample_id.contains(mv.sample.as_str())
                 && mv.reference == ctype
-                && mv.sample_position as usize == query_nt_position
+                && usize::try_from(mv.sample_position).ok() == Some(query_nt_position)
         })
         .collect()
 }
 
-/// Substitutes a minor variant's minority_allele into the query codon at the given
-/// 1-indexed position_in_codon, returning the resulting codon and its translated amino acid.
-/// Returns None if the codon isn't exactly 3 bytes or position_in_codon is out of range.
+/// Substitutes a minor variant's `minority_allele` into the query codon at the given
+/// 1-indexed `position_in_codon`, returning the resulting codon and its translated amino acid.
+/// Returns None if the codon isn't exactly 3 bytes or `position_in_codon` is out of range.
 fn build_minor_variant_codon(
     query_codon: &str,
     position_in_codon: usize,
@@ -427,9 +430,9 @@ fn build_minor_variant_codon(
     Some((codon_str, aa))
 }
 
-/// Finds the raw (aln) nucleotide position within query_cds_aln that maps to the given
-/// adjusted query_nt_position, by searching raw positions 1..=len and adjusting each with
-/// calc_query_nt_position until one matches. Returns None if no raw position maps to it.
+/// Finds the raw (aln) nucleotide position within `query_cds_aln` that maps to the given
+/// adjusted `query_nt_position`, by searching raw positions 1..=len and adjusting each with
+/// `calc_query_nt_position` until one matches. Returns None if no raw position maps to it.
 /// Does not filter insertions/deletions by protein, since minor-variants-only mode has no
 /// protein context to match against.
 fn find_raw_query_position(
@@ -441,14 +444,13 @@ fn find_raw_query_position(
     deletions: &[DeletionInput],
 ) -> Option<usize> {
     (1..=aln_len).find(|&raw_pos| {
-        let mut position = raw_pos as i64;
+        let raw_pos_i64 = i64::try_from(raw_pos).unwrap_or(i64::MAX);
+        let mut position = raw_pos_i64;
 
         for ins in insertions {
-            if ins.query_id == sample_id
-                && ins.ctype == ctype
-                && (ins.upstream_nt_pos as i64) < raw_pos as i64
+            if ins.query_id == sample_id && ins.ctype == ctype && ins.upstream_nt_pos < raw_pos_i64
             {
-                position += ins.inserted_nt.len() as i64;
+                position += i64::try_from(ins.inserted_nt.len()).unwrap_or(i64::MAX);
             }
         }
 
@@ -461,7 +463,7 @@ fn find_raw_query_position(
             }
         }
 
-        position.max(0) as usize == target_query_nt_position
+        usize::try_from(position.max(0)).unwrap_or(usize::MAX) == target_query_nt_position
     })
 }
 
@@ -923,12 +925,13 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
             }
         }
     } else {
-        /// Finds the raw (aln) nucleotide position within query_cds_aln that maps to the given
-        /// adjusted query_nt_position, by searching raw positions 1..=len and adjusting each with
-        /// calc_query_nt_position until one matches. Returns None if no raw position maps to it.
-        /// Filters insertions/deletions by reference_id and product_name (in addition to sample_id
+        /// Finds the raw (aln) nucleotide position within `query_cds_aln` that maps to the given
+        /// adjusted `query_nt_position`, by searching raw positions 1..=len and adjusting each with
+        /// `calc_query_nt_position` until one matches. Returns None if no raw position maps to it.
+        /// Filters insertions/deletions by `reference_id` and `product_name` (in addition to `sample_id`
         /// and ctype) so that samples with multiple products/references sharing a ctype don't have
         /// unrelated indels applied.
+        #[allow(clippy::too_many_arguments)]
         fn find_raw_query_position(
             aln_len: usize,
             target_query_nt_position: usize,
@@ -940,16 +943,16 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
             deletions: &[DeletionInput],
         ) -> Option<usize> {
             (1..=aln_len).find(|&raw_pos| {
-                let mut position = raw_pos as i64;
+                let mut position = i64::try_from(raw_pos).unwrap_or(i64::MAX);
 
                 for ins in insertions {
                     if ins.query_id == sample_id
                         && ins.ctype == ctype
                         && ins.reference_id == reference_id
                         && ins.product_name == product_name
-                        && (ins.upstream_nt_pos as i64) < raw_pos as i64
+                        && ins.upstream_nt_pos < i64::try_from(raw_pos).unwrap_or(i64::MAX)
                     {
-                        position += ins.inserted_nt.len() as i64;
+                        position += i64::try_from(ins.inserted_nt.len()).unwrap_or(i64::MAX);
                     }
                 }
 
@@ -964,7 +967,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                     }
                 }
 
-                position.max(0) as usize == target_query_nt_position
+                usize::try_from(position).is_ok_and(|position| position == target_query_nt_position)
             })
         }
 
@@ -1002,7 +1005,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                     let aln_len = nt_seq.len();
                     let raw_pos = find_raw_query_position(
                         aln_len,
-                        mv.sample_position as usize,
+                        usize::try_from(mv.sample_position).unwrap_or(0),
                         &dais_entry.sample_id,
                         &dais_entry.ctype,
                         &dais_entry.dais_ref_id,

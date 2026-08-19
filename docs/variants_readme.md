@@ -1,156 +1,201 @@
-# Variants Package
+# variants
 
-The `variants` command has two modes:
+A command-line tool for identifying codon and amino-acid differences between a query sample
+and a reference, at specific positions of interest, and/or annotating minor (sub-consensus)
+variants with their codon/amino-acid context.
 
-1. **Comparison** — compares "query" samples against a set of "reference" strains using
-   DAIS-ribosome protein-level output, reporting nucleotide / amino-acid / codon differences
-   and flagging those that fall on user-supplied positions of interest. Selected by supplying
-   `--positions`.
-2. **Annotation** — runs independently on a MIRA minor-variant CSV, appending `codon`,
-   `codon-position`, `consensus-aa` and `minority-aa` to each row using the query CDS. Selected
-   by supplying `--minor-variants` without `--positions`.
+## Overview
 
-In comparison mode, both the reference and query inputs are DAIS-ribosome output. Because the
-DAIS `cds_aln` column is already expressed in reference-coordinate space (deletions appear as
-`-`, padding as `.`, and insertions are stored separately in the `.ins` file), the comparison is
-performed position-by-position in that shared coordinate space. Insertions from the `.ins` files
-are spliced back in to recover the true, indel-adjusted isolate positions reported in the output.
+This tool consumes DAIS-ribosome output (query and, optionally, reference alignments) along
+with insertion/deletion records, and produces a delimited report. It supports two modes,
+which can be run independently or together:
 
-## Inputs
+1. **Positions-of-interest mode** — compares a query sample against a reference sequence,
+   codon by codon, and reports every position that matches a caller-supplied list of
+   mutations of interest (`--positions-of-interest`). Optionally annotates each reported
+   position with any overlapping minor variants.
+2. **Minor-variants-only mode** — takes a minor variants CSV (sub-consensus allele calls,
+   e.g. from deep sequencing) and annotates each row with the consensus and minor-variant
+   codon/amino acid at that position, without requiring a reference or a mutations-of-interest
+   list.
 
-### 1. Reference and query DAIS-ribosome output (protein-level)
-
-Each side (reference and query) is a set of three tab-delimited DAIS files. Genome-level
-(`.gen_*`) files are not used.
-
-`*.seq.txt` (SEQUENCE_OUTPUT) — 14 columns:
-
-```text
-query_id  ctype  reference_id  protein  aa_id  aa_seq  aa_aln  cds_id  has_insertion  has_shift_indel  cds_seq  cds_aln  query_coordinates  cds_coordinates
-```
-
-`*.ins.txt` (INSERTION_OUTPUT) — 9 columns:
-
-```text
-query_id  ctype  reference_id  protein  upstream_aa_pos  inserted_nt  inserted_aa  upstream_nt_pos  codon_shift
-```
-
-`*.del.txt` (DELETION_OUTPUT) — 13 columns:
-
-```text
-query_id  ctype  reference_id  protein  aa_id  del_aa_start  del_aa_end  del_aa_len  in_frame  cds_id  del_cds_start  del_cds_end  del_cds_len
-```
-
-Deletions are already encoded as gaps in `cds_aln`, so the `.del` files are parsed for
-format validation but are not required to reconstruct sequences.
-
-### 2. Positions-of-interest file (tab-delimited, no header)
-
-```text
-ref-name  segment  amino-acid-position  amino-acid-of-interest
-```
-
-- `ref-name` matches the sample name in column 1 (`query_id`) of the reference DAIS files.
-- `segment` is the second underscore-delimited field of `ctype` (e.g. `A_NA_N1` -> `NA`,
-  `A_HA_H1` -> `HA`, `A_MP` -> `MP`).
-- `amino-acid-position` is the reference strain's own (indel-adjusted) amino-acid position,
-  i.e. it is matched against the `ref-aa-position` column of the output.
-- The named reference record supplies a `reference_id` + protein; query records that align to the
-  same `reference_id` + protein are compared against it.
-
-Example (using a real reference sample name from column 1 of the reference `.seq` file):
-
-```text
-CY009630	NA	275	Y
-CY009630	NA	119	V
-CY009630	NA	294	S
-```
+At least one of `--positions-of-interest` or `--minor-variants-file` must be supplied.
 
 ## Usage
 
-### Comparison mode
-
-```bash
-cargo run -p mira-oxide -- variants \
-  --ref-seq   <ref.seq.txt>   --ref-ins   <ref.ins.txt>   --ref-del   <ref.del.txt> \
-  --query-seq <qry.seq.txt>   --query-ins <qry.ins.txt>   --query-del <qry.del.txt> \
-  --positions <positions_of_interest.txt> \
-  [--minor-variants <minor_variants.csv>] \
-  [--filter all-diffs|poi|poi-match]  [-o <output>]  [-d <delimiter>]
+```
+variants \
+  -q <query_dais_file> \
+  -i <query_insertion_file> \
+  -d <query_deletion_file> \
+  [-r <ref_dais_file>] \
+  [-j <ref_insertion_file>] \
+  [-e <ref_deletion_file>] \
+  [-v <positions_of_interest_file>] \
+  [-m <minor_variants_file>] \
+  [-o <output_file>] \
+  [-s <output_delimiter>]
 ```
 
-- `--minor-variants` (optional): a MIRA minor-variant CSV (`sample, reference, sample_position,
-  depth, consensus_allele, minority_allele, consensus_count, minority_count, minority_frequency,
-  ...`). When supplied, six annotation columns are appended to the output. Rows are joined by
-  sample (the CSV `sample` matches the `query-name` with its trailing `_<segment>` stripped),
-  `reference` (the full DAIS `ctype`), and `sample_position` (matched to `query-nt-position`).
+### Arguments
 
-- `--filter` (default `all-diffs`):
-  - `all-diffs`: every nucleotide/amino-acid/codon difference.
-  - `poi`: only differences whose reference amino-acid position is a position of interest.
-  - `poi-match`: only positions-of-interest differences where the query amino acid equals the
-    `amino-acid-of-interest` for that entry.
-- `-d`/`--delimiter`: single-character output delimiter (default TAB).
-- `-o`/`--output`: output file (defaults to stdout).
+| Flag | Long form | Required | Description |
+|---|---|---|---|
+| `-q` | `--query-dais-file` | Yes | DAIS-ribosome output for the query sample(s). Tab-separated, no header. |
+| `-i` | `--query-insertion-file` | Yes | Insertion (`.ins`) file for the query sample(s). Tab-separated, no header. |
+| `-d` | `--query-deletion-file` | Yes | Deletion (`.del`) file for the query sample(s). Tab-separated, no header. |
+| `-r` | `--ref-dais-file` | Only if `-v` is used | DAIS-ribosome output for the reference. |
+| `-j` | `--ref-insertion-file` | Only if `-v` is used | Insertion file for the reference. |
+| `-e` | `--ref-deletion-file` | Only if `-v` is used | Deletion file for the reference. |
+| `-p` | `--positions-of-interest` | No* | Tab-separated, no-header file of mutations of interest. Triggers full positions-of-interest mode. |
+| `-m` | `--minor-variants-file` | No* | CSV (with header) of minor/sub-consensus variant calls. |
+| `-o` | `--output-xsv` | No | Output file path. Defaults to stdout. |
+| `-s` | `--output-delimiter` | No | Delimiter for the output file. Defaults to `,`. |
 
-### Annotation mode (standalone)
+\* At least one of `-v` or `-m` must be provided.
 
-Annotate a MIRA minor-variant CSV with codon / amino-acid data, using only the query CDS
-(no reference or positions files needed):
+### Mode selection
 
-```bash
-cargo run -p mira-oxide -- variants \
-  --query-seq <qry.seq.txt> \
-  --minor-variants <minor_variants.csv> \
-  [-o <output.csv> | --in-place]
+- **`-v` provided** → full positions-of-interest mode runs. `-r`, `-j`, and `-e` become
+  required in this case. If `-m` is *also* provided, each reported position is further
+  annotated with any matching minor variant columns.
+- **`-v` omitted, `-m` provided** → minor-variants-only mode runs instead. No reference
+  files are needed.
+
+## Input file formats
+
+### Query/reference DAIS file (`-q` / `-r`)
+
+Tab-separated, no header. Query and reference files use slightly different column sets
+(the reference file has a `ref_id` instead of `sample_id`, `ref_aa_seq` instead of
+`query_aa_seq`, etc.), but both describe, per sample/reference and per protein:
+
+- Sample/reference ID, ctype (e.g. `B_HA`, `A_PB2`), DAIS reference ID, protein name
+- Amino acid sequence and its aligned form
+- CDS nucleotide sequence and its aligned form
+- Nucleotide and CDS coordinate ranges
+
+### Insertion file (`-i` / `-j`)
+
+Tab-separated, no header. One row per insertion event:
+
+```
+query_id  ctype  reference_id  product_name  upstream_aa_pos  inserted_nt  inserted_aa  upstream_nt_pos  codon_shift
 ```
 
-- Appends four columns to every row of the CSV: `codon`, `codon-position`, `consensus-aa`,
-  `minority-aa`. `codon` is the query CDS codon containing `sample_position`; `codon-position`
-  is 1/2/3; `consensus-aa` / `minority-aa` are the amino acids for the consensus and
-  minor-allele codons.
-- `--in-place` overwrites the input CSV; otherwise `-o` writes a new file (or stdout).
-- The join is on the first columns: the CSV `sample` matches the DAIS query `query_id` (with its
-  trailing `_<segment>` stripped), and the CSV `reference` matches the DAIS `ctype`.
-- `sample_position` is a position in the sample's assembled sequence. It is mapped to the CDS
-  index via the DAIS record's `query_coordinates` (the ordered assembled positions that form
-  `cds_seq`), which correctly handles the 5' UTR offset, splicing (e.g. M2, NEP), and insertions.
-  For segments with multiple protein products, the CDS whose base is consistent with
-  `consensus_allele` is preferred (falling back to the longest CDS that spans the position). Rows
-  whose sample/reference/position cannot be resolved get blank annotation cells.
+### Deletion file (`-d` / `-e`)
 
-## Output
+Tab-separated, no header. One row per deletion event:
 
-Delimited table with header:
-
-```text
-query-name  segment  protein  ref-name  ref-nt-position  query-nt-position  ref-nt  query-nt  ref-aa-position  query-aa-position  ref-codon  query-codon  codon-position  ref-aa  query-aa  position-of-interest
+```
+query_id  ctype  reference_id  product_name  variant_hash  del_aa_start  del_aa_end  del_aa_len  in_frame  cds_id  del_cds_start  del_cds_end  del_cds_len
 ```
 
-- `ref-nt-position` / `query-nt-position`: indel-adjusted isolate nucleotide positions
-  (a value of `0` indicates a deletion or padding on that side).
-- `ref-aa-position` / `query-aa-position`: indel-adjusted isolate amino-acid positions.
-- `ref-codon` / `query-codon`: the reference-coordinate codon (may contain `-` for deletions).
-- `codon-position`: the position (1, 2, or 3) of the differing nucleotide within its codon.
-- `ref-aa` / `query-aa`: the amino acid translated from the respective codon (`X` for
-  codons containing gaps/ambiguities).
-- `position-of-interest`: `true` when the reference amino-acid position (`ref-aa-position`)
-  is listed for that `ref-name`/segment in the positions file.
+### Positions-of-interest file (`-v`)
 
-When `--minor-variants` is supplied, six more columns are appended (blank when no minor-variant
-call matches that query position):
+Tab-separated, no header:
 
-- `minor-nt`: the CSV `minority_allele`.
-- `minor-codon`: the `query-codon` with the minor allele substituted at its codon position.
-- `minor-aa`: the amino acid translated from `minor-codon`.
-- `freq-minor`: the CSV `minority_frequency`.
-- `freq-major`: `consensus_count` / `depth`.
-- `total-depth`: the CSV `depth`.
-
-Example (deletion carrier `MW170131` shows the query nt position offset by an upstream deletion):
-
-```text
-query-name  segment  protein  ref-name  ref-nt-position  query-nt-position  ref-nt  query-nt  ref-aa-position  query-aa-position  ref-codon  query-codon  codon-position  ref-aa  query-aa  position-of-interest
-CY019973    NA       NA       CY009630  825              825                C       T         275              275                CAC        CAT          3               H       H         true
-MW170131    NA       NA       CY009630  357              354                A       G         119              118                GAA        GAG          3               E       E         true
 ```
+subtype  protein  aa_position  aa  description
+```
+
+`subtype` may be `all` to match any DAIS reference. Matching is done by resolving
+`(subtype, protein)` to a DAIS reference ID (via `assign_dais_refs`) and comparing against
+the sample's own `dais_ref_id`.
+
+### Minor variants file (`-m`)
+
+CSV with header:
+
+```
+sample,reference,sample_position,depth,consensus_allele,minority_allele,consensus_count,minority_count,minority_frequency,run_id,instrument
+```
+
+`sample_position` is the **query nucleotide position after insertion/deletion adjustment**
+(i.e. the position as called against the query's own indel-adjusted coordinate space, not
+the raw alignment).
+
+## How position adjustment works
+
+DAIS alignments are gapped to a common coordinate system, but real-world positions (as used
+in variant calling) are relative to the sample's own sequence, accounting for insertions and
+deletions relative to that alignment. The tool moves between these coordinate spaces in both
+directions:
+
+- **`calc_query_nt_position` / `calc_ref_nt_position`** — take a raw (aligned) nucleotide
+  position and produce the indel-adjusted query- or reference-side position, by adding
+  upstream insertion lengths and subtracting upstream deletion lengths. Used in
+  positions-of-interest mode to report `query_nt_position` / `ref_nt_position` alongside
+  the raw `aln_nt_position`.
+- **`calc_query_aa_position` / `calc_ref_aa_position`** — the amino-acid analogues of the
+  above.
+- **`find_raw_query_position`** — the inverse operation, used in minor-variants-only mode.
+  Given an indel-adjusted query nucleotide position (as supplied in the minor variants file),
+  it searches the raw alignment for the position that adjusts to that value. This raw
+  position is reported as `dais_ref_position`, and is also what's used to locate the
+  correct codon for translation.
+
+All four forward functions and `find_raw_query_position` filter candidate insertion/deletion
+rows by `sample_id`/`ref_strain`, `ctype`, `reference_id`, and `product_name`, so that indels
+belonging to a different product or reference sharing the same ctype are not incorrectly
+applied.
+
+## Output formats
+
+### Positions-of-interest mode output
+
+CSV (or custom delimiter) with header:
+
+```
+query_name,ref_name,ctype,dais_reference,protein,aln_nt_position,ref_nt_position,query_nt_position,query_nt,ref_nt,position_in_codon,query_codon,ref_codon,aa_mutation,aln_aa_position,ref_aa_position,query_aa_position,variant_of_interest
+```
+
+If `-m` is also supplied, ten additional columns are appended:
+
+```
+depth,consensus_allele,minority_allele,consensus_count,minority_count,minority_frequency,consensus_codon,consensus_aa,minor_variant_codon,minor_variant_aa
+```
+
+One row is written per nucleotide position within a codon that matches a position of
+interest. If multiple minor variants exist at the same query nucleotide position, one row
+is written per minor variant (all other columns repeated); if none exist, the minor-variant
+columns are left blank.
+
+A final partial ("tail") codon — any leftover nucleotides not forming a complete codon — is
+handled separately and marked with `~` for its reference/query amino acids.
+
+### Minor-variants-only mode output
+
+CSV (or custom delimiter) with header:
+
+```
+sample,reference,sample_position,dais_ref_position,depth,consensus_allele,minority_allele,consensus_count,minority_count,minority_frequency,consensus_codon,consensus_aa,minor_variant_codon,minor_variant_aa,run_id,instrument
+```
+
+- `dais_ref_position` — the raw (pre-indel-adjustment) nucleotide position corresponding to
+  `sample_position`, as found by `find_raw_query_position`.
+- `consensus_codon` / `consensus_aa` — the reference/consensus codon at that position,
+  translated as-is (no allele substitution).
+- `minor_variant_codon` / `minor_variant_aa` — the same codon with the minority allele
+  substituted in at the appropriate base, then translated.
+
+For each minor variant row, the tool finds the matching query DAIS entry by checking that
+`sample_id` contains the `sample` value and that `ctype` matches `reference`. If multiple
+product rows match (e.g. `HA`, `HA1`, `HA-signal` for the same sample/ctype), the one with
+the longest `query_cds_aln` is preferred, since shorter fragments may not contain the
+position being queried.
+
+If no matching DAIS entry is found, or no raw position can be resolved, the codon/amino-acid
+columns (and `dais_ref_position`, in the latter case) are left blank.
+
+## Notes and caveats
+
+- All positions in output columns are 1-indexed.
+- `-o`/`--output-xsv` writes to a file; omitting it writes to stdout.
+- The `-s`/`--output-delimiter` flag lets you produce TSV or other delimited output instead
+  of CSV; it does not affect how input files are parsed (query/reference DAIS, insertion,
+  and deletion files are always tab-separated; the minor variants file is always
+  comma-separated).
+- Query and reference DAIS entries are paired by matching `ctype`, `dais_ref_id`, and
+  `protein`; pairs whose aligned nucleotide sequences differ in length are skipped with a
+  warning, since codon-by-codon comparison requires equal-length alignments.
