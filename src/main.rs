@@ -12,7 +12,6 @@ use crate::processes::{
     di_stats::{DIStatArgs, di_stats_process},
     find_chemistry::{FindChemArgs, find_chemistry_process},
     plotter::{PlotterArgs, plotter_process},
-    positions_of_interest::{PositionsArgs, positions_of_interest_process},
     prepare_mira_reports::{ReportsArgs, prepare_mira_reports_process},
     samplesheet_check::{SamplesheetCheckArgs, samplesheet_check},
     summary_report_update::{SummaryUpdateArgs, summary_report_update_process},
@@ -33,8 +32,6 @@ struct Cli {
 enum Commands {
     /// Variants subprocess (reference-vs-query positions of interest and/or minor-variant annotation)
     Variants(VariantsArgs),
-    /// Positions of Interest
-    PositionsOfInterest(PositionsArgs),
     /// Find Chemistry
     FindChemistry(FindChemArgs),
     /// Hamming
@@ -64,10 +61,6 @@ fn main() {
     match args.command {
         Commands::Variants(cmd_args) => {
             variants_process(cmd_args).unwrap_or_else(|e| panic!("{module}::Variants: {e}"));
-        }
-        Commands::PositionsOfInterest(cmd_args) => {
-            positions_of_interest_process(cmd_args)
-                .unwrap_or_else(|_| panic!("{module}::PositionsOfInterest"));
         }
         Commands::FindChemistry(cmd_args) => {
             find_chemistry_process(&cmd_args).unwrap_or_die(&format!("{module}::FindChemistry"));

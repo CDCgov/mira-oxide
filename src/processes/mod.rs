@@ -5,7 +5,6 @@ pub mod create_nextflow_samplesheet;
 pub mod di_stats;
 pub mod find_chemistry;
 pub mod plotter;
-pub mod positions_of_interest;
 pub mod prepare_mira_reports;
 pub mod samplesheet_check;
 pub mod summary_report_update;
