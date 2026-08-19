@@ -884,8 +884,8 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                                                     mv.minority_count,
                                                     mv.minority_frequency,
                                                     consensus_codon,
-                                                    mv_codon,
                                                     consensus_aa,
+                                                    mv_codon,
                                                     mv_aa
                                                 )
                                             })
@@ -938,7 +938,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
 
         writeln!(
             &mut writer,
-            "sample{delim}reference{delim}sample_position{delim}depth{delim}consensus_allele{delim}minority_allele{delim}consensus_count{delim}minority_count{delim}minority_frequency{delim}run_id{delim}instrument{delim}consensus_codon{delim}consensus_aa{delim}minor_variant_codon{delim}minor_variant_aa"
+            "sample,reference,sample_position,depth,consensus_allele,minority_allele,consensus_count,minority_count,minority_frequency,run_id,instrument,consensus_codon,consensus_aa,minor_variant_codon,minor_variant_aa"
         )?;
 
         for mv in &minor_variants {
@@ -1012,7 +1012,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
 
             writeln!(
                 &mut writer,
-                "{}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{consensus_codon}{delim}{consensus_aa}{delim}{mv_codon}{delim}{mv_aa}",
+                "{}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{consensus_codon}{delim}{consensus_aa}{delim}{mv_codon}{delim}{mv_aa}{delim}{}{delim}{}",
                 mv.sample,
                 mv.reference,
                 mv.sample_position,
