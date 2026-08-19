@@ -923,7 +923,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
             }
         }
     } else {
-        // Finds the raw (aln) nucleotide position within query_cds_aln that maps to the given
+        /// Finds the raw (aln) nucleotide position within query_cds_aln that maps to the given
         /// adjusted query_nt_position, by searching raw positions 1..=len and adjusting each with
         /// calc_query_nt_position until one matches. Returns None if no raw position maps to it.
         /// Filters insertions/deletions by reference_id and product_name (in addition to sample_id
@@ -968,7 +968,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
             })
         }
 
-        // Minor-variants-only mode: annotate the minor variants CSV with minor_variant_codon
+        // Minor-variants only will annotate the minor variants CSV with minor_variant_codon
         // and minor_variant_aa columns, computed from the query dais data.
         let mut writer = if let Some(ref file_path) = args.output_xsv {
             let file = OpenOptions::new()
@@ -1013,9 +1013,12 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
 
                     match raw_pos {
                         Some(raw_pos) => {
+                            // dais_ref_position is the raw (pre-indel-adjustment) position; the codon
+                            // and amino acid are derived directly from this position.
+                            let dais_ref_position = raw_pos;
                             let (codons, tail) = nt_seq.as_codons();
-                            let codon_index = (raw_pos - 1) / 3;
-                            let position_in_codon = ((raw_pos - 1) % 3) + 1;
+                            let codon_index = (dais_ref_position - 1) / 3;
+                            let position_in_codon = ((dais_ref_position - 1) % 3) + 1;
                             let codon_bytes: Option<&[u8]> = if codon_index < codons.len() {
                                 Some(&codons[codon_index])
                             } else if codon_index == codons.len() && !tail.is_empty() {
@@ -1028,15 +1031,16 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                                     let codon_str = std::str::from_utf8(codon_bytes)
                                         .unwrap_or_default()
                                         .to_string();
-                                    let (consensus_codon, consensus_aa) =
-                                        match build_minor_variant_codon(
-                                            &codon_str,
-                                            position_in_codon,
-                                            &mv.consensus_allele,
-                                        ) {
-                                            Some((codon, aa)) => (codon, aa.to_string()),
-                                            None => (String::new(), String::new()),
-                                        };
+                                    // consensus_codon/consensus_aa reflect the reference codon as-is
+                                    // only the minority allele is substituted in to build the minor variant codon/aa.
+                                    let (consensus_codon, consensus_aa) = if codon_str.len() == 3 {
+                                        let aa =
+                                            StdGeneticCode::translate_codon(codon_str.as_bytes())
+                                                as char;
+                                        (codon_str.clone(), aa.to_string())
+                                    } else {
+                                        (String::new(), String::new())
+                                    };
                                     let (mv_codon, mv_aa) = match build_minor_variant_codon(
                                         &codon_str,
                                         position_in_codon,
@@ -1046,7 +1050,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                                         None => (String::new(), String::new()),
                                     };
                                     (
-                                        raw_pos.to_string(),
+                                        dais_ref_position.to_string(),
                                         consensus_codon,
                                         consensus_aa,
                                         mv_codon,
@@ -1054,7 +1058,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                                     )
                                 }
                                 None => (
-                                    raw_pos.to_string(),
+                                    dais_ref_position.to_string(),
                                     String::new(),
                                     String::new(),
                                     String::new(),
