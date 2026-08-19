@@ -923,6 +923,51 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
             }
         }
     } else {
+        // Finds the raw (aln) nucleotide position within query_cds_aln that maps to the given
+        /// adjusted query_nt_position, by searching raw positions 1..=len and adjusting each with
+        /// calc_query_nt_position until one matches. Returns None if no raw position maps to it.
+        /// Filters insertions/deletions by reference_id and product_name (in addition to sample_id
+        /// and ctype) so that samples with multiple products/references sharing a ctype don't have
+        /// unrelated indels applied.
+        fn find_raw_query_position(
+            aln_len: usize,
+            target_query_nt_position: usize,
+            sample_id: &str,
+            ctype: &str,
+            reference_id: &str,
+            product_name: &str,
+            insertions: &[InsertionInput],
+            deletions: &[DeletionInput],
+        ) -> Option<usize> {
+            (1..=aln_len).find(|&raw_pos| {
+                let mut position = raw_pos as i64;
+
+                for ins in insertions {
+                    if ins.query_id == sample_id
+                        && ins.ctype == ctype
+                        && ins.reference_id == reference_id
+                        && ins.product_name == product_name
+                        && (ins.upstream_nt_pos as i64) < raw_pos as i64
+                    {
+                        position += ins.inserted_nt.len() as i64;
+                    }
+                }
+
+                for del in deletions {
+                    if del.query_id == sample_id
+                        && del.ctype == ctype
+                        && del.reference_id == reference_id
+                        && del.product_name == product_name
+                        && (del.del_cds_start + del.del_cds_len) <= position
+                    {
+                        position -= del.del_cds_len;
+                    }
+                }
+
+                position.max(0) as usize == target_query_nt_position
+            })
+        }
+
         // Minor-variants-only mode: annotate the minor variants CSV with minor_variant_codon
         // and minor_variant_aa columns, computed from the query dais data.
         let mut writer = if let Some(ref file_path) = args.output_xsv {
@@ -938,7 +983,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
 
         writeln!(
             &mut writer,
-            "sample{delim}reference{delim}sample_position{delim}depth{delim}consensus_allele{delim}minority_allele{delim}consensus_count{delim}minority_count{delim}minority_frequency{delim}consensus_codon{delim}consensus_aa{delim}minor_variant_codon{delim}minor_variant_aa{delim}run_id{delim}instrument"
+            "sample{delim}reference{delim}sample_position{delim}dais_ref_position{delim}depth{delim}consensus_allele{delim}minority_allele{delim}consensus_count{delim}minority_count{delim}minority_frequency{delim}consensus_codon{delim}consensus_aa{delim}minor_variant_codon{delim}minor_variant_aa{delim}run_id{delim}instrument"
         )?;
 
         for mv in &minor_variants {
@@ -951,68 +996,93 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                 .filter(|d| d.sample_id.contains(mv.sample.as_str()) && d.ctype == mv.reference)
                 .max_by_key(|d| d.query_cds_aln.len());
 
-            let (consensus_codon, consensus_aa, mv_codon, mv_aa) = if let Some(dais_entry) =
-                matching_dais_entry
-            {
-                let nt_seq: Nucleotides = dais_entry.query_cds_aln.clone().into();
-                let aln_len = nt_seq.len();
-                let raw_pos = find_raw_query_position(
-                    aln_len,
-                    mv.sample_position as usize,
-                    &dais_entry.sample_id,
-                    &dais_entry.ctype,
-                    &insertions,
-                    &deletions,
-                );
+            let (dais_ref_position, consensus_codon, consensus_aa, mv_codon, mv_aa) =
+                if let Some(dais_entry) = matching_dais_entry {
+                    let nt_seq: Nucleotides = dais_entry.query_cds_aln.clone().into();
+                    let aln_len = nt_seq.len();
+                    let raw_pos = find_raw_query_position(
+                        aln_len,
+                        mv.sample_position as usize,
+                        &dais_entry.sample_id,
+                        &dais_entry.ctype,
+                        &dais_entry.dais_ref_id,
+                        &dais_entry.protein,
+                        &insertions,
+                        &deletions,
+                    );
 
-                match raw_pos {
-                    Some(raw_pos) => {
-                        let (codons, tail) = nt_seq.as_codons();
-                        let codon_index = (raw_pos - 1) / 3;
-                        let position_in_codon = ((raw_pos - 1) % 3) + 1;
-                        let codon_bytes: Option<&[u8]> = if codon_index < codons.len() {
-                            Some(&codons[codon_index])
-                        } else if codon_index == codons.len() && !tail.is_empty() {
-                            Some(tail)
-                        } else {
-                            None
-                        };
-                        match codon_bytes {
-                            Some(codon_bytes) => {
-                                let codon_str = std::str::from_utf8(codon_bytes)
-                                    .unwrap_or_default()
-                                    .to_string();
-                                let (consensus_codon, consensus_aa) =
-                                    match build_minor_variant_codon(
+                    match raw_pos {
+                        Some(raw_pos) => {
+                            let (codons, tail) = nt_seq.as_codons();
+                            let codon_index = (raw_pos - 1) / 3;
+                            let position_in_codon = ((raw_pos - 1) % 3) + 1;
+                            let codon_bytes: Option<&[u8]> = if codon_index < codons.len() {
+                                Some(&codons[codon_index])
+                            } else if codon_index == codons.len() && !tail.is_empty() {
+                                Some(tail)
+                            } else {
+                                None
+                            };
+                            match codon_bytes {
+                                Some(codon_bytes) => {
+                                    let codon_str = std::str::from_utf8(codon_bytes)
+                                        .unwrap_or_default()
+                                        .to_string();
+                                    let (consensus_codon, consensus_aa) =
+                                        match build_minor_variant_codon(
+                                            &codon_str,
+                                            position_in_codon,
+                                            &mv.consensus_allele,
+                                        ) {
+                                            Some((codon, aa)) => (codon, aa.to_string()),
+                                            None => (String::new(), String::new()),
+                                        };
+                                    let (mv_codon, mv_aa) = match build_minor_variant_codon(
                                         &codon_str,
                                         position_in_codon,
-                                        &mv.consensus_allele,
+                                        &mv.minority_allele,
                                     ) {
                                         Some((codon, aa)) => (codon, aa.to_string()),
                                         None => (String::new(), String::new()),
                                     };
-                                let (mv_codon, mv_aa) = match build_minor_variant_codon(
-                                    &codon_str,
-                                    position_in_codon,
-                                    &mv.minority_allele,
-                                ) {
-                                    Some((codon, aa)) => (codon, aa.to_string()),
-                                    None => (String::new(), String::new()),
-                                };
-                                (consensus_codon, consensus_aa, mv_codon, mv_aa)
+                                    (
+                                        raw_pos.to_string(),
+                                        consensus_codon,
+                                        consensus_aa,
+                                        mv_codon,
+                                        mv_aa,
+                                    )
+                                }
+                                None => (
+                                    raw_pos.to_string(),
+                                    String::new(),
+                                    String::new(),
+                                    String::new(),
+                                    String::new(),
+                                ),
                             }
-                            None => (String::new(), String::new(), String::new(), String::new()),
                         }
+                        None => (
+                            String::new(),
+                            String::new(),
+                            String::new(),
+                            String::new(),
+                            String::new(),
+                        ),
                     }
-                    None => (String::new(), String::new(), String::new(), String::new()),
-                }
-            } else {
-                (String::new(), String::new(), String::new(), String::new())
-            };
+                } else {
+                    (
+                        String::new(),
+                        String::new(),
+                        String::new(),
+                        String::new(),
+                        String::new(),
+                    )
+                };
 
             writeln!(
                 &mut writer,
-                "{}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{consensus_codon}{delim}{consensus_aa}{delim}{mv_codon}{delim}{mv_aa}{delim}{}{delim}{}",
+                "{}{delim}{}{delim}{}{delim}{dais_ref_position}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{consensus_codon}{delim}{consensus_aa}{delim}{mv_codon}{delim}{mv_aa}{delim}{}{delim}{}",
                 mv.sample,
                 mv.reference,
                 mv.sample_position,
@@ -1032,6 +1102,5 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
             minor_variants.len()
         );
     }
-
     Ok(())
 }
