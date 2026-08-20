@@ -66,6 +66,11 @@ pub struct VariantsArgs {
     #[arg(short = 's', long, default_value = ",")]
     /// Use the provider delimiter for separating fields. Default is ','
     output_delimiter: String,
+
+    #[arg(short = 'a', long)]
+    /// Print all positions in the positions-of-interest report, not just those where the
+    /// query and reference nucleotides differ. Has no effect in minor-variants-only mode.
+    all_positions: bool,
 }
 
 // input files *must* be tab-separated
@@ -488,6 +493,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
     }
 
     let delim = args.output_delimiter;
+    let all_positions = args.all_positions;
 
     // Query dais-ribosome file is always required.
     let dais_reader = create_reader(Some(&args.query_dais_file))?;
@@ -707,6 +713,13 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                                         &ref_insertions,
                                         &ref_deletions,
                                     );
+
+                                    // Only emit this position if the caller asked for all
+                                    // positions, or the query/reference nucleotides actually differ.
+                                    if !all_positions && query_nt == ref_nt {
+                                        continue;
+                                    }
+
                                     let mv_matches = find_minor_variants(
                                         &minor_variants,
                                         sample_id,
@@ -842,6 +855,13 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                                     &ref_insertions,
                                     &ref_deletions,
                                 );
+
+                                // Only emit this position if the caller asked for all
+                                // positions, or the query/reference nucleotides actually differ.
+                                if !all_positions && query_nt == ref_nt {
+                                    continue;
+                                }
+
                                 let mv_matches = find_minor_variants(
                                     &minor_variants,
                                     sample_id,
