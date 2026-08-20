@@ -245,6 +245,24 @@ impl Entry<'_> {
 
         false
     }
+
+    /// Returns true if this entry's (dais_ref_id, protein, aa_position) matches any row in
+    /// `muts_columns`, regardless of the amino acid listed there. Used for the `all-diffs`
+    /// report's `position_of_interest` column, which flags whether an nt diff falls within a
+    /// codon that is a position of interest at all -- independent of whether the observed
+    /// amino acid is the flagged one (that's what `variant_of_interest` checks).
+    fn is_position_of_interest(
+        &self,
+        dais_ref_id: &str,
+        muts_columns: &[MutsOfInterestInput],
+    ) -> bool {
+        muts_columns.iter().any(|muts_entry| {
+            let assigned_ref = assign_dais_refs(&muts_entry.subtype, &muts_entry.protein);
+            (assigned_ref == Some(dais_ref_id) || muts_entry.subtype.to_lowercase() == "all")
+                && self.protein == muts_entry.protein
+                && self.aa_position.to_string() == muts_entry.aa_position
+        })
+    }
 }
 
 /// Computes an insertion/deletion-adjusted nucleotide position on the query side.
@@ -619,7 +637,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
             "query_name,ref_name,ctype,dais_reference,protein,aln_nt_position,ref_nt_position,query_nt_position,query_nt,ref_nt,position_in_codon,query_codon,ref_codon,aa_mutation,aln_aa_position,ref_aa_position,query_aa_position",
         );
         if include_variant_of_interest {
-            header.push_str(",variant_of_interest");
+            header.push_str(",variant_of_interest,position_of_interest");
         }
         if include_minor_variants {
             header.push_str(",depth,consensus_allele,minority_allele,consensus_count,minority_count,minority_frequency,consensus_codon,consensus_aa,minor_variant_codon,minor_variant_aa");
@@ -771,7 +789,8 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                                 query_nt as char, ref_nt as char,
                             );
                             if include_variant_of_interest {
-                                row.push_str(&format!("{d}{variant_of_interest}"));
+                                let poi = entry.is_position_of_interest(dais_ref, &muts_interest);
+                                row.push_str(&format!("{d}{variant_of_interest}{d}{poi}"));
                             }
 
                             if include_minor_variants {
@@ -907,7 +926,8 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                             *query_nt as char, *ref_nt as char,
                         );
                         if include_variant_of_interest {
-                            row.push_str(&format!("{d}{variant_of_interest}"));
+                            let poi = entry.is_position_of_interest(dais_ref, &muts_interest);
+                            row.push_str(&format!("{d}{variant_of_interest}{d}{poi}"));
                         }
 
                         if include_minor_variants {
