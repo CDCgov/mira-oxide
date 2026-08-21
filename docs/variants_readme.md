@@ -1,4 +1,4 @@
-# variants
+# Variants
 
 Tool for observing codon and amino acid differences between query samples (dais-ribosome
 output) and their matching references, optionally filtered to positions of interest and/or
@@ -8,13 +8,13 @@ annotated with minor variant calls.
 
 The tool operates in three mutually distinct output modes, chosen by which flags you pass:
 
-1. **Positions-of-interest mode** (`-p/--positions-of-interest`) — reports codon/amino-acid
-   differences only at protein positions listed in a positions-of-interest file, flagging
-   whether the observed amino acid matches a specific variant of concern.
-2. **All-diffs mode** (`-x/--all-diffs`) — reports every nucleotide difference between each
+1. **All-diffs mode** (`-x/--all-diffs`) — reports every nucleotide difference between each
    query and its matching reference, across all codons, without restricting to specific
    positions. Positions-of-interest and minor-variants annotation are both optional add-ons
    in this mode.
+2. **Positions-of-interest mode** (`-p/--positions-of-interest`) — reports codon/amino-acid
+   differences only at protein positions listed in a positions-of-interest file, flagging
+   whether the observed amino acid matches a specific variant of concern.
 3. **Minor-variants-only mode** (`-m/--minor-variants-file` alone, no `-p` or `-x`) — annotates
    an input minor-variants CSV with codon/amino-acid context derived from the query dais data,
    without needing any reference data at all.
@@ -112,7 +112,57 @@ consensus_count, minority_count, minority_frequency, run_id, instrument
 
 ## Modes and outputs
 
-### 1. Positions-of-interest mode (`-p`)
+### 1. All-diffs mode (`-x/--all-diffs`)
+
+Requires `-r`, `-j`, `-e` in addition to the always-required files. `-p` is **optional** in
+this mode.
+
+Walks every codon of every matching query/reference pair (regardless of positions of interest)
+and emits one row per nucleotide position where the query and reference differ.
+`-a/--all-positions` has no effect in this mode.
+
+If `-p` is supplied, two extra columns are included:
+- `variant_of_interest` — true if the codon's observed amino acid matches a positions-of-interest
+  entry's flagged `aa` (same semantics as in positions-of-interest mode).
+- `position_of_interest` — true if the codon's `(protein, aa_position)` matches **any**
+  positions-of-interest entry, regardless of which amino acid is listed there.
+
+If `-m` is also supplied, the same minor-variant columns as positions-of-interest mode are
+appended.
+
+**Output columns:**
+```
+query_name, ref_name, ctype, dais_reference, protein, aln_nt_position, ref_nt_position,
+query_nt_position, ref_nt, query_nt, position_in_codon, ref_codon, query_codon,
+aln_aa_position, ref_aa_position, query_aa_position, aa_mutation
+[, variant_of_interest, position_of_interest]
+[, depth, consensus_allele, minority_allele, consensus_count, minority_count,
+   minority_frequency, consensus_codon, minor_variant_codon, consensus_aa, minor_variant_aa]
+```
+
+**Example (diffs only, no positions-of-interest or minor variants):**
+```sh
+variants \
+  -q query.dais -r ref.dais \
+  -i query.ins -d query.del \
+  -j ref.ins -e ref.del \
+  -x \
+  -o output.csv
+```
+
+**Example (diffs with positions-of-interest and minor-variant annotation):**
+```sh
+variants \
+  -q query.dais -r ref.dais \
+  -i query.ins -d query.del \
+  -j ref.ins -e ref.del \
+  -x \
+  -p positions_of_interest.tsv \
+  -m minor_variants.csv \
+  -o output.csv
+```
+
+### 2. Positions-of-interest mode (`-p`)
 
 Requires `-r`, `-j`, `-e` in addition to the always-required files.
 
@@ -170,56 +220,6 @@ variants \
   -o output.csv
 ```
 
-### 2. All-diffs mode (`-x/--all-diffs`)
-
-Requires `-r`, `-j`, `-e` in addition to the always-required files. `-p` is **optional** in
-this mode.
-
-Walks every codon of every matching query/reference pair (regardless of positions of interest)
-and emits one row per nucleotide position where the query and reference differ.
-`-a/--all-positions` has no effect in this mode.
-
-If `-p` is supplied, two extra columns are included:
-- `variant_of_interest` — true if the codon's observed amino acid matches a positions-of-interest
-  entry's flagged `aa` (same semantics as in positions-of-interest mode).
-- `position_of_interest` — true if the codon's `(protein, aa_position)` matches **any**
-  positions-of-interest entry, regardless of which amino acid is listed there.
-
-If `-m` is also supplied, the same minor-variant columns as positions-of-interest mode are
-appended.
-
-**Output columns:**
-```
-query_name, ref_name, ctype, dais_reference, protein, aln_nt_position, ref_nt_position,
-query_nt_position, ref_nt, query_nt, position_in_codon, ref_codon, query_codon,
-aln_aa_position, ref_aa_position, query_aa_position, aa_mutation
-[, variant_of_interest, position_of_interest]
-[, depth, consensus_allele, minority_allele, consensus_count, minority_count,
-   minority_frequency, consensus_codon, minor_variant_codon, consensus_aa, minor_variant_aa]
-```
-
-**Example (diffs only, no positions-of-interest or minor variants):**
-```sh
-variants \
-  -q query.dais -r ref.dais \
-  -i query.ins -d query.del \
-  -j ref.ins -e ref.del \
-  -x \
-  -o output.csv
-```
-
-**Example (diffs with positions-of-interest and minor-variant annotation):**
-```sh
-variants \
-  -q query.dais -r ref.dais \
-  -i query.ins -d query.del \
-  -j ref.ins -e ref.del \
-  -x \
-  -p positions_of_interest.tsv \
-  -m minor_variants.csv \
-  -o output.csv
-```
-
 ### 3. Minor-variants-only mode (`-m` alone)
 
 Used when neither `-p` nor `-x` is given. Only the always-required files plus `-m` are needed
@@ -263,7 +263,7 @@ variants \
 |---|---|
 | `-o/--output-xsv <path>` | Write output to a file instead of stdout. |
 | `-s/--output-delimiter <char>` | Field delimiter for output (default `,`). |
-| `-a/--all-positions` | Positions-of-interest mode only: emit every position in a flagged codon, not just differences. No effect in all-diffs or minor-variants-only mode. |
+| `-a/--all-positions` | Positions-of-interest mode only (`-p` without `-x`): emit every position in a flagged codon, not just differences. No effect in all-diffs mode or minor-variants-only mode. |
 
 ## Notes
 
