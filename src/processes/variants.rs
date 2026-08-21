@@ -634,13 +634,13 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
         };
 
         let mut header = String::from(
-            "query_name,ref_name,ctype,dais_reference,protein,aln_nt_position,ref_nt_position,query_nt_position,query_nt,ref_nt,position_in_codon,query_codon,ref_codon,aa_mutation,aln_aa_position,ref_aa_position,query_aa_position",
+            "query_name,ref_name,ctype,dais_reference,protein,aln_nt_position,ref_nt_position,query_nt_position,ref_nt,query_nt,position_in_codon,ref_codon,query_codon,aln_aa_position,ref_aa_position,query_aa_position,aa_mutation",
         );
         if include_variant_of_interest {
             header.push_str(",variant_of_interest,position_of_interest");
         }
         if include_minor_variants {
-            header.push_str(",depth,consensus_allele,minority_allele,consensus_count,minority_count,minority_frequency,consensus_codon,consensus_aa,minor_variant_codon,minor_variant_aa");
+            header.push_str(",depth,consensus_allele,minority_allele,consensus_count,minority_count,minority_frequency,consensus_codon,minor_variant_codon,consensus_aa,minor_variant_aa");
         }
         writeln!(&mut writer, "{header}")?;
 
@@ -783,10 +783,10 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                                         {ctype}{d}{dais_ref}{d}{protein}{d}\
                                         {nt_position}{d}{ref_nt_position}{d}{query_nt_position}{d}{}{d}{}{d}\
                                         {position_in_codon}{d}\
-                                        {mut_codon}{d}{ref_codon}{d}\
-                                        {aa_ref}:{aa_position}:{aa_mut}{d}\
-                                        {aln_aa_position}{d}{ref_aa_position}{d}{query_aa_position}",
-                                query_nt as char, ref_nt as char,
+                                        {ref_codon}{d}{mut_codon}{d}\
+                                        {aln_aa_position}{d}{ref_aa_position}{d}{query_aa_position}{d}\
+                                        {aa_ref}:{aa_position}:{aa_mut}",
+                                ref_nt as char, query_nt as char,
                             );
                             if include_variant_of_interest {
                                 let poi = entry.is_position_of_interest(dais_ref, &muts_interest);
@@ -814,13 +814,14 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                                             None => (String::new(), String::new()),
                                         };
                                         let mv_suffix = format!(
-                                            "{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}",
+                                            "{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}",
                                             mv.depth,
                                             mv.consensus_allele,
                                             mv.minority_allele,
                                             mv.consensus_count,
                                             mv.minority_count,
                                             mv.minority_frequency,
+                                            mv_aa,
                                             mv_codon,
                                             mv_aa
                                         );
@@ -1442,7 +1443,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
 
         writeln!(
             &mut writer,
-            "sample{delim}reference{delim}sample_position{delim}dais_ref_position{delim}depth{delim}consensus_allele{delim}minority_allele{delim}consensus_count{delim}minority_count{delim}minority_frequency{delim}consensus_codon{delim}consensus_aa{delim}minor_variant_codon{delim}minor_variant_aa{delim}run_id{delim}instrument"
+            "sample{delim}reference{delim}dais_reference{delim}dais_ref_position{delim}sample_position{delim}depth{delim}consensus_allele{delim}minority_allele{delim}consensus_count{delim}minority_count{delim}minority_frequency{delim}consensus_codon{delim}minor_variant_codon{delim}consensus_aa{delim}minor_variant_aa{delim}major_aa_vs_minor_aa{delim}run_id{delim}instrument"
         )?;
 
         for mv in &minor_variants {
@@ -1455,8 +1456,9 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                 .filter(|d| d.sample_id.contains(mv.sample.as_str()) && d.ctype == mv.reference)
                 .max_by_key(|d| d.query_cds_aln.len());
 
-            let (dais_ref_position, consensus_codon, consensus_aa, mv_codon, mv_aa) =
+            let (dais_reference, dais_ref_position, consensus_codon, consensus_aa, mv_codon, mv_aa) =
                 if let Some(dais_entry) = matching_dais_entry {
+                    let dais_reference = dais_entry.dais_ref_id.clone();
                     let nt_seq: Nucleotides = dais_entry.query_cds_aln.clone().into();
                     let aln_len = nt_seq.len();
                     let raw_pos = find_raw_query_position(
@@ -1509,6 +1511,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                                         None => (String::new(), String::new()),
                                     };
                                     (
+                                        dais_reference,
                                         dais_ref_position.to_string(),
                                         consensus_codon,
                                         consensus_aa,
@@ -1517,6 +1520,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                                     )
                                 }
                                 None => (
+                                    dais_reference,
                                     dais_ref_position.to_string(),
                                     String::new(),
                                     String::new(),
@@ -1526,6 +1530,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                             }
                         }
                         None => (
+                            dais_reference,
                             String::new(),
                             String::new(),
                             String::new(),
@@ -1540,12 +1545,15 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                         String::new(),
                         String::new(),
                         String::new(),
+                        String::new(),
                     )
                 };
 
+            let major_aa_vs_minor_aa = format!("{consensus_aa}:{dais_ref_position}:{mv_aa}");
+
             writeln!(
                 &mut writer,
-                "{}{delim}{}{delim}{}{delim}{dais_ref_position}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{consensus_codon}{delim}{consensus_aa}{delim}{mv_codon}{delim}{mv_aa}{delim}{}{delim}{}",
+                "{}{delim}{}{delim}{dais_reference}{delim}{dais_ref_position}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{consensus_codon}{delim}{mv_codon}{delim}{consensus_aa}{delim}{mv_aa}{delim}{major_aa_vs_minor_aa}{delim}{}{delim}{}{delim}{}",
                 mv.sample,
                 mv.reference,
                 mv.sample_position,
