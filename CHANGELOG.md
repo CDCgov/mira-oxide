@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### `Added`
 - [PR #105](https://github.com/CDCgov/mira-oxide/pull/105) - Added the `varaints` subprocess, that is replacing the `positions-of-interest` and `variants-of-interest` subprocesses. See `docs/variants_readme/md` for more information about usage.
-- 
+
 ## [1.5.10] - 2026-08-11
 - [Amanda Sullivan](https://github.com/mandysulli)
 - [William Chettleburgh](https://github.com/willchet)
@@ -218,7 +218,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - [PR #50](https://github.com/CDCgov/mira-oxide/pull/50) - Added `check_mira_versions.rs` to proccesses. Made to replace checkmiraversion.py within MIRA-NF
 
->>>>>>> main
 ## [1.1.2] - 2025-09-19
 
 - [Amanda Sullivan](https://github.com/mandysulli)
