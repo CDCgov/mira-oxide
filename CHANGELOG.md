@@ -5,6 +5,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.6.0] - 2026-08-22
 - [Amanda Sullivan](https://github.com/mandysulli)
+- [Ben Rambo-Martin](https://github.com/nbx0)
 
 ### `Added`
 - [PR #105](https://github.com/CDCgov/mira-oxide/pull/105) - Added the `varaints` subprocess, that is replacing the `positions-of-interest` and `variants-of-interest` subprocesses. See `docs/variants_readme/md` for more information about usage.
