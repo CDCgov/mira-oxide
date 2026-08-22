@@ -62,11 +62,12 @@ Columns: `query_id`, `ctype`, `reference_id`, `product_name`, `upstream_aa_pos`,
 ### Deletion file (headerless)
 Columns: `query_id`, `ctype`, `reference_id`, `product_name`, `variant_hash`, `del_aa_start`, `del_aa_end`, `del_aa_len`, `in_frame`, `cds_id`, `del_cds_start`, `del_cds_end`, `del_cds_len`
 
-### Minor variants file (header)
+### Minor variants file (headers)
 Columns: `sample`, `reference`, `sample_position`, `depth`, `consensus_allele`, `minority_allele`, `consensus_count`, `minority_count`, `minority_frequency`, `run_id`, `instrument`
 
-### Variants-of-interest file (header)
-This should be the only file that the user is constructing
+### Variants-of-interest file (headers)
+This should be the only file that the user is creating themselves.
+
 Columns: `subtype`, `protein`, `positionS`, `amino_acid`
 
 | Column | Description |
