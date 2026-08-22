@@ -174,7 +174,7 @@ sample_1,ref_A,H3N2,ref_A_id,HA,225,225,222,T,C,3,AAT,AAC,75,75,74,N:74:N,false,
 | `aln_aa_position` | Amino acid position within the aligned sequence (unadjusted for indels) |
 | `ref_aa_position` | Reference-side amino acid position, adjusted for reference insertions/deletions |
 | `query_aa_position` | Query-side amino acid position, adjusted for query insertions/deletions |
-| `aa_mutation` | Amino acid change in dais alignment space, formatted as `ref:position:query` (e.g. `T:50:A`) |
+| `ref_aa_vs_query_aa` | Amino acid change in dais alignment space, formatted as `ref:position:query` (e.g. `T:50:A`) |
 | `variant_of_interest`* | `true` if the observed amino acid matches a listed variant of interest at this position |
 | `position_of_interest`* | `true` if this position is listed in the variant-of-interest file, regardless of which amino acid is observed |
 | `depth`† | Sequencing depth at this position from the minor-variants file |
@@ -223,7 +223,7 @@ sample_1,ref_A,H3N2,ref_A_id,HA,148,148,148,G,A,1,GCC,ACC,T:50:A,50,50,50,true,1
 | `aln_aa_position` | Amino acid position within the aligned sequence (unadjusted for indels) |
 | `ref_aa_position` | Reference-side amino acid position, adjusted for reference insertions/deletions |
 | `query_aa_position` | Query-side amino acid position, adjusted for query insertions/deletions |
-| `aa_mutation` | Amino acid change in dais alignment space, formatted as `ref:position:query` (e.g. `T:50:A`) |
+| `ref_aa_vs_query_aa` | Amino acid change in dais alignment space, formatted as `ref:position:query` (e.g. `T:50:A`) |
 | `variant_of_interest` | `true` if the observed amino acid matches the listed mutation of interest at this position |
 | `depth`† | Sequencing depth at this position from the minor-variants file |
 | `consensus_allele`† | Consensus (majority) nucleotide allele reported in the minor-variants file |

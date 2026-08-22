@@ -661,13 +661,13 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
         };
 
         let mut header = String::from(
-            "query_name,ref_name,ctype,dais_reference,protein,aln_nt_position,ref_nt_position,query_nt_position,ref_nt,query_nt,position_in_codon,ref_codon,query_codon,aln_aa_position,ref_aa_position,query_aa_position,aa_mutation",
+            "query_name,ref_name,ctype,dais_reference,protein,aln_nt_position,ref_nt_position,query_nt_position,ref_nt,query_nt,position_in_codon,ref_codon,query_codon,aln_aa_position,ref_aa_position,query_aa_position,ref_aa_vs_query_aa",
         );
         if include_variant_of_interest {
             header.push_str(",variant_of_interest,position_of_interest");
         }
         if include_minor_variants {
-            header.push_str(",depth,consensus_allele,minority_allele,consensus_count,minority_count,minority_frequency,minor_variant_codon,minor_variant_aa");
+            header.push_str(",depth,consensus_allele,minority_allele,consensus_count,minority_count,minority_frequency,minor_variant_codon,minor_variant_aa,major_aa_vs_minor_aa");
         }
         writeln!(&mut writer, "{header}")?;
 
@@ -828,7 +828,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                                     query_nt_position,
                                 );
                                 if mv_matches.is_empty() {
-                                    let _ = write!(row, "{d}{d}{d}{d}{d}{d}{d}{d}");
+                                    let _ = write!(row, "{d}{d}{d}{d}{d}{d}{d}{d}{d}");
                                     writeln!(&mut writer, "{row}")?;
                                 } else {
                                     for mv in &mv_matches {
@@ -840,6 +840,8 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                                             Some((codon, aa)) => (codon, aa.to_string()),
                                             None => (String::new(), String::new()),
                                         };
+                                        let major_aa_vs_minor_aa =
+                                            format!("{aa_mut}:{query_nt_position}:{mv_aa}");
                                         let mv_suffix = format!(
                                             "{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}",
                                             mv.depth,
@@ -851,7 +853,10 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                                             mv_codon,
                                             mv_aa
                                         );
-                                        writeln!(&mut writer, "{row}{mv_suffix}")?;
+                                        writeln!(
+                                            &mut writer,
+                                            "{row}{mv_suffix}{d}{major_aa_vs_minor_aa}"
+                                        )?;
                                     }
                                 }
                             } else {
@@ -965,7 +970,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                                 query_nt_position,
                             );
                             if mv_matches.is_empty() {
-                                row.push_str(&format!("{d}{d}{d}{d}{d}{d}{d}{d}"));
+                                row.push_str(&format!("{d}{d}{d}{d}{d}{d}{d}{d}{d}"));
                                 writeln!(&mut writer, "{row}")?;
                             } else {
                                 for mv in &mv_matches {
@@ -977,6 +982,8 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                                         Some((codon, aa)) => (codon, aa.to_string()),
                                         None => (String::new(), String::new()),
                                     };
+                                    let major_aa_vs_minor_aa =
+                                        format!("{aa_mut}:{query_nt_position}:{mv_aa}");
                                     let mv_suffix = format!(
                                         "{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}",
                                         mv.depth,
@@ -988,7 +995,10 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                                         mv_codon,
                                         mv_aa
                                     );
-                                    writeln!(&mut writer, "{row}{mv_suffix}")?;
+                                    writeln!(
+                                        &mut writer,
+                                        "{row}{mv_suffix}{d}{major_aa_vs_minor_aa}"
+                                    )?;
                                 }
                             }
                         } else {
@@ -1062,7 +1072,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
             BufWriter::new(Either::Right(stdout()))
         };
         let mut header = String::from(
-            "query_name,ref_name,ctype,dais_reference,protein,aln_nt_position,ref_nt_position,query_nt_position,query_nt,ref_nt,position_in_codon,query_codon,ref_codon,aln_aa_position,ref_aa_position,query_aa_position,aa_mutation,variant_of_interest",
+            "query_name,ref_name,ctype,dais_reference,protein,aln_nt_position,ref_nt_position,query_nt_position,query_nt,ref_nt,position_in_codon,query_codon,ref_codon,aln_aa_position,ref_aa_position,query_aa_position,ref_aa_vs_query_aa,variant_of_interest",
         );
         if include_minor_variants {
             header.push_str(",depth,consensus_allele,minority_allele,consensus_count,minority_count,minority_frequency,consensus_codon,consensus_aa,minor_variant_codon,minor_variant_aa");
