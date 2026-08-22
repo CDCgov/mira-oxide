@@ -10,3 +10,4 @@
 *lock
 **/*lock
 *.crt
+.DS_Store

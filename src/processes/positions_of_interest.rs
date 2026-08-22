@@ -1,3 +1,6 @@
+// ARCHIVED
+// This process is no longer accessible in mira-oxide
+
 #![allow(unreachable_patterns)]
 #![allow(dead_code, unused_imports)]
 use clap::Parser;
