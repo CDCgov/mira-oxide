@@ -667,7 +667,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
             header.push_str(",variant_of_interest,position_of_interest");
         }
         if include_minor_variants {
-            header.push_str(",depth,consensus_allele,minority_allele,consensus_count,minority_count,minority_frequency,minor_variant_codon,minor_variant_aa,major_aa_vs_minor_aa");
+            header.push_str(",depth,minority_allele,consensus_count,minority_count,minority_frequency,minor_variant_codon,minor_variant_aa,major_aa_vs_minor_aa");
         }
         writeln!(&mut writer, "{header}")?;
 
@@ -828,7 +828,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                                     query_nt_position,
                                 );
                                 if mv_matches.is_empty() {
-                                    let _ = write!(row, "{d}{d}{d}{d}{d}{d}{d}{d}{d}");
+                                    let _ = write!(row, "{d}{d}{d}{d}{d}{d}{d}{d}");
                                     writeln!(&mut writer, "{row}")?;
                                 } else {
                                     for mv in &mv_matches {
@@ -843,9 +843,8 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                                         let major_aa_vs_minor_aa =
                                             format!("{aa_mut}:{query_nt_position}:{mv_aa}");
                                         let mv_suffix = format!(
-                                            "{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}",
+                                            "{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}",
                                             mv.depth,
-                                            mv.consensus_allele,
                                             mv.minority_allele,
                                             mv.consensus_count,
                                             mv.minority_count,
@@ -970,7 +969,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                                 query_nt_position,
                             );
                             if mv_matches.is_empty() {
-                                row.push_str(&format!("{d}{d}{d}{d}{d}{d}{d}{d}{d}"));
+                                row.push_str(&format!("{d}{d}{d}{d}{d}{d}{d}{d}"));
                                 writeln!(&mut writer, "{row}")?;
                             } else {
                                 for mv in &mv_matches {
@@ -985,9 +984,8 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                                     let major_aa_vs_minor_aa =
                                         format!("{aa_mut}:{query_nt_position}:{mv_aa}");
                                     let mv_suffix = format!(
-                                        "{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}",
+                                        "{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}",
                                         mv.depth,
-                                        mv.consensus_allele,
                                         mv.minority_allele,
                                         mv.consensus_count,
                                         mv.minority_count,
@@ -1072,10 +1070,10 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
             BufWriter::new(Either::Right(stdout()))
         };
         let mut header = String::from(
-            "query_name,ref_name,ctype,dais_reference,protein,aln_nt_position,ref_nt_position,query_nt_position,query_nt,ref_nt,position_in_codon,query_codon,ref_codon,aln_aa_position,ref_aa_position,query_aa_position,ref_aa_vs_query_aa,variant_of_interest",
+            "query_name,ref_name,ctype,dais_reference,protein,aln_nt_position,ref_nt_position,query_nt_position,ref_nt,query_nt,position_in_codon,query_codon,ref_codon,aln_aa_position,ref_aa_position,query_aa_position,ref_aa_vs_query_aa,variant_of_interest",
         );
         if include_minor_variants {
-            header.push_str(",depth,consensus_allele,minority_allele,consensus_count,minority_count,minority_frequency,consensus_codon,consensus_aa,minor_variant_codon,minor_variant_aa");
+            header.push_str(",depth,minority_allele,consensus_count,minority_count,minority_frequency,minor_variant_codon,minor_variant_aa,major_aa_vs_minor_aa");
         }
         writeln!(&mut writer, "{header}")?;
 
@@ -1205,7 +1203,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                                     );
                                     let mv_suffixes: Vec<String> = if include_minor_variants {
                                         if mv_matches.is_empty() {
-                                            vec![format!("{d}{d}{d}{d}{d}{d}{d}{d}")]
+                                            vec![format!("{d}{d}{d}{d}{d}{d}{d}{d}{d}")]
                                         } else {
                                             mv_matches
                                                 .iter()
@@ -1221,16 +1219,19 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                                                             }
                                                             None => (String::new(), String::new()),
                                                         };
+                                                    let major_aa_vs_minor_aa = format!(
+                                                        "{aa_mut}:{query_nt_position}:{mv_aa}"
+                                                    );
                                                     format!(
                                                         "{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}",
                                                         mv.depth,
-                                                        mv.consensus_allele,
                                                         mv.minority_allele,
                                                         mv.consensus_count,
                                                         mv.minority_count,
                                                         mv.minority_frequency,
                                                         mv_codon,
-                                                        mv_aa
+                                                        mv_aa,
+                                                        major_aa_vs_minor_aa
                                                     )
                                                 })
                                                 .collect()
@@ -1249,7 +1250,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                                                     {aln_aa_position}{d}{ref_aa_position}{d}{query_aa_position}{d}\
                                                     {aa_ref}:{aa_position}:{aa_mut}{d}\
                                                     {variant_of_interest}{mv_suffix}",
-                                            query_nt as char, ref_nt as char,
+                                            ref_nt as char, query_nt as char,
                                         )?;
                                     }
                                 }
@@ -1347,7 +1348,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                                 );
                                 let mv_suffixes: Vec<String> = if include_minor_variants {
                                     if mv_matches.is_empty() {
-                                        vec![format!("{d}{d}{d}{d}{d}{d}{d}{d}{d}{d}")]
+                                        vec![format!("{d}{d}{d}{d}{d}{d}{d}{d}{d}{d}{d}")]
                                     } else {
                                         mv_matches
                                             .iter()
@@ -1374,8 +1375,11 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                                                         }
                                                         None => (String::new(), String::new()),
                                                     };
+                                                let major_aa_vs_minor_aa = format!(
+                                                    "{aa_mut}:{query_nt_position}:{mv_aa}"
+                                                );
                                                 format!(
-                                                    "{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}",
+                                                    "{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}",
                                                     mv.depth,
                                                     mv.consensus_allele,
                                                     mv.minority_allele,
@@ -1385,7 +1389,8 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                                                     consensus_codon,
                                                     consensus_aa,
                                                     mv_codon,
-                                                    mv_aa
+                                                    mv_aa,
+                                                    major_aa_vs_minor_aa
                                                 )
                                             })
                                             .collect()
@@ -1404,7 +1409,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                                                 {aln_aa_position}{d}{ref_aa_position}{d}{query_aa_position}{d}\
                                                 {aa_ref}:{aa_position}:{aa_mut}{d}\
                                                 {variant_of_interest}{mv_suffix}",
-                                        *query_nt as char, *ref_nt as char,
+                                        *ref_nt as char, *query_nt as char,
                                     )?;
                                 }
                             }
