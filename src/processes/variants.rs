@@ -24,43 +24,43 @@ use crate::io::data_ingest::read_csv;
 use crate::utils::get_dais_refs::assign_dais_refs;
 
 #[derive(Debug, Parser)]
-#[command(about = "Tool for observing codon and amino acid differences at a given poistion")]
+#[command(about = "Tool for observing nucleotide, codon and amino acid differences.")]
+#[allow(clippy::struct_excessive_bools)]
 pub struct VariantsArgs {
     #[arg(short = 'q', long)]
     /// Input dais-ribosome file
     query_dais_file: PathBuf,
 
     #[arg(short = 'r', long)]
-    /// Reference dais-ribosome file (required if --positions-of-interest is used)
+    /// Reference dais-ribosome file.
     ref_dais_file: Option<PathBuf>,
 
-    #[arg(short = 'p', long)]
-    /// Optional positions-of-interest (mutations) file. If provided, the full codon/amino-acid diff report is produced.
-    /// If omitted and --minor-variants-file falg is provided alone, the minor variants file is annotated with `minor_variant_codon`/`minor_variant_aa` columns.
-    positions_of_interest: Option<PathBuf>,
+    #[arg(short = 'v', long)]
+    /// Variants-of-interest (mutations) file.
+    variants_of_interest: Option<PathBuf>,
 
     #[arg(short = 'i', long)]
-    /// Insertion (.ins) file
+    /// Query insertion (.ins) file
     query_insertion_file: PathBuf,
 
     #[arg(short = 'd', long)]
-    /// Deletion (.del) file
+    /// Query deletion (.del) file
     query_deletion_file: PathBuf,
 
     #[arg(short = 'j', long)]
-    /// Reference insertion (.ins) file (required if --positions-of-interest is used)
+    /// Reference insertion (.ins) file.
     ref_insertion_file: Option<PathBuf>,
 
     #[arg(short = 'e', long)]
-    /// Reference deletion (.del) file (required if --positions-of-interest is used)
+    /// Reference deletion (.del) file.
     ref_deletion_file: Option<PathBuf>,
 
     #[arg(short = 'm', long)]
-    /// Minor variants (.csv, with headers) file
-    minor_variants_file: Option<PathBuf>,
+    /// Minor variants (.csv, with headers) file.
+    minor_variants: Option<PathBuf>,
 
     #[arg(short = 'o', long)]
-    /// Optional output delimited file
+    /// Optional output delimited file. If not provided printes to screen
     output_xsv: Option<PathBuf>,
 
     #[arg(short = 's', long, default_value = ",")]
@@ -69,18 +69,25 @@ pub struct VariantsArgs {
 
     #[arg(short = 'a', long)]
     /// Print all positions in the positions-of-interest report, not just those where the
-    /// query and reference nucleotides differ. Has no effect in minor-variants-only mode
+    /// query and reference nucleotides differ. Has no effect in --annotate-minor-variants mode
     /// or when --all-diffs is used.
     all_positions: bool,
 
-    #[arg(short = 'x', long)]
-    /// Report every nucleotide difference between each query and its matching reference,
-    /// across all proteins, without regard to positions-of-interest. Requires --ref-dais-file,
-    /// --ref-insertion-file, and --ref-deletion-file. --positions-of-interest is optional in
-    /// this mode: if provided, a `variant_of_interest` column is included. --minor-variants-file
-    /// is also optional here: if provided, minor-variant columns are included where they apply.
-    /// --all-positions has no effect on this mode.
+    #[arg(long = "all-diffs")]
+    /// Mode selector. Reports variant information at every nucleotide difference between each
+    // query and its matching reference without restricting to specific positions.
     all_diffs: bool,
+
+    #[arg(long = "positions-of-interest")]
+    /// Mode selector. reports variant information when nucleotide differences are found within protein positions listed in a variants-of-interest file
+    positions_of_interest_mode: bool,
+
+    #[arg(long)]
+    /// Mode selector. Annotate the file given by --minor-variants (required in this mode) with
+    /// codon/amino-acid context derived from the query dais data. Does not require any
+    /// reference dais/insertion/deletion files. Exactly one of --all-diffs,
+    /// --positions-of-interest, or --annotate-minor-variants must be given.
+    annotate_minor_variants: bool,
 }
 
 // input files *must* be tab-separated
@@ -513,11 +520,31 @@ fn create_reader(path: Option<&PathBuf>) -> std::io::Result<BufReader<Either<Fil
 
 #[allow(clippy::too_many_lines)]
 pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
-    if args.positions_of_interest.is_none() && args.minor_variants_file.is_none() && !args.all_diffs
-    {
+    let mode_count = [
+        args.all_diffs,
+        args.positions_of_interest_mode,
+        args.annotate_minor_variants,
+    ]
+    .iter()
+    .filter(|&&b| b)
+    .count();
+
+    if mode_count != 1 {
         return Err(
-            "At least one of --positions-of-interest, --minor-variants-file, or --all-diffs must be provided."
+            "Exactly one of --all-diffs, --positions-of-interest, or --annotate-minor-variants must be provided."
                 .into(),
+        );
+    }
+
+    if args.positions_of_interest_mode && args.variants_of_interest.is_none() {
+        return Err(
+            "--variants-of-interest is required when --positions-of-interest mode is used.".into(),
+        );
+    }
+
+    if args.annotate_minor_variants && args.minor_variants.is_none() {
+        return Err(
+            "--minor-variants is required when --annotate-minor-variants mode is used.".into(),
         );
     }
 
@@ -551,7 +578,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
     );
 
     // Optional: minor variants (.csv, with headers)
-    let minor_variants: Vec<MinorVariantInput> = if let Some(mv_path) = &args.minor_variants_file {
+    let minor_variants: Vec<MinorVariantInput> = if let Some(mv_path) = &args.minor_variants {
         let mv_reader = create_reader(Some(mv_path))?;
         let parsed: Vec<MinorVariantInput> = read_csv(mv_reader, true)?;
         println!(
@@ -563,7 +590,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
     } else {
         Vec::new()
     };
-    let include_minor_variants = args.minor_variants_file.is_some();
+    let include_minor_variants = args.minor_variants.is_some();
 
     if all_diffs {
         // --all-diffs mode: requires ref dais/insertion/deletion files, but positions-of-interest
@@ -586,18 +613,18 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
 
         // positions-of-interest is optional in this mode.
         let muts_interest: Vec<MutsOfInterestInput> =
-            if let Some(muts_path) = &args.positions_of_interest {
+            if let Some(muts_path) = &args.variants_of_interest {
                 let muts_reader = create_reader(Some(muts_path))?;
                 let parsed: Vec<MutsOfInterestInput> = read_tsv(muts_reader, false)?;
                 println!(
-                    "Read {} entries from the mutations of interest file.",
+                    "Read {} entries from the variants of interest file.",
                     parsed.len()
                 );
                 parsed
             } else {
                 Vec::new()
             };
-        let include_variant_of_interest = args.positions_of_interest.is_some();
+        let include_variant_of_interest = args.variants_of_interest.is_some();
 
         let ref_reader = create_reader(Some(&ref_dais_file))?;
         let refs: Vec<RefDaisInput> = read_tsv(ref_reader, false)?;
@@ -972,7 +999,11 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                 }
             }
         }
-    } else if let Some(muts_path) = &args.positions_of_interest {
+    } else if args.positions_of_interest_mode {
+        let muts_path = args
+            .variants_of_interest
+            .as_ref()
+            .expect("validated above: --variants-of-interest is required in this mode");
         // Full positions-of-interest mode: requires ref dais/insertion/deletion files.
         let ref_dais_file = args
             .ref_dais_file
@@ -985,7 +1016,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
             .ok_or("--ref-deletion-file is required when --positions-of-interest is used.")?;
 
         println!(
-            "Processing positions of interest for input file: {:?}, reference file: {:?}, and mutations file: {:?}",
+            "Processing positions of interest for input file: {:?}, reference file: {:?}, and variants file: {:?}",
             &args.query_dais_file.display(),
             &ref_dais_file.display(),
             &muts_path.display()
@@ -994,7 +1025,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
         let muts_reader = create_reader(Some(muts_path))?;
         let muts_interest: Vec<MutsOfInterestInput> = read_tsv(muts_reader, false)?;
         println!(
-            "Read {} entries from the mutations of interest file.",
+            "Read {} entries from the variants of interest file.",
             muts_interest.len()
         );
 
@@ -1382,6 +1413,10 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
             }
         }
     } else {
+        // annotate-minor-variants mode (validated above: exactly one mode flag is set, and
+        // --minor-variants is required here).
+        debug_assert!(args.annotate_minor_variants);
+
         /// Finds the raw (aln) nucleotide position within `query_cds_aln` that maps to the given
         /// adjusted `query_nt_position`, by searching raw positions 1..=len and adjusting each with
         /// `calc_query_nt_position` until one matches. Returns None if no raw position maps to it.
