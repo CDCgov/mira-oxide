@@ -154,12 +154,11 @@ pub struct UpdatedRefInput {
 }
 
 #[derive(Deserialize, Debug, Clone)]
-pub struct MutsOfInterestInput {
+pub struct VarsOfInterestInput {
     subtype: String,
     protein: String,
     aa_position: String,
     aa: String,
-    description: String,
 }
 
 /// Insertion file.
@@ -230,7 +229,7 @@ impl Entry<'_> {
         dais_ref_id: &str,
         aa_1: u8,
         aa_2: u8,
-        muts_columns: &[MutsOfInterestInput],
+        muts_columns: &[VarsOfInterestInput],
     ) -> bool {
         self.aa_mut = aa_2 as char;
         self.aa_ref = aa_1 as char;
@@ -261,7 +260,7 @@ impl Entry<'_> {
     fn is_position_of_interest(
         &self,
         dais_ref_id: &str,
-        muts_columns: &[MutsOfInterestInput],
+        muts_columns: &[VarsOfInterestInput],
     ) -> bool {
         muts_columns.iter().any(|muts_entry| {
             let assigned_ref = assign_dais_refs(&muts_entry.subtype, &muts_entry.protein);
@@ -612,10 +611,10 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
         );
 
         // positions-of-interest is optional in this mode.
-        let muts_interest: Vec<MutsOfInterestInput> =
+        let muts_interest: Vec<VarsOfInterestInput> =
             if let Some(muts_path) = &args.variants_of_interest {
                 let muts_reader = create_reader(Some(muts_path))?;
-                let parsed: Vec<MutsOfInterestInput> = read_tsv(muts_reader, false)?;
+                let parsed: Vec<VarsOfInterestInput> = read_tsv(muts_reader, false)?;
                 println!(
                     "Read {} entries from the variants of interest file.",
                     parsed.len()
@@ -1023,7 +1022,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
         );
 
         let muts_reader = create_reader(Some(muts_path))?;
-        let muts_interest: Vec<MutsOfInterestInput> = read_tsv(muts_reader, false)?;
+        let muts_interest: Vec<VarsOfInterestInput> = read_tsv(muts_reader, false)?;
         println!(
             "Read {} entries from the variants of interest file.",
             muts_interest.len()
