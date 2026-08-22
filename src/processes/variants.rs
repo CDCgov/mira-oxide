@@ -85,9 +85,7 @@ pub struct VariantsArgs {
 
     #[arg(long)]
     /// Mode selector. Annotate the file given by --minor-variants (required in this mode) with
-    /// codon/amino-acid context derived from the query dais data. Does not require any
-    /// reference dais/insertion/deletion files. Exactly one of --all-diffs,
-    /// --positions-of-interest, or --annotate-minor-variants must be given.
+    /// codon/amino-acid context derived from the query dais data.
     annotate_minor_variants: bool,
 }
 
@@ -253,8 +251,8 @@ impl Entry<'_> {
         false
     }
 
-    /// Returns true if this entry's (dais_ref_id, protein, aa_position) matches any row in
-    /// `muts_columns`, regardless of the amino acid listed there. Used for the `all-diffs`
+    /// Returns true if this entry's (`dais_ref_id`, protein, `aa_position`) matches any position in
+    /// `variants-of-interest` file, regardless of the amino acid listed there. Used for the `all-diffs`
     /// report's `position_of_interest` column, which flags whether an nt diff falls within a
     /// codon that is a position of interest at all -- independent of whether the observed
     /// amino acid is the flagged one (that's what `variant_of_interest` checks).
@@ -817,7 +815,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                             );
                             if include_variant_of_interest {
                                 let poi = entry.is_position_of_interest(dais_ref, &muts_interest);
-                                row.push_str(&format!("{d}{variant_of_interest}{d}{poi}"));
+                                let _ = write!(row, "{d}{variant_of_interest}{d}{poi}");
                             }
 
                             if include_minor_variants {
@@ -958,7 +956,10 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                         );
                         if include_variant_of_interest {
                             let poi = entry.is_position_of_interest(dais_ref, &muts_interest);
-                            row.push_str(&format!("{d}{variant_of_interest}{d}{poi}"));
+                            let _ = std::fmt::Write::write_fmt(
+                                &mut row,
+                                format_args!("{d}{variant_of_interest}{d}{poi}"),
+                            );
                         }
 
                         if include_minor_variants {
@@ -969,7 +970,9 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                                 query_nt_position,
                             );
                             if mv_matches.is_empty() {
-                                row.push_str(&format!("{d}{d}{d}{d}{d}{d}{d}{d}"));
+                                for _ in 0..8 {
+                                    row.push_str(d);
+                                }
                                 writeln!(&mut writer, "{row}")?;
                             } else {
                                 for mv in &mv_matches {
@@ -1427,13 +1430,10 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
             }
         }
     } else {
-        // annotate-minor-variants mode (validated above: exactly one mode flag is set, and
-        // --minor-variants is required here).
-        debug_assert!(args.annotate_minor_variants);
-
+        // annotate-minor-variants mode
         /// Finds the raw (aln) nucleotide position within `query_cds_aln` that maps to the given
         /// adjusted `query_nt_position`, by searching raw positions 1..=len and adjusting each with
-        /// `calc_query_nt_position` until one matches. Returns None if no raw position maps to it.
+        /// `calc_query_nt_position` until one matches. Returns None if no raw position maps to it (but that shouldn't happen?).
         /// Filters insertions/deletions by `reference_id` and `product_name` (in addition to `sample_id`
         /// and ctype) so that samples with multiple products/references sharing a ctype don't have
         /// unrelated indels applied.
@@ -1476,6 +1476,8 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                 usize::try_from(position).is_ok_and(|position| position == target_query_nt_position)
             })
         }
+
+        debug_assert!(args.annotate_minor_variants);
 
         // Minor-variants only will annotate the minor variants CSV with minor_variant_codon
         // and minor_variant_aa columns, computed from the query dais data.
