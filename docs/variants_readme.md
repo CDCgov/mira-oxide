@@ -154,17 +154,89 @@ sample_1,ref_A,H3N2,ref_A_id,HA,225,225,222,T,C,3,AAT,AAC,75,75,74,N:74:N,false,
 - `variant_of_interest` is only `true` when the observed amino acid matches a listed mutation of interest at that position; `position_of_interest` is `true` whenever the position is *listed*, whether or not the amino acid matches.
 - Rows with no matching minor-variant data have empty trailing fields (as in the second row above).
 
+### `--all-diffs` columns
+
+| Column | Description |
+|---|---|
+| `query_name` | Sample ID of the query sequence (`sample_id`) |
+| `ref_name` | ID of the matched reference strain (`ref_id`) |
+| `ctype` | Sequence/segment type shared by query and reference |
+| `dais_reference` | DAIS reference ID used to match query and reference entries |
+| `protein` | Protein name |
+| `aln_nt_position` | Nucleotide position within the aligned sequence (1-indexed, unadjusted for indels) |
+| `ref_nt_position` | Reference-side nucleotide position, adjusted for reference insertions/deletions |
+| `query_nt_position` | Query-side nucleotide position, adjusted for query insertions/deletions |
+| `ref_nt` | Reference nucleotide at this position in dais alignment space |
+| `query_nt` | Query nucleotide at this position in dais alignment space |
+| `position_in_codon` | Position within the codon (1, 2, or 3) where the difference occurs |
+| `ref_codon` | Full reference codon containing this nucleotide in dais alignment space |
+| `query_codon` | Full query codon containing this nucleotide in dais alignment space |
+| `aln_aa_position` | Amino acid position within the aligned sequence (unadjusted for indels) |
+| `ref_aa_position` | Reference-side amino acid position, adjusted for reference insertions/deletions |
+| `query_aa_position` | Query-side amino acid position, adjusted for query insertions/deletions |
+| `aa_mutation` | Amino acid change in dais alignment space, formatted as `ref:position:query` (e.g. `T:50:A`) |
+| `variant_of_interest`* | `true` if the observed amino acid matches a listed variant of interest at this position |
+| `position_of_interest`* | `true` if this position is listed in the variant-of-interest file, regardless of which amino acid is observed |
+| `depth`† | Sequencing depth at this position from the minor-variants file |
+| `consensus_allele`† | Consensus (majority) nucleotide allele reported in the minor-variants file |
+| `minority_allele`† | Minority (sub-consensus) nucleotide allele reported in the minor-variants file |
+| `consensus_count`† | Read count supporting the consensus allele |
+| `minority_count`† | Read count supporting the minority allele |
+| `minority_frequency`† | Frequency of the minority allele (minority_count / depth) |
+| `consensus_codon`† | Query codon as originally observed (before minority allele substitution) |
+| `minor_variant_codon`† | Query codon with the minority allele substituted in at `position_in_codon` in dais alignment space|
+| `consensus_aa`† | Amino acid translated from `consensus_codon` in dais alignment space |
+| `minor_variant_aa`† | Amino acid translated from `minor_variant_codon` in dais alignment space |
+
+\* Present only when `--variants-of-interest` is supplied.
+† Present only when `--minor-variants` is supplied. If no minor variant matches this position, these fields are emitted empty.
+
 ### `--positions-of-interest` output
 
 Base columns, plus minor-variant columns (if `--minor-variants` given):
 
 ```
-query_name,ref_name,ctype,dais_reference,protein,aln_nt_position,ref_nt_position,query_nt_position,query_nt,ref_nt,position_in_codon,query_codon,ref_codon,aa_mutation,aln_aa_position,ref_aa_position,query_aa_position,variant_of_interest,depth,consensus_allele,minority_allele,consensus_count,minority_count,minority_frequency,consensus_codon,consensus_aa,minor_variant_codon,minor_variant_aa
+query_name,ref_name,ctype,dais_reference,protein,aln_nt_position,ref_nt_position,query_nt_position,query_nt,ref_nt,position_in_codon,query_codon,ref_codon,aln_aa_position,ref_aa_position,query_aa_position,aa_mutation,variant_of_interest,depth,consensus_allele,minority_allele,consensus_count,minority_count,minority_frequency,consensus_codon,consensus_aa,minor_variant_codon,minor_variant_aa
 sample_1,ref_A,H3N2,ref_A_id,HA,148,148,148,G,A,1,GCC,ACC,T:50:A,50,50,50,true,1000,A,G,950,50,0.05,ACC,T,GCC,A
 ```
 
 - Only rows matching an entry in the mutations-of-interest file are emitted (unless `--all-positions` is set, in which case all listed positions are shown even where query and reference agree).
 - This mode always reflects `variant_of_interest`; there's no separate `position_of_interest` column here since every row is already restricted to listed positions.
+
+### `--positions-of-interest` columns
+
+| Column | Description |
+|---|---|
+| `query_name` | Sample ID of the query sequence (`sample_id`) |
+| `ref_name` | ID of the matched reference strain (`ref_id`) |
+| `ctype` | Sequence/segment type shared by query and reference |
+| `dais_reference` | DAIS reference ID used to match query and reference entries |
+| `protein` | Protein/product name |
+| `aln_nt_position` | Nucleotide position within the aligned sequence (1-indexed, unadjusted for indels) |
+| `ref_nt_position` | Reference-side nucleotide position, adjusted for reference insertions/deletions |
+| `query_nt_position` | Query-side nucleotide position, adjusted for query insertions/deletions |
+| `query_nt` | Query nucleotide at this position in dais alignment space |
+| `ref_nt` | Reference nucleotide at this position in dais alignment space |
+| `position_in_codon` | Position within the codon (1, 2, or 3) for this nucleotide |
+| `query_codon` | Full query codon containing this nucleotide in dais alignment space |
+| `ref_codon` | Full reference codon containing this nucleotide in dais alignment space |
+| `aln_aa_position` | Amino acid position within the aligned sequence (unadjusted for indels) |
+| `ref_aa_position` | Reference-side amino acid position, adjusted for reference insertions/deletions |
+| `query_aa_position` | Query-side amino acid position, adjusted for query insertions/deletions |
+| `aa_mutation` | Amino acid change in dais alignment space, formatted as `ref:position:query` (e.g. `T:50:A`) |
+| `variant_of_interest` | `true` if the observed amino acid matches the listed mutation of interest at this position |
+| `depth`† | Sequencing depth at this position from the minor-variants file |
+| `consensus_allele`† | Consensus (majority) nucleotide allele reported in the minor-variants file |
+| `minority_allele`† | Minority (sub-consensus) nucleotide allele reported in the minor-variants file |
+| `consensus_count`† | Read count supporting the consensus allele |
+| `minority_count`† | Read count supporting the minority allele |
+| `minority_frequency`† | Frequency of the minority allele (minority_count / depth) |
+| `consensus_codon`† | Query codon as originally observed (before minority allele substitution) |
+| `consensus_aa`† | Amino acid translated from `consensus_codon` |
+| `minor_variant_codon`† | Query codon with the minority allele substituted in at `position_in_codon` in dais alignment space|
+| `minor_variant_aa`† | Amino acid translated from `minor_variant_codon` in dais alignment space|
+
+† Present only when `--minor-variants` is supplied. If no minor variant matches this position, these fields are emitted empty.
 
 ### `--annotate-minor-variants` output
 
@@ -176,3 +248,28 @@ sample_2,H1N1,ref_B_id,,200,500,C,T,480,20,0.04,,,,,: :,run_2024_08,MiSeq
 
 - Each row of the input minor-variants CSV is annotated with the codon and amino acid context derived from the matching query DAIS entry.
 - If no matching DAIS entry or raw position mapping is found (as in the second example row), the codon/amino-acid fields are left blank and `major_aa_vs_minor_aa` shows empty values around the position.
+
+### `--annotate-minor-variants` columns
+
+| Column | Description |
+|---|---|
+| `sample` | Sample name from the minor-variants file |
+| `reference` | Reference/ctype from the minor-variants file |
+| `dais_reference` | DAIS reference ID of the matching query entry (longest `query_cds_aln` match on sample/ctype) |
+| `dais_ref_position` | Raw (pre-indel-adjustment) alignment position in the query sequence that maps to `sample_position` |
+| `sample_position` | Original sample position from the minor-variants file |
+| `depth` | Sequencing depth at this position |
+| `consensus_allele` | Consensus (majority) nucleotide allele |
+| `minority_allele` | Minority (sub-consensus) nucleotide allele |
+| `consensus_count` | Read count supporting the consensus allele |
+| `minority_count` | Read count supporting the minority allele |
+| `minority_frequency` | Frequency of the minority allele (minority_count / depth) |
+| `consensus_codon` | Codon at `dais_ref_position` as observed in the query sequence |
+| `minor_variant_codon` | Codon with the minority allele substituted in |
+| `consensus_aa` | Amino acid translated from `consensus_codon` |
+| `minor_variant_aa` | Amino acid translated from `minor_variant_codon` |
+| `major_aa_vs_minor_aa` | Formatted comparison of consensus vs. minor amino acid, as `consensus_aa:dais_ref_position:minor_variant_aa` |
+| `run_id` | Sequencing run ID from the minor-variants file |
+| `instrument` | Sequencing instrument from the minor-variants file |
+
+If no matching query DAIS entry is found, or no raw position maps to `sample_position`, the codon/amino-acid fields are left blank.

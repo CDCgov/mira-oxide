@@ -6,6 +6,7 @@ use either::Either;
 use serde::{self, Deserialize, de::DeserializeOwned};
 use std::{
     error::Error,
+    fmt::Write as _,
     fs::{File, OpenOptions},
     io::{BufRead, BufReader, BufWriter, Stdin, Write, stdin, stdout},
     path::{Path, PathBuf},
@@ -666,7 +667,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
             header.push_str(",variant_of_interest,position_of_interest");
         }
         if include_minor_variants {
-            header.push_str(",depth,consensus_allele,minority_allele,consensus_count,minority_count,minority_frequency,consensus_codon,minor_variant_codon,consensus_aa,minor_variant_aa");
+            header.push_str(",depth,consensus_allele,minority_allele,consensus_count,minority_count,minority_frequency,minor_variant_codon,minor_variant_aa");
         }
         writeln!(&mut writer, "{header}")?;
 
@@ -827,7 +828,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                                     query_nt_position,
                                 );
                                 if mv_matches.is_empty() {
-                                    row.push_str(&format!("{d}{d}{d}{d}{d}{d}{d}{d}"));
+                                    let _ = write!(row, "{d}{d}{d}{d}{d}{d}{d}{d}");
                                     writeln!(&mut writer, "{row}")?;
                                 } else {
                                     for mv in &mv_matches {
@@ -840,14 +841,13 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                                             None => (String::new(), String::new()),
                                         };
                                         let mv_suffix = format!(
-                                            "{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}",
+                                            "{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}",
                                             mv.depth,
                                             mv.consensus_allele,
                                             mv.minority_allele,
                                             mv.consensus_count,
                                             mv.minority_count,
                                             mv.minority_frequency,
-                                            mv_aa,
                                             mv_codon,
                                             mv_aa
                                         );
@@ -1062,7 +1062,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
             BufWriter::new(Either::Right(stdout()))
         };
         let mut header = String::from(
-            "query_name,ref_name,ctype,dais_reference,protein,aln_nt_position,ref_nt_position,query_nt_position,query_nt,ref_nt,position_in_codon,query_codon,ref_codon,aa_mutation,aln_aa_position,ref_aa_position,query_aa_position,variant_of_interest",
+            "query_name,ref_name,ctype,dais_reference,protein,aln_nt_position,ref_nt_position,query_nt_position,query_nt,ref_nt,position_in_codon,query_codon,ref_codon,aln_aa_position,ref_aa_position,query_aa_position,aa_mutation,variant_of_interest",
         );
         if include_minor_variants {
             header.push_str(",depth,consensus_allele,minority_allele,consensus_count,minority_count,minority_frequency,consensus_codon,consensus_aa,minor_variant_codon,minor_variant_aa");
@@ -1236,8 +1236,8 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                                                     {nt_position}{d}{ref_nt_position}{d}{query_nt_position}{d}{}{d}{}{d}\
                                                     {position_in_codon}{d}\
                                                     {mut_codon}{d}{ref_codon}{d}\
-                                                    {aa_ref}:{aa_position}:{aa_mut}{d}\
                                                     {aln_aa_position}{d}{ref_aa_position}{d}{query_aa_position}{d}\
+                                                    {aa_ref}:{aa_position}:{aa_mut}{d}\
                                                     {variant_of_interest}{mv_suffix}",
                                             query_nt as char, ref_nt as char,
                                         )?;
@@ -1391,8 +1391,8 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                                                 {nt_position}{d}{ref_nt_position}{d}{query_nt_position}{d}{}{d}{}{d}\
                                                 {position_in_codon}{d}\
                                                 {mut_codon}{d}{ref_codon}{d}\
-                                                {aa_ref}:{aa_position}:{aa_mut}{d}\
                                                 {aln_aa_position}{d}{ref_aa_position}{d}{query_aa_position}{d}\
+                                                {aa_ref}:{aa_position}:{aa_mut}{d}\
                                                 {variant_of_interest}{mv_suffix}",
                                         *query_nt as char, *ref_nt as char,
                                     )?;
