@@ -3,7 +3,7 @@ use clap::Parser;
 use csv::ReaderBuilder;
 use glob::glob;
 use plotly::{
-    Layout, Plot, Sankey, Scatter,
+    Layout, Plot, Scatter,
     common::{Mode, Title},
     configuration::{ImageButtonFormats, ToImageButtonOptions},
     layout::{Axis, GridPattern, LayoutGrid},
@@ -15,6 +15,18 @@ use std::{
     io::{BufRead, BufReader},
     path::{Path, PathBuf},
 };
+
+/// A raw JSON trace, used where the plotly crate's typed builders lack a field
+/// we need (here: sankey link `customdata`).
+#[derive(Clone, serde::Serialize)]
+#[serde(transparent)]
+struct RawTrace(serde_json::Value);
+
+impl plotly::Trace for RawTrace {
+    fn to_json(&self) -> String {
+        serde_json::to_string(&self.0).unwrap_or_default()
+    }
+}
 
 use crate::constants::theme;
 
@@ -259,6 +271,9 @@ pub fn generate_plot_coverage_seg(input_directory: &Path) -> Result<Plot, Box<dy
         }
     }
 
+    // Segment title labels, positioned dynamically per subplot.
+    let mut annotations = Vec::new();
+
     // Process each file and create a subplot
     for (idx, path) in file_paths.iter().enumerate() {
         // Extract segment name from file path
@@ -297,6 +312,29 @@ pub fn generate_plot_coverage_seg(input_directory: &Path) -> Result<Plot, Box<dy
             y_values.push(y);
         }
 
+        // Pick the emptiest top corner (data coords) for the segment label so
+        // it does not sit on top of the coverage curve or variant lines.
+        let n = y_values.len();
+        let max_y = y_values.iter().copied().max().unwrap_or(1);
+        let min_x = x_values.iter().copied().min().unwrap_or(0);
+        let max_x = x_values.iter().copied().max().unwrap_or(1);
+        let mid = n / 2;
+        let left_peak = y_values[..mid].iter().copied().max().unwrap_or(0);
+        let right_peak = y_values[mid..].iter().copied().max().unwrap_or(0);
+        let (label_x, label_x_anchor, region_peak) = if left_peak <= right_peak {
+            (f64::from(min_x), plotly::common::Anchor::Left, left_peak)
+        } else {
+            (f64::from(max_x), plotly::common::Anchor::Right, right_peak)
+        };
+        // Vertical anchor also varies per subplot so the label clears the data:
+        // low local coverage -> pin to the top; high local coverage -> float
+        // just above the local curve.
+        let (label_y, label_y_anchor) = if region_peak * 2 <= max_y {
+            (f64::from(max_y), plotly::common::Anchor::Top)
+        } else {
+            (f64::from(region_peak), plotly::common::Anchor::Bottom)
+        };
+
         // Create a trace for the current CSV file with consistent color
         let trace = Scatter::new(x_values, y_values.clone())
             .mode(Mode::Lines)
@@ -326,14 +364,28 @@ pub fn generate_plot_coverage_seg(input_directory: &Path) -> Result<Plot, Box<dy
         // Add trace to plot
         plot.add_trace(trace);
 
-        // Add variant data as scatter traces if we have data for this segment
-        if let Some(variants) = variants_data.get(&segment_name) {
-            // Collect positions and values for consensus and minority traces
-            let mut variant_positions: Vec<u32> = Vec::new();
-            let mut consensus_values: Vec<u32> = Vec::new();
-            let mut minority_values: Vec<u32> = Vec::new();
-            let mut hover_texts: Vec<String> = Vec::new();
+        // Segment label anchored in the chosen corner of this subplot.
+        let label = segment_name.split('_').nth(1).unwrap_or(&segment_name);
+        annotations.push(
+            plotly::layout::Annotation::new()
+                .text(label)
+                .x_ref(&xaxis)
+                .y_ref(&yaxis)
+                .x(label_x)
+                .y(label_y)
+                .x_anchor(label_x_anchor)
+                .y_anchor(label_y_anchor)
+                .font(
+                    plotly::common::Font::new()
+                        .family(theme::TITLE_FONT)
+                        .size(22)
+                        .color(segment_color),
+                )
+                .show_arrow(false),
+        );
 
+        // Add variant data as vertical lines if we have data for this segment
+        if let Some(variants) = variants_data.get(&segment_name) {
             for &(
                 position,
                 ref consensus_allele,
@@ -343,33 +395,46 @@ pub fn generate_plot_coverage_seg(input_directory: &Path) -> Result<Plot, Box<dy
                 minority_frequency,
             ) in variants
             {
-                variant_positions.push(position);
-                consensus_values.push(consensus_count + minority_count); // Total height
-                minority_values.push(minority_count);
-                hover_texts.push(format!(
-                    "<b>Position:</b> {}<br><br><b>Consensus Allele:</b> {}<br><b>Consensus Count:</b> {}<br><br><b>Minority Allele:</b> {}<br><b>Minority Count:</b> {}<br><b>Minority Frequency:</b> {:.2}%<br><br><b>Total:</b> {}",
-                    position, consensus_allele, consensus_count, minority_allele, minority_count, minority_frequency * 100.0, consensus_count + minority_count
-                ));
+                let total = consensus_count + minority_count;
+                let hover = format!(
+                    "<b>Position:</b> {}<br><br><b>Consensus Allele:</b> {}<br><b>Consensus Count:</b> {}<br><br><b>Minority Allele:</b> {}<br><b>Minority Count:</b> {}<br><b>Minority Frequency:</b> {:.2}%<br><br><b>Total:</b> {}<extra></extra>",
+                    position,
+                    consensus_allele,
+                    consensus_count,
+                    minority_allele,
+                    minority_count,
+                    minority_frequency * 100.0,
+                    total
+                );
+
+                // Line 1: minority allele depth, y=0 -> minority_count (solid).
+                let minor_line = Scatter::new(vec![position, position], vec![0, minority_count])
+                    .mode(Mode::Lines)
+                    .name(&segment_name)
+                    .line(plotly::common::Line::new().color(segment_color).width(4.0))
+                    .hover_template(hover.clone())
+                    .x_axis(&xaxis)
+                    .y_axis(&yaxis)
+                    .show_legend(false);
+                plot.add_trace(minor_line);
+
+                // Line 2: remainder up to total, y=minority_count -> total (dashed).
+                let total_line =
+                    Scatter::new(vec![position, position], vec![minority_count, total])
+                        .mode(Mode::Lines)
+                        .name(&segment_name)
+                        .line(
+                            plotly::common::Line::new()
+                                .color(segment_color)
+                                .width(4.0)
+                                .dash(plotly::common::DashType::Dot),
+                        )
+                        .hover_template(hover.clone())
+                        .x_axis(&xaxis)
+                        .y_axis(&yaxis)
+                        .show_legend(false);
+                plot.add_trace(total_line);
             }
-
-            // Create trace for minority values with consistent color (but with transparency)
-            let minority_trace = Scatter::new(variant_positions, minority_values)
-                .mode(Mode::Markers)
-                .name(&segment_name)
-                .marker(
-                    plotly::common::Marker::new()
-                        .color(segment_color)
-                        .opacity(0.5)
-                        .size(15)
-                        .symbol(plotly::common::MarkerSymbol::TriangleUp),
-                )
-                .text_array(hover_texts)
-                .x_axis(&xaxis)
-                .y_axis(&yaxis)
-                .show_legend(false);
-
-            // Add variant traces to plot
-            plot.add_trace(minority_trace);
         }
     }
 
@@ -391,65 +456,6 @@ pub fn generate_plot_coverage_seg(input_directory: &Path) -> Result<Plot, Box<dy
                 .to_str()
                 .unwrap_or("Unknown")
         ));
-
-    // Add annotations for each segment title
-    let mut annotations = Vec::new();
-    for (idx, path) in file_paths.iter().enumerate() {
-        let ctype: Vec<&str> = path
-            .file_name()
-            .unwrap_or_default()
-            .to_str()
-            .unwrap_or("Unknown")
-            .split('-')
-            .next()
-            .unwrap_or("Unknown")
-            .split('_')
-            .collect();
-        let segment_name = ctype[1];
-        /* .file_name()
-        .unwrap_or_default()
-        .to_str()
-        .unwrap_or("Unknown")
-        .split('-')
-        .next()
-        .unwrap_or("Unknown")
-        .split('_')
-        .next()
-        .unwrap_or("Unknown")
-        .next()
-        .unwrap_or("Unknown");
-        */
-        let row = idx / cols;
-        let col = idx % cols;
-
-        // Calculate position for annotation (centered above each subplot)
-        annotations.push(
-            plotly::layout::Annotation::new()
-                .text(segment_name)
-                .x_ref("paper")
-                .y_ref("paper")
-                //.x((col as f64 + 0.5) / cols as f64)
-                .x(match col {
-                    0 => 0.2,
-                    1 => 0.8,
-                    _ => (col as f64 + 0.5) / cols as f64, // fallback formula for other columns
-                })
-                .y(match row {
-                    0 => 1.0,
-                    1 => 0.78,
-                    2 => 0.48,
-                    3 => 0.18,
-                    _ => (row as f64 + 0.5) / rows as f64, // fallback formula for other rows
-                })
-                .font(
-                    plotly::common::Font::new()
-                        .family(theme::TITLE_FONT)
-                        .size(22)
-                        .color(get_segment_color(segment_name)),
-                )
-                .show_arrow(false),
-        );
-    }
 
     // Add annotations to layout
     layout = layout.annotations(annotations);
@@ -661,89 +667,114 @@ pub fn generate_sankey_plot(input_directory: &Path) -> Result<Plot, Box<dyn Erro
     // Prepare Sankey plot
     let mut plot = Plot::new();
 
-    // Create Sankey trace
-    let node_labels_refs: Vec<&str> = node_labels
-        .iter()
-        .map(std::string::String::as_str)
-        .collect();
-
-    // Explicitly define x and y positions for each node
-    let n = node_labels.len();
-    let mut x = vec![0.0; n];
-    let mut y = vec![0.0; n];
     // Node colors: CDC blues for the read-funnel stages, segment/virus colors
     // (shared with the coverage plots) for the assignment nodes.
-    let mut node_colors: Vec<&'static str> = vec![theme::GRAY; n];
-    // Assign positions for the first five nodes (Initial Reads, Pass QC, Fail QC, No Match, Alt Match)
-    // Remaining nodes (segments) are stacked vertically in the last column
-    let mut seg_idx = 0;
-    for (i, label) in node_labels.iter().enumerate() {
-        match label.as_str() {
-            "Initial Reads" => {
-                x[i] = 0.0;
-                y[i] = 0.5;
-                node_colors[i] = "#87B5E3"; // light blue
-            }
-            "Pass QC" => {
-                x[i] = 0.2;
-                y[i] = 0.2;
-                node_colors[i] = theme::CDC_BLUE_1; // #3382CF
-            }
-            "Fail QC" => {
-                x[i] = 0.2;
-                y[i] = 0.1;
-                node_colors[i] = theme::GRAY;
-            }
-            "No Match" => {
-                x[i] = 0.4;
-                y[i] = 0.2;
-                node_colors[i] = theme::GRAY;
-            }
-            "Alt Match" => {
-                x[i] = 0.4;
-                y[i] = 0.8;
-                node_colors[i] = theme::CDC_TEAL;
-            }
-            "Primary Match" => {
-                x[i] = 0.4;
-                y[i] = 0.5;
-                node_colors[i] = theme::CDC_BLUE; // #0057B7
-            }
-            _ => {
-                // Segment nodes: stack vertically in last column
-                x[i] = 0.7;
-                y[i] = 0.1 + 0.8 * f64::from(seg_idx) / ((n - 5).max(1) as f64);
-                node_colors[i] = get_segment_color(label);
-                seg_idx += 1;
-            }
-        }
+    let node_colors: Vec<&'static str> = node_labels
+        .iter()
+        .map(|label| match label.as_str() {
+            "Initial Reads" => "#87B5E3",   // light blue
+            "Pass QC" => theme::CDC_BLUE_1, // #3382CF
+            "Alt Match" => theme::CDC_TEAL,
+            "Primary Match" => theme::CDC_BLUE, // #0057B7
+            "Fail QC" | "No Match" => theme::GRAY,
+            _ => get_segment_color(label),
+        })
+        .collect();
+
+    // Let Snap auto-lay out the columns from the link topology: sink nodes
+    // (Fail QC, No Match and every segment) align on the same right-hand x,
+    // Pass QC sits left of the match nodes, and nodes stay draggable. Height
+    // scales with the sink column so tall diagrams still fit.
+    let source_set: std::collections::HashSet<usize> = source_indices.iter().copied().collect();
+    let sink_count = (0..node_labels.len())
+        .filter(|i| !source_set.contains(i))
+        .count()
+        .max(6);
+    let sankey_height = (sink_count * 70).clamp(500, 1400);
+
+    // Outgoing reads per node (also the denominator for a child's "% of parent").
+    let mut parent_totals: HashMap<usize, u32> = HashMap::new();
+    for (s, v) in source_indices.iter().zip(values.iter()) {
+        *parent_totals.entry(*s).or_insert(0) += *v;
     }
 
-    let sankey = Sankey::new()
-        .node(
-            plotly::sankey::Node::new()
-                .label(node_labels_refs)
-                .x(x)
-                .y(y)
-                .color_array(node_colors)
-                .pad(15)
-                .thickness(20)
-                .line(plotly::sankey::Line::new().color("black"))
-                .hover_template("<b>%{label}</b><br>%{value} reads")
-                .hover_info(plotly::common::HoverInfo::Name),
-        )
-        .link(
-            plotly::sankey::Link::new()
-                .source(source_indices)
-                .target(target_indices)
-                .value(values)
-                //.color(vec!["rgba(0,0,0,0.2)"; values.len()])
-                //.hover_info("all")
-                .hover_info(plotly::common::HoverInfo::None),
-        )
-        .arrangement(plotly::sankey::Arrangement::Snap);
+    // Incoming reads and parents per node, for the label read count and %.
+    let mut node_in: HashMap<usize, u32> = HashMap::new();
+    let mut node_parents: HashMap<usize, std::collections::HashSet<usize>> = HashMap::new();
+    for ((s, t), v) in source_indices
+        .iter()
+        .zip(target_indices.iter())
+        .zip(values.iter())
+    {
+        *node_in.entry(*t).or_insert(0) += *v;
+        node_parents.entry(*t).or_default().insert(*s);
+    }
 
-    plot.add_trace(sankey);
+    // Thousands-separated read count.
+    let commafy = |n: u32| -> String {
+        let s = n.to_string();
+        let len = s.len();
+        s.chars()
+            .enumerate()
+            .flat_map(|(i, c)| {
+                if i > 0 && (len - i) % 3 == 0 {
+                    vec![',', c]
+                } else {
+                    vec![c]
+                }
+            })
+            .collect()
+    };
+
+    // Node labels show name, read count, and % of parent (root has no parent).
+    let node_display: Vec<String> = node_labels
+        .iter()
+        .enumerate()
+        .map(|(i, name)| {
+            let incoming = node_in.get(&i).copied().unwrap_or(0);
+            let outgoing = parent_totals.get(&i).copied().unwrap_or(0);
+            let count = incoming.max(outgoing);
+            let denom: u32 = node_parents
+                .get(&i)
+                .map(|ps| {
+                    ps.iter()
+                        .map(|s| parent_totals.get(s).copied().unwrap_or(0))
+                        .sum()
+                })
+                .unwrap_or(0);
+            if denom > 0 {
+                format!(
+                    "{name} ({} reads, {:.1}%)",
+                    commafy(count),
+                    f64::from(incoming) / f64::from(denom) * 100.0
+                )
+            } else {
+                format!("{name} ({} reads)", commafy(count))
+            }
+        })
+        .collect();
+
+    // Built as raw JSON to control the node/link fields directly.
+    let sankey_json = serde_json::json!({
+        "type": "sankey",
+        "arrangement": "snap",
+        "node": {
+            "label": node_display,
+            "color": node_colors,
+            "pad": 15,
+            "thickness": 20,
+            "line": { "color": "black" },
+            "hovertemplate": "<b>%{label}</b><extra></extra>"
+        },
+        "link": {
+            "source": source_indices,
+            "target": target_indices,
+            "value": values,
+            "hoverinfo": "skip"
+        }
+    });
+
+    plot.add_trace(Box::new(RawTrace(sankey_json)));
 
     // Set layout
     let layout = Layout::new()
@@ -756,6 +787,7 @@ pub fn generate_sankey_plot(input_directory: &Path) -> Result<Plot, Box<dyn Erro
                 .to_str()
                 .unwrap_or("Unknown")
         ))
+        .height(sankey_height)
         .auto_size(true);
 
     plot.set_layout(layout);
