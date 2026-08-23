@@ -197,6 +197,15 @@ fn load_indel_data(
     Ok((insertions_data, deletions_data))
 }
 
+/// Evenly spaced points along a vertical line at `x` from `y0` to `y1`, so hover
+/// fires anywhere along the drawn line rather than only at its two ends.
+fn vline(x: u32, y0: u32, y1: u32) -> (Vec<u32>, Vec<u32>) {
+    const STEPS: u32 = 40;
+    let (lo, hi) = (y0.min(y1), y0.max(y1));
+    let span = hi - lo;
+    (0..=STEPS).map(|i| (x, lo + span * i / STEPS)).unzip()
+}
+
 /// Draw the minor-SNV and indel vertical lines for one segment. Every trace
 /// shares `legend_group` (the segment name) so a front end can highlight or
 /// toggle a whole segment independently of Plotly's own legend controls.
@@ -234,7 +243,8 @@ fn add_variant_indel_traces(
                 *minority_frequency * 100.0,
                 total
             );
-            let minor_line = Scatter::new(vec![*position, *position], vec![0, *minority_count])
+            let (vx, vy) = vline(*position, 0, *minority_count);
+            let minor_line = Scatter::new(vx, vy)
                 .mode(Mode::Lines)
                 .name(segment_name)
                 .legend_group(legend_group)
@@ -244,7 +254,8 @@ fn add_variant_indel_traces(
                 .y_axis(yaxis)
                 .show_legend(false);
             plot.add_trace(minor_line);
-            let total_line = Scatter::new(vec![*position, *position], vec![*minority_count, total])
+            let (tx, ty) = vline(*position, *minority_count, total);
+            let total_line = Scatter::new(tx, ty)
                 .mode(Mode::Lines)
                 .name(segment_name)
                 .legend_group(legend_group)
@@ -276,7 +287,8 @@ fn add_variant_indel_traces(
                 total,
                 *frequency * 100.0
             );
-            let major_line = Scatter::new(vec![*position, *position], vec![0, major])
+            let (mx, my) = vline(*position, 0, major);
+            let major_line = Scatter::new(mx, my)
                 .mode(Mode::Lines)
                 .name("Insertion")
                 .legend_group(legend_group)
@@ -290,7 +302,8 @@ fn add_variant_indel_traces(
                 .y_axis(yaxis)
                 .show_legend(false);
             plot.add_trace(major_line);
-            let indel_line = Scatter::new(vec![*position, *position], vec![major, *total])
+            let (ix, iy) = vline(*position, major, *total);
+            let indel_line = Scatter::new(ix, iy)
                 .mode(Mode::Lines)
                 .name("Insertion")
                 .legend_group(legend_group)
@@ -321,7 +334,8 @@ fn add_variant_indel_traces(
                 total,
                 *frequency * 100.0
             );
-            let major_line = Scatter::new(vec![*position, *position], vec![0, major])
+            let (mx, my) = vline(*position, 0, major);
+            let major_line = Scatter::new(mx, my)
                 .mode(Mode::Lines)
                 .name("Deletion")
                 .legend_group(legend_group)
@@ -331,7 +345,8 @@ fn add_variant_indel_traces(
                 .y_axis(yaxis)
                 .show_legend(false);
             plot.add_trace(major_line);
-            let indel_line = Scatter::new(vec![*position, *position], vec![major, *total])
+            let (ix, iy) = vline(*position, major, *total);
+            let indel_line = Scatter::new(ix, iy)
                 .mode(Mode::Lines)
                 .name("Deletion")
                 .legend_group(legend_group)
@@ -465,9 +480,11 @@ pub fn generate_plot_coverage(input_directory: &Path) -> Result<Plot, Box<dyn Er
                 for result in rdr.records() {
                     let record = result?;
                     let x: u32 = record[1].parse()?;
-                    let y: u32 = record[2].parse()?;
+                    // Depth = base-call depth + deletion-spanning reads (true read depth).
+                    let depth: u32 = record[2].parse()?;
+                    let deletions: u32 = record.get(4).and_then(|s| s.parse().ok()).unwrap_or(0);
                     x_values.push(x);
-                    y_values.push(y);
+                    y_values.push(depth + deletions);
                 }
 
                 // Extract segment name
@@ -488,7 +505,8 @@ pub fn generate_plot_coverage(input_directory: &Path) -> Result<Plot, Box<dyn Er
                     .mode(Mode::Lines)
                     .name(segment_name)
                     .legend_group(segment_name)
-                    .line(plotly::common::Line::new().color(segment_color).width(3.0));
+                    .line(plotly::common::Line::new().color(segment_color).width(3.0))
+                    .hover_template("<b>Position:</b> %{x}<br><b>Depth:</b> %{y}<extra></extra>");
 
                 plot.add_trace(trace);
 
@@ -606,9 +624,11 @@ pub fn generate_plot_coverage_seg(input_directory: &Path) -> Result<Plot, Box<dy
         for result in rdr.records() {
             let record = result?;
             let x: u32 = record[1].parse()?;
-            let y: u32 = record[2].parse()?;
+            // Depth = base-call depth + deletion-spanning reads (true read depth).
+            let depth: u32 = record[2].parse()?;
+            let deletions: u32 = record.get(4).and_then(|s| s.parse().ok()).unwrap_or(0);
             x_values.push(x);
-            y_values.push(y);
+            y_values.push(depth + deletions);
         }
 
         // Pick the emptiest top corner (data coords) for the segment label so
@@ -640,7 +660,7 @@ pub fn generate_plot_coverage_seg(input_directory: &Path) -> Result<Plot, Box<dy
             .name(&segment_name)
             .legend_group(&segment_name)
             .line(plotly::common::Line::new().color(segment_color).width(3.0))
-            .hover_template("<b>Position:</b> %{x}<br><b>Coverage:</b> %{y}<br>")
+            .hover_template("<b>Position:</b> %{x}<br><b>Depth:</b> %{y}<extra></extra>")
             .show_legend(false);
 
         // Calculate row and column for this subplot (1-indexed)
