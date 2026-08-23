@@ -117,8 +117,10 @@ fn build_layout_json(colorscale: &[(f64, &str)]) -> serde_json::Value {
                 }]
             },
             "layout": {
-                "paper_bgcolor": "white",
-                "plot_bgcolor": "#E5ECF6"
+                "font": {"family": crate::constants::theme::BODY_FONT, "color": crate::constants::theme::CHARCOAL, "size": 13},
+                "title": {"font": crate::constants::theme::title_font_json()},
+                "paper_bgcolor": crate::constants::theme::WHITE,
+                "plot_bgcolor": crate::constants::theme::WHITE
             }
         },
         "legend": {

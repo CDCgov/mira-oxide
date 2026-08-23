@@ -16,44 +16,37 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use crate::constants::theme;
+
 // Add this function to generate consistent colors for segment names
 #[must_use]
 pub fn get_segment_color(segment_name: &str) -> &'static str {
-    // This ensures the same segment always gets the same color across all plots
-    // Check if segment_name contains any of our known segment identifiers
-    if segment_name.contains("PB2") {
-        "#3366CC" // blue
-    } else if segment_name.contains("PB1") {
-        "#DC3912" // red
-    } else if segment_name.contains("PA") {
-        "#FF9900" // orange
-    } else if segment_name.contains("HA") {
-        "#109618" // green
-    } else if segment_name.contains("NP") {
-        "#990099" // purple
+    // Two CDC color families (same segment -> same color):
+    //   set1 (red range)       -> HA, NA
+    //   set2 (blue/teal range) -> PB2, PB1, PA, NP, MP, NS
+    if segment_name.contains("HA") {
+        theme::CDC_RED // #CC1B22
     } else if segment_name.contains("NA") {
-        "#3B3EAC" // indigo
+        "#F0695E" // coral (light red)
+    } else if segment_name.contains("PB2") {
+        theme::CDC_NAVY // #032659
+    } else if segment_name.contains("PB1") {
+        theme::CDC_BLUE // #0057B7
+    } else if segment_name.contains("PA") {
+        theme::CDC_BLUE_1 // #3382CF
+    } else if segment_name.contains("NP") {
+        "#5796D9" // light blue
     } else if segment_name.contains("MP") {
-        "#0099C6" // cyan
+        theme::CDC_TEAL // #0081A1
     } else if segment_name.contains("NS") {
-        "#DD4477" // pink
+        "#00B1CE" // light teal
     } else {
-        // For any other segments, use a hash of the segment name to pick a color
+        // Other virus types (RSV, SC2) -> CDC colorway by hash.
         let hash = segment_name
             .bytes()
             .fold(0u32, |acc, b| acc.wrapping_add(u32::from(b)));
-        match hash % 10 {
-            0 => "#3366CC", // blue
-            1 => "#DC3912", // red
-            2 => "#FF9900", // orange
-            3 => "#109618", // green
-            4 => "#990099", // purple
-            5 => "#3B3EAC", // indigo
-            6 => "#0099C6", // cyan
-            7 => "#DD4477", // pink
-            8 => "#66AA00", // lime
-            _ => "#B82E2E", // dark red
-        }
+        let cw = theme::colorway();
+        cw[hash as usize % cw.len()]
     }
 }
 
@@ -158,7 +151,7 @@ pub fn generate_plot_coverage(input_directory: &Path) -> Result<Plot, Box<dyn Er
                 let trace = Scatter::new(x_values, y_values)
                     .mode(Mode::Lines)
                     .name(segment_name)
-                    .line(plotly::common::Line::new().color(segment_color));
+                    .line(plotly::common::Line::new().color(segment_color).width(3.0));
 
                 plot.add_trace(trace);
             }
@@ -168,6 +161,7 @@ pub fn generate_plot_coverage(input_directory: &Path) -> Result<Plot, Box<dyn Er
 
     // Set the figure title
     let layout = Layout::new()
+        .template(theme::cdc_template())
         .title(format!(
             "Coverage | {}",
             input_directory
@@ -307,7 +301,7 @@ pub fn generate_plot_coverage_seg(input_directory: &Path) -> Result<Plot, Box<dy
         let trace = Scatter::new(x_values, y_values.clone())
             .mode(Mode::Lines)
             .name(&segment_name)
-            .line(plotly::common::Line::new().color(segment_color))
+            .line(plotly::common::Line::new().color(segment_color).width(3.0))
             .hover_template("<b>Position:</b> %{x}<br><b>Coverage:</b> %{y}<br>")
             .show_legend(false);
 
@@ -382,6 +376,7 @@ pub fn generate_plot_coverage_seg(input_directory: &Path) -> Result<Plot, Box<dy
     // Configure subplot layout
     // Create a base layout first
     let mut layout = Layout::new()
+        .template(theme::cdc_template())
         .grid(
             LayoutGrid::new()
                 .rows(rows)
@@ -448,6 +443,7 @@ pub fn generate_plot_coverage_seg(input_directory: &Path) -> Result<Plot, Box<dy
                 })
                 .font(
                     plotly::common::Font::new()
+                        .family(theme::TITLE_FONT)
                         .size(22)
                         .color(get_segment_color(segment_name)),
                 )
@@ -675,6 +671,9 @@ pub fn generate_sankey_plot(input_directory: &Path) -> Result<Plot, Box<dyn Erro
     let n = node_labels.len();
     let mut x = vec![0.0; n];
     let mut y = vec![0.0; n];
+    // Node colors: CDC blues for the read-funnel stages, segment/virus colors
+    // (shared with the coverage plots) for the assignment nodes.
+    let mut node_colors: Vec<&'static str> = vec![theme::GRAY; n];
     // Assign positions for the first five nodes (Initial Reads, Pass QC, Fail QC, No Match, Alt Match)
     // Remaining nodes (segments) are stacked vertically in the last column
     let mut seg_idx = 0;
@@ -683,31 +682,38 @@ pub fn generate_sankey_plot(input_directory: &Path) -> Result<Plot, Box<dyn Erro
             "Initial Reads" => {
                 x[i] = 0.0;
                 y[i] = 0.5;
+                node_colors[i] = "#87B5E3"; // light blue
             }
             "Pass QC" => {
                 x[i] = 0.2;
                 y[i] = 0.2;
+                node_colors[i] = theme::CDC_BLUE_1; // #3382CF
             }
             "Fail QC" => {
                 x[i] = 0.2;
                 y[i] = 0.1;
+                node_colors[i] = theme::GRAY;
             }
             "No Match" => {
                 x[i] = 0.4;
                 y[i] = 0.2;
+                node_colors[i] = theme::GRAY;
             }
             "Alt Match" => {
                 x[i] = 0.4;
                 y[i] = 0.8;
+                node_colors[i] = theme::CDC_TEAL;
             }
             "Primary Match" => {
                 x[i] = 0.4;
                 y[i] = 0.5;
+                node_colors[i] = theme::CDC_BLUE; // #0057B7
             }
             _ => {
                 // Segment nodes: stack vertically in last column
                 x[i] = 0.7;
                 y[i] = 0.1 + 0.8 * f64::from(seg_idx) / ((n - 5).max(1) as f64);
+                node_colors[i] = get_segment_color(label);
                 seg_idx += 1;
             }
         }
@@ -719,6 +725,7 @@ pub fn generate_sankey_plot(input_directory: &Path) -> Result<Plot, Box<dyn Erro
                 .label(node_labels_refs)
                 .x(x)
                 .y(y)
+                .color_array(node_colors)
                 .pad(15)
                 .thickness(20)
                 .line(plotly::sankey::Line::new().color("black"))
@@ -740,6 +747,7 @@ pub fn generate_sankey_plot(input_directory: &Path) -> Result<Plot, Box<dyn Erro
 
     // Set layout
     let layout = Layout::new()
+        .template(theme::cdc_template())
         .title(format!(
             "Read Assignment | {}",
             input_directory

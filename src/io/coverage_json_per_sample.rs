@@ -1,4 +1,6 @@
 use crate::io::data_ingest::CoverageData;
+use crate::constants::theme;
+use crate::processes::plotter::get_segment_color;
 use plotly::{
     Plot, Scatter,
     common::{Fill, Line, Mode, Title},
@@ -117,32 +119,8 @@ pub fn create_sample_coverage_fig(
     };
 
     // Predefined list of colors for ORFs and different flu segments
-    let orf_color_palette = [
-        "#5796D9", // Light Blue
-        "#CC1B22", // Red
-        "#125261", // Dark Teal
-        "#0057B7", // Blue
-        "#FABF61", // Yellow
-        "#722161", // Magenta
-        "#00B1CE", // Light Teal
-        "#B278B2", // Purple
-        "#DB5E2E", // Light Orange
-        "#D1ADD4", // Light Purple
-        "#B8D4ED", // White Blue
-        "#FB7E38", // Orange
-    ];
-
-    // Pattern-based color map for flu
-    let flu_pattern_colors: Vec<(&str, &str)> = vec![
-        ("HA", "#5796D9"),  // Light Blue
-        ("NA", "#7DDEEC"),  // Teal
-        ("MP", "#B278B2"),  // Purple
-        ("NP", "#FABF61"),  // Yellow
-        ("NS", "#FF9C63"),  // Orange
-        ("PA", "#F0695E"),  // Light Red
-        ("PB1", "#0081A1"), // Dark Teal
-        ("PB2", "#8F4A8F"), // Dark Purplr
-    ];
+    // CDC palette for ORF/gene boxes and non-flu (RSV, SC2) coverage segments
+    let orf_color_palette = theme::orf_palette();
 
     // Add ORF boxes to the plot
     let oy = f64::from(max_coverage_depth) / 10.0;
@@ -181,19 +159,17 @@ pub fn create_sample_coverage_fig(
             let x: Vec<i32> = segment_data.iter().map(|d| d.position).collect();
             let y: Vec<i32> = segment_data.iter().map(|d| d.coverage_depth).collect();
 
-            // Determine color by virus
+            // Determine color by virus: flu uses the shared segment families,
+            // other viruses cycle the CDC ORF palette.
             let color = if virus == "flu" {
-                flu_pattern_colors
-                    .iter()
-                    .find(|(pattern, _)| segment.contains(pattern))
-                    .map_or("#000000".to_string(), |(_, color)| (*color).to_string())
+                get_segment_color(segment).to_string()
             } else {
                 orf_color_palette[seg_idx % orf_color_palette.len()].to_string()
             };
 
             let trace = Scatter::new(x, y)
                 .mode(Mode::Lines)
-                .line(Line::new().color(color))
+                .line(Line::new().color(color).width(3.0))
                 .name(segment.clone());
 
             plot.add_trace(trace);
@@ -236,6 +212,7 @@ pub fn create_sample_coverage_fig(
     // Set full layout
     plot.set_layout(
         Layout::new()
+            .template(crate::constants::theme::cdc_template())
             .title(Title::with_text(sample.to_string()))
             .height(600)
             .x_axis(Axis::new().title(Title::with_text("Position")))

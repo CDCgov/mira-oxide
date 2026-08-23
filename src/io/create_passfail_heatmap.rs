@@ -230,11 +230,12 @@ fn plotly_template(colorscale: &Vec<(f64, &str)>) -> serde_json::Value {
         },
         "layout": {
             "autotypenumbers": "strict",
-            "font": {"color": "#2a3f5f"},
+            "font": {"family": crate::constants::theme::BODY_FONT, "color": crate::constants::theme::CHARCOAL, "size": 13},
+            "colorway": crate::constants::theme::colorway(),
             "hovermode": "closest",
             "hoverlabel": {"align": "left"},
-            "paper_bgcolor": "white",
-            "plot_bgcolor": "#E5ECF6",
+            "paper_bgcolor": crate::constants::theme::WHITE,
+            "plot_bgcolor": crate::constants::theme::WHITE,
             "polar": {
                 "bgcolor": "#E5ECF6",
                 "angularaxis": {"gridcolor": "white", "linecolor": "white", "ticks": ""},
@@ -277,7 +278,7 @@ fn plotly_template(colorscale: &Vec<(f64, &str)>) -> serde_json::Value {
             "shapedefaults": {"line": {"color": "#2a3f5f"}},
             "annotationdefaults": {"arrowcolor": "#2a3f5f", "arrowhead": 0, "arrowwidth": 1},
             "geo": {"bgcolor": "white", "landcolor": "#E5ECF6", "subunitcolor": "white", "showland": true, "showlakes": true, "lakecolor": "white"},
-            "title": {"x": 0.05},
+            "title": {"x": 0.05, "font": crate::constants::theme::title_font_json()},
             "mapbox": {"style": "light"}
         }
     });

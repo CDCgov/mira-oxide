@@ -1,4 +1,5 @@
 use super::data_ingest::ReadsData;
+use crate::constants::theme;
 use serde_json::json;
 
 /// Creates a barcode distribution figure - writes it to a file and returns the JSON object.
@@ -20,15 +21,11 @@ pub fn create_barcode_distribution_figure(
         }
     }
 
-    // Color palette
-    let colors = vec![
-        "#0057B7", "#0081A1", "#722161", "#DE8A05", "#FB7E38", "#CC1B22", "#032659", "#125261",
-        "#47264F", "#975722", "#944521", "#660F14", "#3382CF", "#00B1CE", "#8F4A8F", "#FFB24D",
-        "#DB5E2E", "#961C1C",
-    ]
-    .into_iter()
-    .map(std::string::ToString::to_string)
-    .collect::<Vec<String>>();
+    // CDC color palette
+    let colors = theme::orf_palette()
+        .into_iter()
+        .map(std::string::ToString::to_string)
+        .collect::<Vec<String>>();
 
     assert!(!colors.is_empty(), "Color list cannot be empty.");
 
@@ -56,9 +53,11 @@ pub fn create_barcode_distribution_figure(
         "marker": marker_json,
     });
 
+    let mut layout = theme::layout_json();
+    layout["margin"] = json!({ "t": 60 });
     let plot_json = json!({
         "data": [pie_data],
-        "layout": { "margin": { "t": 60 } }
+        "layout": layout
     });
 
     // Save to file
