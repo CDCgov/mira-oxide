@@ -51,6 +51,305 @@ fn read_run_info(irma_dir: &Path) -> HashMap<String, String> {
     map
 }
 
+/// One minor-SNV variant: (position, consensus allele, minority allele, consensus count, minority count, minority frequency).
+type VariantRec = (u32, String, String, u32, u32, f32);
+/// One insertion: (position, inserted bases, count, total, frequency).
+type InsertionRec = (u32, String, u32, u32, f32);
+/// One deletion: (position, length, count, total, frequency).
+type DeletionRec = (u32, u32, u32, u32, f32);
+
+/// Load IRMA minor-SNV variants per segment from `tables/*variants.txt`.
+fn load_variant_data(
+    input_directory: &Path,
+) -> Result<HashMap<String, Vec<VariantRec>>, Box<dyn Error>> {
+    let mut variants_data: HashMap<String, Vec<VariantRec>> = HashMap::new();
+    for variant_path in (glob(&format!(
+        "{}/tables/*variants.txt",
+        input_directory.display()
+    ))?)
+    .flatten()
+    {
+        let file = File::open(&variant_path)?;
+        let mut rdr = ReaderBuilder::new()
+            .delimiter(b'\t')
+            .has_headers(true)
+            .from_reader(file);
+        for result in rdr.records() {
+            let record = result?;
+            if record.len() >= 8 {
+                let segment_name = record[0].to_string();
+                let position: u32 = record[1].parse()?;
+                let consensus_allele: String = record[3].to_string();
+                let minority_allele: String = record[4].to_string();
+                let consensus_count: u32 = record[5].parse()?;
+                let minority_count: u32 = record[6].parse()?;
+                let minority_frequency: f32 = record[8].parse()?;
+                variants_data.entry(segment_name).or_default().push((
+                    position,
+                    consensus_allele,
+                    minority_allele,
+                    consensus_count,
+                    minority_count,
+                    minority_frequency,
+                ));
+            }
+        }
+    }
+    Ok(variants_data)
+}
+
+/// Load IRMA insertions/deletions per segment. Per-type frequency thresholds are
+/// sourced from run_info.txt (MIN_FI/MIN_FD), floored at a platform default so
+/// low IRMA settings do not bury the coverage curve in indel noise.
+#[allow(clippy::type_complexity)]
+fn load_indel_data(
+    input_directory: &Path,
+) -> Result<
+    (
+        HashMap<String, Vec<InsertionRec>>,
+        HashMap<String, Vec<DeletionRec>>,
+    ),
+    Box<dyn Error>,
+> {
+    let run_info = read_run_info(input_directory);
+    let platform_default = if input_directory
+        .components()
+        .any(|c| c.as_os_str().eq_ignore_ascii_case("ont"))
+    {
+        INDEL_FREQ_DEFAULT_ONT
+    } else {
+        INDEL_FREQ_DEFAULT_ILLUMINA
+    };
+    let insertion_min_frequency = run_info
+        .get("MIN_FI")
+        .and_then(|v| v.parse::<f32>().ok())
+        .map_or(platform_default, |v| v.max(platform_default));
+    let deletion_min_frequency = run_info
+        .get("MIN_FD")
+        .and_then(|v| v.parse::<f32>().ok())
+        .map_or(platform_default, |v| v.max(platform_default));
+
+    let mut insertions_data: HashMap<String, Vec<InsertionRec>> = HashMap::new();
+    let mut deletions_data: HashMap<String, Vec<DeletionRec>> = HashMap::new();
+
+    for ins_path in (glob(&format!(
+        "{}/tables/*insertions.txt",
+        input_directory.display()
+    ))?)
+    .flatten()
+    {
+        let file = File::open(&ins_path)?;
+        let mut rdr = ReaderBuilder::new()
+            .delimiter(b'\t')
+            .has_headers(true)
+            .from_reader(file);
+        for result in rdr.records() {
+            let record = result?;
+            if record.len() >= 8 {
+                let frequency: f32 = record[7].parse().unwrap_or(0.0);
+                if frequency < insertion_min_frequency {
+                    continue;
+                }
+                let segment = record[0].to_string();
+                let position: u32 = record[1].parse()?;
+                let insert = record[2].to_string();
+                let count: u32 = record[5].parse()?;
+                let total: u32 = record[6].parse()?;
+                insertions_data
+                    .entry(segment)
+                    .or_default()
+                    .push((position, insert, count, total, frequency));
+            }
+        }
+    }
+
+    for del_path in (glob(&format!(
+        "{}/tables/*deletions.txt",
+        input_directory.display()
+    ))?)
+    .flatten()
+    {
+        let file = File::open(&del_path)?;
+        let mut rdr = ReaderBuilder::new()
+            .delimiter(b'\t')
+            .has_headers(true)
+            .from_reader(file);
+        for result in rdr.records() {
+            let record = result?;
+            if record.len() >= 8 {
+                let frequency: f32 = record[7].parse().unwrap_or(0.0);
+                if frequency < deletion_min_frequency {
+                    continue;
+                }
+                let segment = record[0].to_string();
+                let position: u32 = record[1].parse()?;
+                let length: u32 = record[2].parse()?;
+                let count: u32 = record[5].parse()?;
+                let total: u32 = record[6].parse()?;
+                deletions_data
+                    .entry(segment)
+                    .or_default()
+                    .push((position, length, count, total, frequency));
+            }
+        }
+    }
+
+    Ok((insertions_data, deletions_data))
+}
+
+/// Draw the minor-SNV and indel vertical lines for one segment. Every trace
+/// shares `legend_group` (the segment name) so a front end can highlight or
+/// toggle a whole segment independently of Plotly's own legend controls.
+#[allow(clippy::too_many_arguments)]
+fn add_variant_indel_traces(
+    plot: &mut Plot,
+    segment_name: &str,
+    segment_color: &'static str,
+    variants_data: &HashMap<String, Vec<VariantRec>>,
+    insertions_data: &HashMap<String, Vec<InsertionRec>>,
+    deletions_data: &HashMap<String, Vec<DeletionRec>>,
+    xaxis: &str,
+    yaxis: &str,
+    legend_group: &str,
+) {
+    // Minor-SNV variants: solid minority depth, dashed remainder up to total.
+    if let Some(variants) = variants_data.get(segment_name) {
+        for (
+            position,
+            consensus_allele,
+            minority_allele,
+            consensus_count,
+            minority_count,
+            minority_frequency,
+        ) in variants
+        {
+            let total = *consensus_count + *minority_count;
+            let hover = format!(
+                "<b>Position:</b> {}<br><br><b>Consensus Allele:</b> {}<br><b>Consensus Count:</b> {}<br><br><b>Minority Allele:</b> {}<br><b>Minority Count:</b> {}<br><b>Minority Frequency:</b> {:.2}%<br><br><b>Total:</b> {}<extra></extra>",
+                position,
+                consensus_allele,
+                consensus_count,
+                minority_allele,
+                minority_count,
+                *minority_frequency * 100.0,
+                total
+            );
+            let minor_line = Scatter::new(vec![*position, *position], vec![0, *minority_count])
+                .mode(Mode::Lines)
+                .name(segment_name)
+                .legend_group(legend_group)
+                .line(plotly::common::Line::new().color(segment_color).width(4.0))
+                .hover_template(hover.clone())
+                .x_axis(xaxis)
+                .y_axis(yaxis)
+                .show_legend(false);
+            plot.add_trace(minor_line);
+            let total_line = Scatter::new(vec![*position, *position], vec![*minority_count, total])
+                .mode(Mode::Lines)
+                .name(segment_name)
+                .legend_group(legend_group)
+                .line(
+                    plotly::common::Line::new()
+                        .color(segment_color)
+                        .width(4.0)
+                        .dash(plotly::common::DashType::Dot),
+                )
+                .hover_template(hover.clone())
+                .x_axis(xaxis)
+                .y_axis(yaxis)
+                .show_legend(false);
+            plot.add_trace(total_line);
+        }
+    }
+
+    // Insertions: solid green major count, dashed green indel count.
+    if let Some(insertions) = insertions_data.get(segment_name) {
+        for (position, insert, count, total, frequency) in insertions {
+            let major = total.saturating_sub(*count);
+            let hover = format!(
+                "<b>Insertion</b><br><br><b>Position:</b> {}<br><b>Inserted:</b> {}<br><b>Length:</b> {}<br><br><b>Insertion Count:</b> {}<br><b>Major Count:</b> {}<br><b>Total:</b> {}<br><b>Minor Frequency:</b> {:.2}%<extra></extra>",
+                position,
+                insert,
+                insert.chars().count(),
+                count,
+                major,
+                total,
+                *frequency * 100.0
+            );
+            let major_line = Scatter::new(vec![*position, *position], vec![0, major])
+                .mode(Mode::Lines)
+                .name("Insertion")
+                .legend_group(legend_group)
+                .line(
+                    plotly::common::Line::new()
+                        .color(INSERTION_COLOR)
+                        .width(3.0),
+                )
+                .hover_template(hover.clone())
+                .x_axis(xaxis)
+                .y_axis(yaxis)
+                .show_legend(false);
+            plot.add_trace(major_line);
+            let indel_line = Scatter::new(vec![*position, *position], vec![major, *total])
+                .mode(Mode::Lines)
+                .name("Insertion")
+                .legend_group(legend_group)
+                .line(
+                    plotly::common::Line::new()
+                        .color(INSERTION_COLOR)
+                        .width(3.0)
+                        .dash(plotly::common::DashType::Dash),
+                )
+                .hover_template(hover.clone())
+                .x_axis(xaxis)
+                .y_axis(yaxis)
+                .show_legend(false);
+            plot.add_trace(indel_line);
+        }
+    }
+
+    // Deletions: solid purple major count, dashed purple indel count.
+    if let Some(deletions) = deletions_data.get(segment_name) {
+        for (position, length, count, total, frequency) in deletions {
+            let major = total.saturating_sub(*count);
+            let hover = format!(
+                "<b>Deletion</b><br><br><b>Position:</b> {}<br><b>Length:</b> {}<br><br><b>Deletion Count:</b> {}<br><b>Major Count:</b> {}<br><b>Total:</b> {}<br><b>Minor Frequency:</b> {:.2}%<extra></extra>",
+                position,
+                length,
+                count,
+                major,
+                total,
+                *frequency * 100.0
+            );
+            let major_line = Scatter::new(vec![*position, *position], vec![0, major])
+                .mode(Mode::Lines)
+                .name("Deletion")
+                .legend_group(legend_group)
+                .line(plotly::common::Line::new().color(DELETION_COLOR).width(3.0))
+                .hover_template(hover.clone())
+                .x_axis(xaxis)
+                .y_axis(yaxis)
+                .show_legend(false);
+            plot.add_trace(major_line);
+            let indel_line = Scatter::new(vec![*position, *position], vec![major, *total])
+                .mode(Mode::Lines)
+                .name("Deletion")
+                .legend_group(legend_group)
+                .line(
+                    plotly::common::Line::new()
+                        .color(DELETION_COLOR)
+                        .width(3.0)
+                        .dash(plotly::common::DashType::Dash),
+                )
+                .hover_template(hover.clone())
+                .x_axis(xaxis)
+                .y_axis(yaxis)
+                .show_legend(false);
+            plot.add_trace(indel_line);
+        }
+    }
+}
+
 // Add this function to generate consistent colors for segment names
 #[must_use]
 pub fn get_segment_color(segment_name: &str) -> &'static str {
@@ -141,6 +440,10 @@ pub fn generate_plot_coverage(input_directory: &Path) -> Result<Plot, Box<dyn Er
     // Create a Plotly plot
     let mut plot = Plot::new();
 
+    // Load variant/indel overlays once, keyed by segment.
+    let variants_data = load_variant_data(input_directory)?;
+    let (insertions_data, deletions_data) = load_indel_data(input_directory)?;
+
     // Iterate over all coverage files in the input directory
     for entry in glob(&format!(
         "{}/tables/*coverage.txt",
@@ -184,9 +487,23 @@ pub fn generate_plot_coverage(input_directory: &Path) -> Result<Plot, Box<dyn Er
                 let trace = Scatter::new(x_values, y_values)
                     .mode(Mode::Lines)
                     .name(segment_name)
+                    .legend_group(segment_name)
                     .line(plotly::common::Line::new().color(segment_color).width(3.0));
 
                 plot.add_trace(trace);
+
+                // Overlay minor-SNV variants and indels for this segment.
+                add_variant_indel_traces(
+                    &mut plot,
+                    segment_name,
+                    segment_color,
+                    &variants_data,
+                    &insertions_data,
+                    &deletions_data,
+                    "x",
+                    "y",
+                    segment_name,
+                );
             }
             Err(e) => eprintln!("Error reading file: {e}"),
         }
@@ -249,140 +566,9 @@ pub fn generate_plot_coverage_seg(input_directory: &Path) -> Result<Plot, Box<dy
     let rows = 4; //((file_count + 2) as f64).sqrt().ceil() as usize;
     let cols = 2; //(file_count + rows - 1) / rows; // Ceiling division
 
-    // Load variant data into a HashMap keyed by segment name
-    // TODO: consider a struct with named fields
-    let mut variants_data: HashMap<String, Vec<(u32, String, String, u32, u32, f32)>> =
-        HashMap::new();
-
-    // Look for variant files with matching prefixes in the directory
-    for variant_path in (glob(&format!(
-        "{}/tables/*variants.txt",
-        input_directory.display()
-    ))?)
-    .flatten()
-    {
-        let file = File::open(&variant_path)?;
-
-        // Create a TSV reader
-        let mut rdr = ReaderBuilder::new()
-            .delimiter(b'\t')
-            .has_headers(true)
-            .from_reader(file);
-
-        for result in rdr.records() {
-            let record = result?;
-            if record.len() >= 8 {
-                let segment_name = record[0].to_string();
-                let position: u32 = record[1].parse()?;
-                let consensus_allele: String = record[3].to_string();
-                let minority_allele: String = record[4].to_string();
-                let consensus_count: u32 = record[5].parse()?;
-                let minority_count: u32 = record[6].parse()?;
-                let minority_frequency: f32 = record[8].parse()?;
-
-                variants_data.entry(segment_name).or_default().push((
-                    position,
-                    consensus_allele,
-                    minority_allele,
-                    consensus_count,
-                    minority_count,
-                    minority_frequency,
-                ));
-            }
-        }
-    }
-
-    // Load IRMA insertions/deletions per segment, keeping minor indels at or
-    // above the significance threshold.
-    // Per-type thresholds come from IRMA run_info.txt (MIN_FI/MIN_FD), floored at
-    // a platform default (ONT is noisier than Illumina) so low IRMA settings do
-    // not bury the coverage curve in indel noise.
-    let run_info = read_run_info(input_directory);
-    let platform_default = if input_directory
-        .components()
-        .any(|c| c.as_os_str().eq_ignore_ascii_case("ont"))
-    {
-        INDEL_FREQ_DEFAULT_ONT
-    } else {
-        INDEL_FREQ_DEFAULT_ILLUMINA
-    };
-    let insertion_min_frequency = run_info
-        .get("MIN_FI")
-        .and_then(|v| v.parse::<f32>().ok())
-        .map_or(platform_default, |v| v.max(platform_default));
-    let deletion_min_frequency = run_info
-        .get("MIN_FD")
-        .and_then(|v| v.parse::<f32>().ok())
-        .map_or(platform_default, |v| v.max(platform_default));
-
-    // segment -> Vec of (position, inserted_bases, count, total, frequency)
-    let mut insertions_data: HashMap<String, Vec<(u32, String, u32, u32, f32)>> = HashMap::new();
-    // segment -> Vec of (position, length, count, total, frequency)
-    let mut deletions_data: HashMap<String, Vec<(u32, u32, u32, u32, f32)>> = HashMap::new();
-
-    // Insertions: Reference_Name, Upstream_Position, Insert, Context, Called, Count, Total, Frequency
-    for ins_path in (glob(&format!(
-        "{}/tables/*insertions.txt",
-        input_directory.display()
-    ))?)
-    .flatten()
-    {
-        let file = File::open(&ins_path)?;
-        let mut rdr = ReaderBuilder::new()
-            .delimiter(b'\t')
-            .has_headers(true)
-            .from_reader(file);
-        for result in rdr.records() {
-            let record = result?;
-            if record.len() >= 8 {
-                let frequency: f32 = record[7].parse().unwrap_or(0.0);
-                if frequency < insertion_min_frequency {
-                    continue;
-                }
-                let segment = record[0].to_string();
-                let position: u32 = record[1].parse()?;
-                let insert = record[2].to_string();
-                let count: u32 = record[5].parse()?;
-                let total: u32 = record[6].parse()?;
-                insertions_data
-                    .entry(segment)
-                    .or_default()
-                    .push((position, insert, count, total, frequency));
-            }
-        }
-    }
-
-    // Deletions: Reference_Name, Upstream_Position, Length, Context, Called, Count, Total, Frequency
-    for del_path in (glob(&format!(
-        "{}/tables/*deletions.txt",
-        input_directory.display()
-    ))?)
-    .flatten()
-    {
-        let file = File::open(&del_path)?;
-        let mut rdr = ReaderBuilder::new()
-            .delimiter(b'\t')
-            .has_headers(true)
-            .from_reader(file);
-        for result in rdr.records() {
-            let record = result?;
-            if record.len() >= 8 {
-                let frequency: f32 = record[7].parse().unwrap_or(0.0);
-                if frequency < deletion_min_frequency {
-                    continue;
-                }
-                let segment = record[0].to_string();
-                let position: u32 = record[1].parse()?;
-                let length: u32 = record[2].parse()?;
-                let count: u32 = record[5].parse()?;
-                let total: u32 = record[6].parse()?;
-                deletions_data
-                    .entry(segment)
-                    .or_default()
-                    .push((position, length, count, total, frequency));
-            }
-        }
-    }
+    // Load variant/indel overlays once, keyed by segment.
+    let variants_data = load_variant_data(input_directory)?;
+    let (insertions_data, deletions_data) = load_indel_data(input_directory)?;
 
     // Segment title labels, positioned dynamically per subplot.
     let mut annotations = Vec::new();
@@ -452,6 +638,7 @@ pub fn generate_plot_coverage_seg(input_directory: &Path) -> Result<Plot, Box<dy
         let trace = Scatter::new(x_values, y_values.clone())
             .mode(Mode::Lines)
             .name(&segment_name)
+            .legend_group(&segment_name)
             .line(plotly::common::Line::new().color(segment_color).width(3.0))
             .hover_template("<b>Position:</b> %{x}<br><b>Coverage:</b> %{y}<br>")
             .show_legend(false);
@@ -497,145 +684,18 @@ pub fn generate_plot_coverage_seg(input_directory: &Path) -> Result<Plot, Box<dy
                 .show_arrow(false),
         );
 
-        // Add variant data as vertical lines if we have data for this segment
-        if let Some(variants) = variants_data.get(&segment_name) {
-            for &(
-                position,
-                ref consensus_allele,
-                ref minority_allele,
-                consensus_count,
-                minority_count,
-                minority_frequency,
-            ) in variants
-            {
-                let total = consensus_count + minority_count;
-                let hover = format!(
-                    "<b>Position:</b> {}<br><br><b>Consensus Allele:</b> {}<br><b>Consensus Count:</b> {}<br><br><b>Minority Allele:</b> {}<br><b>Minority Count:</b> {}<br><b>Minority Frequency:</b> {:.2}%<br><br><b>Total:</b> {}<extra></extra>",
-                    position,
-                    consensus_allele,
-                    consensus_count,
-                    minority_allele,
-                    minority_count,
-                    minority_frequency * 100.0,
-                    total
-                );
-
-                // Line 1: minority allele depth, y=0 -> minority_count (solid).
-                let minor_line = Scatter::new(vec![position, position], vec![0, minority_count])
-                    .mode(Mode::Lines)
-                    .name(&segment_name)
-                    .line(plotly::common::Line::new().color(segment_color).width(4.0))
-                    .hover_template(hover.clone())
-                    .x_axis(&xaxis)
-                    .y_axis(&yaxis)
-                    .show_legend(false);
-                plot.add_trace(minor_line);
-
-                // Line 2: remainder up to total, y=minority_count -> total (dashed).
-                let total_line =
-                    Scatter::new(vec![position, position], vec![minority_count, total])
-                        .mode(Mode::Lines)
-                        .name(&segment_name)
-                        .line(
-                            plotly::common::Line::new()
-                                .color(segment_color)
-                                .width(4.0)
-                                .dash(plotly::common::DashType::Dot),
-                        )
-                        .hover_template(hover.clone())
-                        .x_axis(&xaxis)
-                        .y_axis(&yaxis)
-                        .show_legend(false);
-                plot.add_trace(total_line);
-            }
-        }
-
-        // Add IRMA insertions: solid green major count, dashed green indel count.
-        if let Some(insertions) = insertions_data.get(&segment_name) {
-            for (position, insert, count, total, frequency) in insertions {
-                let major = total.saturating_sub(*count);
-                let hover = format!(
-                    "<b>Insertion</b><br><br><b>Position:</b> {}<br><b>Inserted:</b> {}<br><b>Length:</b> {}<br><br><b>Insertion Count:</b> {}<br><b>Major Count:</b> {}<br><b>Total:</b> {}<br><b>Minor Frequency:</b> {:.2}%<extra></extra>",
-                    position,
-                    insert,
-                    insert.chars().count(),
-                    count,
-                    major,
-                    total,
-                    *frequency * 100.0
-                );
-                // Solid: major count, y=0 -> major.
-                let major_line = Scatter::new(vec![*position, *position], vec![0, major])
-                    .mode(Mode::Lines)
-                    .name("Insertion")
-                    .line(
-                        plotly::common::Line::new()
-                            .color(INSERTION_COLOR)
-                            .width(3.0),
-                    )
-                    .hover_template(hover.clone())
-                    .x_axis(&xaxis)
-                    .y_axis(&yaxis)
-                    .show_legend(false);
-                plot.add_trace(major_line);
-                // Dashed: indel count, y=major -> total.
-                let indel_line = Scatter::new(vec![*position, *position], vec![major, *total])
-                    .mode(Mode::Lines)
-                    .name("Insertion")
-                    .line(
-                        plotly::common::Line::new()
-                            .color(INSERTION_COLOR)
-                            .width(3.0)
-                            .dash(plotly::common::DashType::Dash),
-                    )
-                    .hover_template(hover.clone())
-                    .x_axis(&xaxis)
-                    .y_axis(&yaxis)
-                    .show_legend(false);
-                plot.add_trace(indel_line);
-            }
-        }
-
-        // Add IRMA deletions: solid purple major count, dashed purple indel count.
-        if let Some(deletions) = deletions_data.get(&segment_name) {
-            for (position, length, count, total, frequency) in deletions {
-                let major = total.saturating_sub(*count);
-                let hover = format!(
-                    "<b>Deletion</b><br><br><b>Position:</b> {}<br><b>Length:</b> {}<br><br><b>Deletion Count:</b> {}<br><b>Major Count:</b> {}<br><b>Total:</b> {}<br><b>Minor Frequency:</b> {:.2}%<extra></extra>",
-                    position,
-                    length,
-                    count,
-                    major,
-                    total,
-                    *frequency * 100.0
-                );
-                // Solid: major count, y=0 -> major.
-                let major_line = Scatter::new(vec![*position, *position], vec![0, major])
-                    .mode(Mode::Lines)
-                    .name("Deletion")
-                    .line(plotly::common::Line::new().color(DELETION_COLOR).width(3.0))
-                    .hover_template(hover.clone())
-                    .x_axis(&xaxis)
-                    .y_axis(&yaxis)
-                    .show_legend(false);
-                plot.add_trace(major_line);
-                // Dashed: indel count, y=major -> total.
-                let indel_line = Scatter::new(vec![*position, *position], vec![major, *total])
-                    .mode(Mode::Lines)
-                    .name("Deletion")
-                    .line(
-                        plotly::common::Line::new()
-                            .color(DELETION_COLOR)
-                            .width(3.0)
-                            .dash(plotly::common::DashType::Dash),
-                    )
-                    .hover_template(hover.clone())
-                    .x_axis(&xaxis)
-                    .y_axis(&yaxis)
-                    .show_legend(false);
-                plot.add_trace(indel_line);
-            }
-        }
+        // Overlay minor-SNV variants and indels for this segment.
+        add_variant_indel_traces(
+            &mut plot,
+            &segment_name,
+            segment_color,
+            &variants_data,
+            &insertions_data,
+            &deletions_data,
+            &xaxis,
+            &yaxis,
+            &segment_name,
+        );
     }
 
     // Configure subplot layout
