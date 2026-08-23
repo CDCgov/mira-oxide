@@ -30,6 +30,27 @@ impl plotly::Trace for RawTrace {
 
 use crate::constants::theme;
 
+/// Colors for IRMA indels overlaid on coverage subplots.
+const INSERTION_COLOR: &str = "#2CA02C"; // green
+const DELETION_COLOR: &str = "#9467BD"; // purple
+/// Fallback minor-indel frequency thresholds when IRMA run_info.txt is absent.
+const INDEL_FREQ_DEFAULT_ILLUMINA: f32 = 0.05;
+const INDEL_FREQ_DEFAULT_ONT: f32 = 0.30;
+
+/// Read IRMA run parameters (short name -> value) from `<irma>/logs/run_info.txt`.
+fn read_run_info(irma_dir: &Path) -> HashMap<String, String> {
+    let mut map = HashMap::new();
+    if let Ok(content) = std::fs::read_to_string(irma_dir.join("logs/run_info.txt")) {
+        for line in content.lines() {
+            let cols: Vec<&str> = line.split('\t').collect();
+            if cols.len() >= 3 {
+                map.insert(cols[1].to_string(), cols[2].trim().to_string());
+            }
+        }
+    }
+    map
+}
+
 // Add this function to generate consistent colors for segment names
 #[must_use]
 pub fn get_segment_color(segment_name: &str) -> &'static str {
@@ -271,6 +292,98 @@ pub fn generate_plot_coverage_seg(input_directory: &Path) -> Result<Plot, Box<dy
         }
     }
 
+    // Load IRMA insertions/deletions per segment, keeping minor indels at or
+    // above the significance threshold.
+    // Per-type thresholds come from IRMA run_info.txt (MIN_FI/MIN_FD), floored at
+    // a platform default (ONT is noisier than Illumina) so low IRMA settings do
+    // not bury the coverage curve in indel noise.
+    let run_info = read_run_info(input_directory);
+    let platform_default = if input_directory
+        .components()
+        .any(|c| c.as_os_str().eq_ignore_ascii_case("ont"))
+    {
+        INDEL_FREQ_DEFAULT_ONT
+    } else {
+        INDEL_FREQ_DEFAULT_ILLUMINA
+    };
+    let insertion_min_frequency = run_info
+        .get("MIN_FI")
+        .and_then(|v| v.parse::<f32>().ok())
+        .map_or(platform_default, |v| v.max(platform_default));
+    let deletion_min_frequency = run_info
+        .get("MIN_FD")
+        .and_then(|v| v.parse::<f32>().ok())
+        .map_or(platform_default, |v| v.max(platform_default));
+
+    // segment -> Vec of (position, inserted_bases, count, total, frequency)
+    let mut insertions_data: HashMap<String, Vec<(u32, String, u32, u32, f32)>> = HashMap::new();
+    // segment -> Vec of (position, length, count, total, frequency)
+    let mut deletions_data: HashMap<String, Vec<(u32, u32, u32, u32, f32)>> = HashMap::new();
+
+    // Insertions: Reference_Name, Upstream_Position, Insert, Context, Called, Count, Total, Frequency
+    for ins_path in (glob(&format!(
+        "{}/tables/*insertions.txt",
+        input_directory.display()
+    ))?)
+    .flatten()
+    {
+        let file = File::open(&ins_path)?;
+        let mut rdr = ReaderBuilder::new()
+            .delimiter(b'\t')
+            .has_headers(true)
+            .from_reader(file);
+        for result in rdr.records() {
+            let record = result?;
+            if record.len() >= 8 {
+                let frequency: f32 = record[7].parse().unwrap_or(0.0);
+                if frequency < insertion_min_frequency {
+                    continue;
+                }
+                let segment = record[0].to_string();
+                let position: u32 = record[1].parse()?;
+                let insert = record[2].to_string();
+                let count: u32 = record[5].parse()?;
+                let total: u32 = record[6].parse()?;
+                insertions_data
+                    .entry(segment)
+                    .or_default()
+                    .push((position, insert, count, total, frequency));
+            }
+        }
+    }
+
+    // Deletions: Reference_Name, Upstream_Position, Length, Context, Called, Count, Total, Frequency
+    for del_path in (glob(&format!(
+        "{}/tables/*deletions.txt",
+        input_directory.display()
+    ))?)
+    .flatten()
+    {
+        let file = File::open(&del_path)?;
+        let mut rdr = ReaderBuilder::new()
+            .delimiter(b'\t')
+            .has_headers(true)
+            .from_reader(file);
+        for result in rdr.records() {
+            let record = result?;
+            if record.len() >= 8 {
+                let frequency: f32 = record[7].parse().unwrap_or(0.0);
+                if frequency < deletion_min_frequency {
+                    continue;
+                }
+                let segment = record[0].to_string();
+                let position: u32 = record[1].parse()?;
+                let length: u32 = record[2].parse()?;
+                let count: u32 = record[5].parse()?;
+                let total: u32 = record[6].parse()?;
+                deletions_data
+                    .entry(segment)
+                    .or_default()
+                    .push((position, length, count, total, frequency));
+            }
+        }
+    }
+
     // Segment title labels, positioned dynamically per subplot.
     let mut annotations = Vec::new();
 
@@ -434,6 +547,93 @@ pub fn generate_plot_coverage_seg(input_directory: &Path) -> Result<Plot, Box<dy
                         .y_axis(&yaxis)
                         .show_legend(false);
                 plot.add_trace(total_line);
+            }
+        }
+
+        // Add IRMA insertions: solid green major count, dashed green indel count.
+        if let Some(insertions) = insertions_data.get(&segment_name) {
+            for (position, insert, count, total, frequency) in insertions {
+                let major = total.saturating_sub(*count);
+                let hover = format!(
+                    "<b>Insertion</b><br><br><b>Position:</b> {}<br><b>Inserted:</b> {}<br><b>Length:</b> {}<br><br><b>Insertion Count:</b> {}<br><b>Major Count:</b> {}<br><b>Total:</b> {}<br><b>Minor Frequency:</b> {:.2}%<extra></extra>",
+                    position,
+                    insert,
+                    insert.chars().count(),
+                    count,
+                    major,
+                    total,
+                    *frequency * 100.0
+                );
+                // Solid: major count, y=0 -> major.
+                let major_line = Scatter::new(vec![*position, *position], vec![0, major])
+                    .mode(Mode::Lines)
+                    .name("Insertion")
+                    .line(
+                        plotly::common::Line::new()
+                            .color(INSERTION_COLOR)
+                            .width(3.0),
+                    )
+                    .hover_template(hover.clone())
+                    .x_axis(&xaxis)
+                    .y_axis(&yaxis)
+                    .show_legend(false);
+                plot.add_trace(major_line);
+                // Dashed: indel count, y=major -> total.
+                let indel_line = Scatter::new(vec![*position, *position], vec![major, *total])
+                    .mode(Mode::Lines)
+                    .name("Insertion")
+                    .line(
+                        plotly::common::Line::new()
+                            .color(INSERTION_COLOR)
+                            .width(3.0)
+                            .dash(plotly::common::DashType::Dash),
+                    )
+                    .hover_template(hover.clone())
+                    .x_axis(&xaxis)
+                    .y_axis(&yaxis)
+                    .show_legend(false);
+                plot.add_trace(indel_line);
+            }
+        }
+
+        // Add IRMA deletions: solid purple major count, dashed purple indel count.
+        if let Some(deletions) = deletions_data.get(&segment_name) {
+            for (position, length, count, total, frequency) in deletions {
+                let major = total.saturating_sub(*count);
+                let hover = format!(
+                    "<b>Deletion</b><br><br><b>Position:</b> {}<br><b>Length:</b> {}<br><br><b>Deletion Count:</b> {}<br><b>Major Count:</b> {}<br><b>Total:</b> {}<br><b>Minor Frequency:</b> {:.2}%<extra></extra>",
+                    position,
+                    length,
+                    count,
+                    major,
+                    total,
+                    *frequency * 100.0
+                );
+                // Solid: major count, y=0 -> major.
+                let major_line = Scatter::new(vec![*position, *position], vec![0, major])
+                    .mode(Mode::Lines)
+                    .name("Deletion")
+                    .line(plotly::common::Line::new().color(DELETION_COLOR).width(3.0))
+                    .hover_template(hover.clone())
+                    .x_axis(&xaxis)
+                    .y_axis(&yaxis)
+                    .show_legend(false);
+                plot.add_trace(major_line);
+                // Dashed: indel count, y=major -> total.
+                let indel_line = Scatter::new(vec![*position, *position], vec![major, *total])
+                    .mode(Mode::Lines)
+                    .name("Deletion")
+                    .line(
+                        plotly::common::Line::new()
+                            .color(DELETION_COLOR)
+                            .width(3.0)
+                            .dash(plotly::common::DashType::Dash),
+                    )
+                    .hover_template(hover.clone())
+                    .x_axis(&xaxis)
+                    .y_axis(&yaxis)
+                    .show_legend(false);
+                plot.add_trace(indel_line);
             }
         }
     }
