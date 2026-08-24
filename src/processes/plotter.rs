@@ -55,8 +55,8 @@ fn read_run_info(irma_dir: &Path) -> HashMap<String, String> {
 type VariantRec = (u32, String, String, u32, u32, f32);
 /// One insertion: (position, inserted bases, count, total, frequency).
 type InsertionRec = (u32, String, u32, u32, f32);
-/// One deletion: (position, length, count, total, frequency).
-type DeletionRec = (u32, u32, u32, u32, f32);
+/// One deletion: (position, length, context, count, total, frequency).
+type DeletionRec = (u32, u32, String, u32, u32, f32);
 
 /// Load IRMA minor-SNV variants per segment from `tables/*variants.txt`.
 fn load_variant_data(
@@ -184,12 +184,13 @@ fn load_indel_data(
                 let segment = record[0].to_string();
                 let position: u32 = record[1].parse()?;
                 let length: u32 = record[2].parse()?;
+                let context = record[3].to_string();
                 let count: u32 = record[5].parse()?;
                 let total: u32 = record[6].parse()?;
                 deletions_data
                     .entry(segment)
                     .or_default()
-                    .push((position, length, count, total, frequency));
+                    .push((position, length, context, count, total, frequency));
             }
         }
     }
@@ -275,13 +276,9 @@ fn add_variant_indel_traces(
         for (position, insert, count, total, frequency) in insertions {
             let major = total.saturating_sub(*count);
             let hover = format!(
-                "<b>Insertion</b><br><br><b>Position:</b> {}<br><b>Inserted:</b> {}<br><b>Length:</b> {}<br><br><b>Insertion Count:</b> {}<br><b>Major Count:</b> {}<br><b>Total:</b> {}<br><b>Minor Frequency:</b> {:.2}%<extra></extra>",
+                "-:{}:{} ({:.2}%)<extra></extra>",
                 position,
                 insert,
-                insert.chars().count(),
-                count,
-                major,
-                total,
                 *frequency * 100.0
             );
             let (mx, my) = vline(*position, 0, major);
@@ -320,17 +317,10 @@ fn add_variant_indel_traces(
 
     // Deletions: solid purple major count, dashed purple indel count.
     if let Some(deletions) = deletions_data.get(segment_name) {
-        for (position, length, count, total, frequency) in deletions {
+        for (position, _length, context, count, total, _frequency) in deletions {
             let major = total.saturating_sub(*count);
-            let hover = format!(
-                "<b>Deletion</b><br><br><b>Position:</b> {}<br><b>Length:</b> {}<br><br><b>Deletion Count:</b> {}<br><b>Major Count:</b> {}<br><b>Total:</b> {}<br><b>Minor Frequency:</b> {:.2}%<extra></extra>",
-                position,
-                length,
-                count,
-                major,
-                total,
-                *frequency * 100.0
-            );
+            let dashes = "-".repeat(context.matches('-').count());
+            let hover = format!("{context}:{position}:{dashes}<extra></extra>");
             let (mx, my) = vline(*position, 0, major);
             let major_line = Scatter::new(mx, my)
                 .mode(Mode::Lines)
@@ -1031,6 +1021,40 @@ pub fn generate_sankey_plot(input_directory: &Path) -> Result<Plot, Box<dyn Erro
         })
         .collect();
 
+    // Manual columns so Fail QC shares Pass QC's x, and No Match shares the
+    // Primary/Alt Match x. Segments occupy the rightmost column.
+    let col_of = |label: &str| -> usize {
+        match label {
+            "Initial Reads" => 0,
+            "Pass QC" | "Fail QC" => 1,
+            "Primary Match" | "Alt Match" | "No Match" => 2,
+            _ => 3,
+        }
+    };
+    let max_col = 3usize;
+    let cols: Vec<usize> = node_labels.iter().map(|l| col_of(l)).collect();
+    let mut col_counts = vec![0usize; max_col + 1];
+    for &c in &cols {
+        col_counts[c] += 1;
+    }
+    // Even vertical spread within each column seeds the snap layout ordering.
+    let mut col_seen = vec![0usize; max_col + 1];
+    let mut node_x = Vec::with_capacity(node_labels.len());
+    let mut node_y = Vec::with_capacity(node_labels.len());
+    for &c in &cols {
+        let x = if c == 0 {
+            0.001
+        } else if c == max_col {
+            0.999
+        } else {
+            c as f64 / max_col as f64
+        };
+        node_x.push(x);
+        let j = col_seen[c];
+        col_seen[c] += 1;
+        node_y.push((j as f64 + 1.0) / (col_counts[c] as f64 + 1.0));
+    }
+
     // Built as raw JSON to control the node/link fields directly.
     let sankey_json = serde_json::json!({
         "type": "sankey",
@@ -1038,6 +1062,8 @@ pub fn generate_sankey_plot(input_directory: &Path) -> Result<Plot, Box<dyn Erro
         "node": {
             "label": node_display,
             "color": node_colors,
+            "x": node_x,
+            "y": node_y,
             "pad": 15,
             "thickness": 20,
             "line": { "color": "black" },
