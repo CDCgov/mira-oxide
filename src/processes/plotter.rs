@@ -234,14 +234,11 @@ fn add_variant_indel_traces(
         {
             let total = *consensus_count + *minority_count;
             let hover = format!(
-                "<b>Position:</b> {}<br><br><b>Consensus Allele:</b> {}<br><b>Consensus Count:</b> {}<br><br><b>Minority Allele:</b> {}<br><b>Minority Count:</b> {}<br><b>Minority Frequency:</b> {:.2}%<br><br><b>Total:</b> {}<extra></extra>",
-                position,
+                "{}:{}:{} ({:.2}%)<extra></extra>",
                 consensus_allele,
-                consensus_count,
+                position,
                 minority_allele,
-                minority_count,
-                *minority_frequency * 100.0,
-                total
+                *minority_frequency * 100.0
             );
             let (vx, vy) = vline(*position, 0, *minority_count);
             let minor_line = Scatter::new(vx, vy)
