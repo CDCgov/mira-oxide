@@ -25,6 +25,13 @@ pub const WHITE: &str = "#FFFFFF"; // canvas
 pub const MUTED: &str = "#ECF5FF"; // pale blue panel
 pub const BORDER: &str = "#B8D4ED"; // pale blue border / gridlines
 
+// ── QC pass/fail heatmap gradient (pass -> fail) ────────────────────────────
+pub const QC_PASS: &str = "#87B5E3"; // pass (light blue)
+pub const QC_LOW: &str = "#FCCF85"; // low severity (amber)
+pub const QC_MED: &str = "#FF9C63"; // medium severity (orange)
+pub const QC_HIGH: &str = "#F5968F"; // high severity (salmon)
+pub const QC_FAIL: &str = "#961C1C"; // fail (dark red)
+
 // ── CDC brand fonts (from theme.css) ────────────────────────────────────────
 pub const TITLE_FONT: &str = "Roboto, system-ui, -apple-system, sans-serif";
 pub const BODY_FONT: &str = "'Nunito Sans', system-ui, -apple-system, sans-serif";
@@ -36,6 +43,18 @@ pub fn colorway() -> Vec<&'static str> {
     vec![
         CDC_BLUE, CDC_TEAL, CDC_YELLOW, CDC_RED, CDC_BLUE_1, CDC_NAVY, "#00B1CE", "#5796D9",
         "#F0695E", GRAY,
+    ]
+}
+
+/// QC pass/fail heatmap gradient stops (position, color) from pass to fail.
+#[must_use]
+pub fn qc_colorscale() -> Vec<(f64, &'static str)> {
+    vec![
+        (0.0, QC_PASS),
+        (0.25, QC_LOW),
+        (0.5, QC_MED),
+        (0.75, QC_HIGH),
+        (1.0, QC_FAIL),
     ]
 }
 

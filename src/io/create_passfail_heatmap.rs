@@ -1,4 +1,5 @@
 use crate::constants::heatmap_ref::get_references_for_virus;
+use crate::constants::theme;
 use crate::utils::data_processing::IRMASummary;
 use serde_json::json;
 use std::fs::File;
@@ -296,13 +297,9 @@ pub fn create_passfail_heatmap(
 ) -> serde_json::Value {
     println!("Building pass_fail_heatmap as JSON");
 
-    let colorscale = vec![
-        (0.0, "rgb(184, 212, 237)"),
-        (0.25, "rgb(252, 235, 201)"),
-        (0.5, "rgb(251, 126, 56)"),
-        (0.75, "rgb(204, 27, 34)"),
-        (1.0, "rgb(0,0,0)"),
-    ];
+    // QC decision scale: pale blue (pass) -> yellow -> orange -> salmon ->
+    // dark red (worst).
+    let colorscale = theme::qc_colorscale();
 
     let references = get_references_for_virus(virus);
     let records = build_records(summaries, &references, sample_list, virus);
@@ -324,9 +321,9 @@ pub fn create_passfail_heatmap(
 
     let layout = json!({
         "template": plotly_template(&colorscale),
-        "xaxis": {"side": "top"},
-        "paper_bgcolor": "white",
-        "plot_bgcolor": "white"
+        "xaxis": {"side": "top", "tickangle": -80},
+        "paper_bgcolor": theme::WHITE,
+        "plot_bgcolor": theme::WHITE
     });
 
     let plot_json = json!({
