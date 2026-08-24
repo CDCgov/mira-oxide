@@ -317,10 +317,13 @@ fn add_variant_indel_traces(
 
     // Deletions: solid purple major count, dashed purple indel count.
     if let Some(deletions) = deletions_data.get(segment_name) {
-        for (position, _length, context, count, total, _frequency) in deletions {
+        for (position, _length, context, count, total, frequency) in deletions {
             let major = total.saturating_sub(*count);
             let dashes = "-".repeat(context.matches('-').count());
-            let hover = format!("{context}:{position}:{dashes}<extra></extra>");
+            let hover = format!(
+                "{context}:{position}:{dashes} ({:.2}%)<extra></extra>",
+                *frequency * 100.0
+            );
             let (mx, my) = vline(*position, 0, major);
             let major_line = Scatter::new(mx, my)
                 .mode(Mode::Lines)
