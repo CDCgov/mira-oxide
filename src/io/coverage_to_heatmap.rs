@@ -74,18 +74,8 @@ fn prepare_heatmap_axes(
 }
 
 fn get_colorscale() -> Vec<(f64, &'static str)> {
-    // CDC's teal scale with darkest blue at end
-    vec![
-        (0.0, "rgb(244, 252, 252)"),
-        (0.125, "rgb(234, 248, 249)"),
-        (0.25, "rgb(213, 247, 249)"),
-        (0.375, "rgb(174, 236, 242)"),
-        (0.5, "rgb(125, 222, 236)"),
-        (0.625, "rgb(0, 177, 206)"),
-        (0.75, "rgb(0, 129, 161)"),
-        (0.875, "rgb(18, 82, 97)"),
-        (1.0, "rgb(3, 38, 89)"),
-    ]
+    // CDC teal scale ending in CDC navy.
+    crate::constants::theme::coverage_colorscale()
 }
 
 fn build_heatmap_json(
@@ -129,7 +119,8 @@ fn build_layout_json(colorscale: &[(f64, &str)]) -> serde_json::Value {
             "orientation": "h"
         },
         "xaxis": {
-            "side": "top"
+            "side": "top",
+            "tickangle": -80
         }
     })
 }

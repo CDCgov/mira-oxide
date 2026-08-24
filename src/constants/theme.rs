@@ -58,6 +58,22 @@ pub fn qc_colorscale() -> Vec<(f64, &'static str)> {
     ]
 }
 
+/// Coverage heatmap gradient stops (position, color): pale teal to CDC navy.
+#[must_use]
+pub fn coverage_colorscale() -> Vec<(f64, &'static str)> {
+    vec![
+        (0.0, "#F4FCFC"),
+        (0.125, "#EAF8F9"),
+        (0.25, "#D5F7F9"),
+        (0.375, "#AEECF2"),
+        (0.5, "#7DDEEC"),
+        (0.625, "#00B1CE"),
+        (0.75, CDC_TEAL),
+        (0.875, "#125261"),
+        (1.0, CDC_NAVY),
+    ]
+}
+
 /// CDC palette for ORF/gene boxes and non-flu (RSV, SC2) coverage segments.
 #[must_use]
 pub fn orf_palette() -> Vec<&'static str> {
