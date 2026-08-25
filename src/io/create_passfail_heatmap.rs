@@ -294,6 +294,7 @@ pub fn create_passfail_heatmap(
     sample_list: &[String],
     virus: &str,
     output_path: &str,
+    write_file: bool,
 ) -> serde_json::Value {
     println!("Building pass_fail_heatmap as JSON");
 
@@ -331,12 +332,14 @@ pub fn create_passfail_heatmap(
         "layout": layout
     });
 
-    let file_path = format!("{output_path}pass_fail_heatmap.json");
-    let mut file = File::create(&file_path).expect("Unable to create file");
-    file.write_all(plot_json.to_string().as_bytes())
-        .expect("Unable to write data");
+    if write_file {
+        let file_path = format!("{output_path}pass_fail_heatmap.json");
+        let mut file = File::create(&file_path).expect("Unable to create file");
+        file.write_all(plot_json.to_string().as_bytes())
+            .expect("Unable to write data");
 
-    println!("  -> pass_fail heatmap json saved to {file_path}");
+        println!("  -> pass_fail heatmap json saved to {file_path}");
+    }
 
     // Return the JSON object
     plot_json

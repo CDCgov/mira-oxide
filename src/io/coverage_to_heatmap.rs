@@ -131,6 +131,7 @@ pub fn coverage_to_heatmap_json(
     sample_list: &[String],
     virus: &str,
     output_file: &str,
+    write_file: bool,
 ) -> serde_json::Value {
     println!("Building coverage heatmap as JSON");
     let filtered_data = normalize_rsv_segments(coverage_data, virus);
@@ -146,9 +147,11 @@ pub fn coverage_to_heatmap_json(
         "layout": layout
     });
 
-    let file_path = format!("{output_file}heatmap.json");
-    std::fs::write(&file_path, plot_json.to_string()).expect("Failed to write heatmap JSON");
-    println!("  -> coverage heatmap json saved to {file_path}");
+    if write_file {
+        let file_path = format!("{output_file}heatmap.json");
+        std::fs::write(&file_path, plot_json.to_string()).expect("Failed to write heatmap JSON");
+        println!("  -> coverage heatmap json saved to {file_path}");
+    }
 
     // Return the JSON object
     plot_json

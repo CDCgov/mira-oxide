@@ -7,6 +7,7 @@ use serde_json::json;
 pub fn create_barcode_distribution_figure(
     summaries: &[ReadsData],
     output_path: &str,
+    write_file: bool,
 ) -> serde_json::Value {
     println!("Building barcode distribution stacked bar figure as JSON");
 
@@ -108,12 +109,13 @@ pub fn create_barcode_distribution_figure(
         "layout": layout
     });
 
-    // Save to file
-    let file_path = format!("{output_path}barcode_distribution.json");
-    std::fs::write(&file_path, plot_json.to_string())
-        .expect("Failed to write barcode distribution JSON");
+    if write_file {
+        let file_path = format!("{output_path}barcode_distribution.json");
+        std::fs::write(&file_path, plot_json.to_string())
+            .expect("Failed to write barcode distribution JSON");
 
-    println!("  -> barcode distribution stacked bar figure saved to {file_path}");
+        println!("  -> barcode distribution stacked bar figure saved to {file_path}");
+    }
 
     plot_json
 }

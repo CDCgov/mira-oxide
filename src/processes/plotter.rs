@@ -451,7 +451,11 @@ pub struct PlotterArgs {
 
 /// Emit a plot as plotly JSON: to `output` (with the given filename suffix and a
 /// `.json` extension) when provided, otherwise to stdout.
-fn emit_plot_json(plot: &Plot, output: Option<&PathBuf>, suffix: &str) -> Result<(), Box<dyn Error>> {
+fn emit_plot_json(
+    plot: &Plot,
+    output: Option<&PathBuf>,
+    suffix: &str,
+) -> Result<(), Box<dyn Error>> {
     let json = plot.to_json();
     match output {
         Some(path) => {
