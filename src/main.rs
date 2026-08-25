@@ -70,7 +70,7 @@ fn main() {
         }
         Commands::NTDiffs(cmd_args) => all_sample_nt_diffs_process(&cmd_args),
         Commands::Plotter(cmd_args) => {
-            plotter_process(cmd_args).unwrap_or_else(|_| panic!("{module}::Plotter"));
+            plotter_process(cmd_args).unwrap_or_else(|e| panic!("{module}::Plotter: {e}"));
         }
         Commands::CheckMiraVersion(cmd_args) => {
             check_mira_version(&cmd_args).unwrap_or_die(&format!("{module}::CheckMiraVersion"));

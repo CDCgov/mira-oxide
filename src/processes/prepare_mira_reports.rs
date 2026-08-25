@@ -1,13 +1,17 @@
 #![allow(dead_code, unused_imports)]
-use crate::io::coverage_json_per_sample::create_coverage_plot;
+use crate::io::coverage_json_per_sample::{SampleCoverageJson, create_coverage_plot};
 use crate::io::coverage_to_heatmap::coverage_to_heatmap_json;
 use crate::io::create_passfail_heatmap::create_passfail_heatmap;
 use crate::io::create_statichtml::generate_html_report;
 use crate::io::data_ingest::{all_alleles_data_collection, split_by_comma};
 use crate::io::reads_to_piechart::create_barcode_distribution_figure;
-use crate::io::reads_to_sankey_json::reads_to_sankey_json;
+use crate::io::reads_to_sankey_json::{SampleSankeyJson, reads_to_sankey_json};
 use crate::io::write_fasta_files::write_out_nextclade_fasta_files;
 use crate::io::write_parquet_files::write_samplesheet_to_parquet;
+use crate::processes::plotter::{
+    generate_plot_coverage, generate_plot_coverage_seg, generate_sankey_plot,
+};
+use glob::glob;
 use crate::utils::data_processing::{
     DaisVarsData, NextcladeSequences, ProcessedCoverage, Subtype, collect_analysis_metadata,
     collect_negatives, collect_sample_id, compute_cvv_dais_variants, compute_dais_variants,
@@ -99,6 +103,11 @@ pub struct ReportsArgs {
     #[arg(short = 't', long, default_value = "")]
     /// (Optional) if a custom qc template is used for QC.
     qc_template: String,
+
+    #[arg(short = 'H', long, default_value_t = false)]
+    /// (Optional) A flag to also write each per-sample coverage, segment coverage,
+    /// and read-assignment plot as an individual standalone HTML file.
+    individual_html: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -146,7 +155,7 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
     /////////////// Read in and process data from IRMA and Dais ///////////////
     // Read in samplesheet
     let samplesheet_path = create_reader(&args.samplesheet)?;
-    let samplesheet = if &args.platform == "illumina" {
+    let samplesheet = if args.platform.to_lowercase() == "illumina" {
         let illumina_samplesheet: Vec<SamplesheetI> = read_csv(samplesheet_path, true)?;
         Samplesheet::Illumina(illumina_samplesheet)
     } else {
@@ -188,7 +197,7 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
         }
     };
     // Keeping function for segment data extraction, though segset abd segcolor not currently used
-    let (segments, _segset, _segcolor) = return_seg_data(extract_field(&coverage_data, |item| {
+    let (_segments, _segset, _segcolor) = return_seg_data(extract_field(&coverage_data, |item| {
         item.reference_name.clone()
     }));
 
@@ -505,18 +514,77 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
 
     //////////////////////////////// Create JSONS for Dashboard ////////////////////////////////
 
-    let coverage_json_per_sample = create_coverage_plot(
-        &coverage_data,
-        segments,
-        &args.virus,
-        &format!("{}/", args.output_path.display()),
-    )?;
+    // Build per-sample coverage, segmented coverage, and read-sankey JSONs with the
+    // plotter module so the CLI plots and the prepared reports share one implementation.
+    let mut coverage_json_per_sample: Vec<SampleCoverageJson> = Vec::new();
+    let mut sankey_json_per_sample: Vec<SampleSankeyJson> = Vec::new();
 
-    let sankey_json_per_sample = reads_to_sankey_json(
-        &read_data,
-        &args.virus,
-        &format!("{}/", args.output_path.display()),
-    );
+    println!("Building coverage, segment coverage, and read sankey plots as JSONs");
+    for tables_dir in glob(&format!("{}/**/tables", args.irma_path.display()))?.flatten() {
+        // The plotter functions glob `<irma_dir>/tables/*coverage.txt`, so the IRMA
+        // directory is the parent of `tables/` and the sample name is its grandparent.
+        let Some(irma_dir) = tables_dir.parent() else {
+            continue;
+        };
+        let Some(sample) = irma_dir
+            .parent()
+            .and_then(Path::file_name)
+            .map(|s| s.to_string_lossy().into_owned())
+        else {
+            continue;
+        };
+
+        let out = args.output_path.display();
+
+        // Coverage plot (all segments in one figure)
+        let coverage_plot = generate_plot_coverage(irma_dir)?;
+        let coverage_value: serde_json::Value = serde_json::from_str(&coverage_plot.to_json())?;
+        let coverage_file = format!("{out}/coveragefig_{sample}_linear.json");
+        std::fs::write(&coverage_file, serde_json::to_string_pretty(&coverage_value)?)?;
+        println!("  -> saved {coverage_file}");
+        if args.individual_html {
+            let coverage_html = format!("{out}/coveragefig_{sample}_linear.html");
+            coverage_plot.write_html(&coverage_html);
+            println!("  -> saved {coverage_html}");
+        }
+
+        // Segmented coverage subplots with minor-variant annotation
+        let coverage_seg_plot = generate_plot_coverage_seg(irma_dir)?;
+        let coverage_seg_value: serde_json::Value =
+            serde_json::from_str(&coverage_seg_plot.to_json())?;
+        let coverage_seg_file = format!("{out}/coveragefig_{sample}_seg.json");
+        std::fs::write(
+            &coverage_seg_file,
+            serde_json::to_string_pretty(&coverage_seg_value)?,
+        )?;
+        println!("  -> saved {coverage_seg_file}");
+        if args.individual_html {
+            let coverage_seg_html = format!("{out}/coveragefig_{sample}_seg.html");
+            coverage_seg_plot.write_html(&coverage_seg_html);
+            println!("  -> saved {coverage_seg_html}");
+        }
+
+        // Read assignment sankey diagram
+        let sankey_plot = generate_sankey_plot(irma_dir)?;
+        let sankey_value: serde_json::Value = serde_json::from_str(&sankey_plot.to_json())?;
+        let sankey_file = format!("{out}/readsfig_{sample}.json");
+        std::fs::write(&sankey_file, serde_json::to_string_pretty(&sankey_value)?)?;
+        println!("  -> read sankey plot json saved to {sankey_file}");
+        if args.individual_html {
+            let sankey_html = format!("{out}/readsfig_{sample}.html");
+            sankey_plot.write_html(&sankey_html);
+            println!("  -> read sankey plot html saved to {sankey_html}");
+        }
+
+        coverage_json_per_sample.push(SampleCoverageJson {
+            sample_id: sample.clone(),
+            json: coverage_value,
+        });
+        sankey_json_per_sample.push(SampleSankeyJson {
+            sample_id: sample,
+            json: sankey_value,
+        });
+    }
 
     let cov_heatmap_json = coverage_to_heatmap_json(
         &transformed_cov_data,

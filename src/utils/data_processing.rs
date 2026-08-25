@@ -933,7 +933,8 @@ pub fn collect_analysis_metadata(
     let description_path = format!("{}/DESCRIPTION", work_path.display());
 
     // Open the file for reading
-    let file = File::open(&description_path)?;
+    let file = File::open(&description_path)
+        .map_err(|e| format!("failed to open DESCRIPTION file at {description_path}: {e}"))?;
     let reader = io::BufReader::new(file);
 
     // Read the file line by line

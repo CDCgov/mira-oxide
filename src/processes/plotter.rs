@@ -434,11 +434,34 @@ pub struct PlotterArgs {
     inline_html: bool,
 
     #[arg(
+        short = 'j',
+        long,
+        default_value_t = false,
+        help = "Emit plotly JSON instead of HTML (written to the -o path with a .json extension, or to stdout when -o is omitted) (Default: false)"
+    )]
+    json: bool,
+
+    #[arg(
         short = 'o',
         long,
         help = "Output standalone HTML file path (Optional)"
     )]
     output: Option<PathBuf>,
+}
+
+/// Emit a plot as plotly JSON: to `output` (with the given filename suffix and a
+/// `.json` extension) when provided, otherwise to stdout.
+fn emit_plot_json(plot: &Plot, output: Option<&PathBuf>, suffix: &str) -> Result<(), Box<dyn Error>> {
+    let json = plot.to_json();
+    match output {
+        Some(path) => {
+            let stem = path.file_stem().unwrap_or_default().to_string_lossy();
+            let json_file = path.with_file_name(format!("{stem}{suffix}.json"));
+            std::fs::write(json_file, json)?;
+        }
+        None => println!("{json}"),
+    }
+    Ok(())
 }
 
 pub fn generate_plot_coverage(input_directory: &Path) -> Result<Plot, Box<dyn Error>> {
@@ -1142,16 +1165,23 @@ pub fn plotter_process(args: PlotterArgs) -> Result<(), Box<dyn Error>> {
     // Check for correct number of arguments
     //let args = PlotterArgs::parse();
 
-    // Get the input directory and output file path from the command line arguments
-    let input_directory = args.irma_dir;
+    // Get the input directory and output file path from the command line arguments.
+    // Accept either an IRMA output directory (contains `tables/`) or a sample
+    // directory whose `IRMA/` subdirectory contains it.
+    let mut input_directory = args.irma_dir;
+    if !input_directory.join("tables").is_dir() && input_directory.join("IRMA/tables").is_dir() {
+        input_directory = input_directory.join("IRMA");
+    }
     let output_html_file = args.output;
 
     // Generate coverage plot if specified
     if args.coverage {
         let plot = generate_plot_coverage(&input_directory)?;
 
-        // Save the plot as an HTML file if output path is provided
-        if let Some(optional_file) = &output_html_file {
+        // Emit plotly JSON if requested, otherwise save as HTML
+        if args.json {
+            emit_plot_json(&plot, output_html_file.as_ref(), "")?;
+        } else if let Some(optional_file) = &output_html_file {
             plot.write_html(optional_file);
         }
 
@@ -1170,8 +1200,10 @@ pub fn plotter_process(args: PlotterArgs) -> Result<(), Box<dyn Error>> {
     if args.coverage_seg {
         let plot = generate_plot_coverage_seg(&input_directory)?;
 
-        // Save the plot as an HTML file if output path is provided
-        if let Some(optional_file) = &output_html_file {
+        // Emit plotly JSON if requested, otherwise save as HTML
+        if args.json {
+            emit_plot_json(&plot, output_html_file.as_ref(), "_seg")?;
+        } else if let Some(optional_file) = &output_html_file {
             // Add "_seg" suffix to the filename to distinguish from regular coverage plot
             let seg_file = optional_file.with_file_name(format!(
                 "{}_seg{}",
@@ -1200,8 +1232,10 @@ pub fn plotter_process(args: PlotterArgs) -> Result<(), Box<dyn Error>> {
     if args.read_flow {
         let plot = generate_sankey_plot(&input_directory)?;
 
-        // Save the plot as an HTML file if output path is provided
-        if let Some(optional_file) = &output_html_file {
+        // Emit plotly JSON if requested, otherwise save as HTML
+        if args.json {
+            emit_plot_json(&plot, output_html_file.as_ref(), "_read_assignment")?;
+        } else if let Some(optional_file) = &output_html_file {
             let flow_file = optional_file.with_file_name(format!(
                 "{}_read_assignment{}",
                 optional_file
