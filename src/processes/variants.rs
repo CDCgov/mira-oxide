@@ -1494,7 +1494,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
 
         writeln!(
             &mut writer,
-            "sample{delim}reference{delim}dais_reference{delim}dais_ref_position{delim}sample_position{delim}depth{delim}consensus_allele{delim}minority_allele{delim}consensus_count{delim}minority_count{delim}minority_frequency{delim}consensus_codon{delim}minor_variant_codon{delim}consensus_aa{delim}minor_variant_aa{delim}major_aa_vs_minor_aa{delim}run_id{delim}instrument"
+            "sample{delim}reference{delim}dais_reference{delim}dais_ref_position{delim}sample_position{delim}depth{delim}consensus_allele{delim}minority_allele{delim}consensus_count{delim}minority_count{delim}consensus_codon{delim}minor_variant_codon{delim}consensus_aa{delim}minor_variant_aa{delim}major_aa_vs_minor_aa{delim}minority_frequency{delim}run_id{delim}instrument"
         )?;
 
         for mv in &minor_variants {
