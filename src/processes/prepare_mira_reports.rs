@@ -562,140 +562,125 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
 
     //////////////////////////////// Create JSONS for Dashboard ////////////////////////////////
 
-    let want_fig_json = args.want_figure(FigureFileType::Json);
-    let want_fig_html = args.want_figure(FigureFileType::Html);
-    let want_summary = args.want_html_summary();
-    // The summary report embeds the figure JSONs, so build them in memory whenever
-    // figures or the summary are requested (only writing files when figures ask for it).
-    let build_figures = want_fig_json || want_fig_html || want_summary;
-
     // Build per-sample coverage, segmented coverage, and read-sankey JSONs with the
     // plotter module so the CLI plots and the prepared reports share one implementation.
     let mut coverage_json_per_sample: Vec<SampleCoverageJson> = Vec::new();
     let mut sankey_json_per_sample: Vec<SampleSankeyJson> = Vec::new();
 
-    if build_figures {
-        println!("Building coverage, segment coverage, and read sankey plots as JSONs");
-        for tables_dir in glob(&format!("{}/**/tables", args.irma_path.display()))?.flatten() {
-            // The plotter functions glob `<irma_dir>/tables/*coverage.txt`, so the IRMA
-            // directory is the parent of `tables/` and the sample name is its grandparent.
-            let Some(irma_dir) = tables_dir.parent() else {
-                continue;
-            };
-            let Some(sample) = irma_dir
-                .parent()
-                .and_then(Path::file_name)
-                .map(|s| s.to_string_lossy().into_owned())
-            else {
-                continue;
-            };
+    println!("Building coverage, segment coverage, and read sankey plots as JSONs");
+    for tables_dir in glob(&format!("{}/**/tables", args.irma_path.display()))?.flatten() {
+        // The plotter functions glob `<irma_dir>/tables/*coverage.txt`, so the IRMA
+        // directory is the parent of `tables/` and the sample name is its grandparent.
+        let Some(irma_dir) = tables_dir.parent() else {
+            continue;
+        };
+        let Some(sample) = irma_dir
+            .parent()
+            .and_then(Path::file_name)
+            .map(|s| s.to_string_lossy().into_owned())
+        else {
+            continue;
+        };
 
-            let out = args.output_path.display();
+        let out = args.output_path.display();
 
-            // Coverage plot (all segments in one figure)
-            let coverage_plot = generate_plot_coverage(irma_dir)?;
-            let coverage_value: serde_json::Value = serde_json::from_str(&coverage_plot.to_json())?;
-            if want_fig_json {
-                let coverage_file = format!("{out}/coveragefig_{sample}_linear.json");
-                std::fs::write(
-                    &coverage_file,
-                    serde_json::to_string_pretty(&coverage_value)?,
-                )?;
-                println!("  -> saved {coverage_file}");
-            }
-            if want_fig_html {
-                let coverage_html = format!("{out}/coveragefig_{sample}_linear.html");
-                coverage_plot.write_html(&coverage_html);
-                println!("  -> saved {coverage_html}");
-            }
-
-            // Segmented coverage subplots with minor-variant annotation
-            let coverage_seg_plot = generate_plot_coverage_seg(irma_dir)?;
-            let coverage_seg_value: serde_json::Value =
-                serde_json::from_str(&coverage_seg_plot.to_json())?;
-            if want_fig_json {
-                let coverage_seg_file = format!("{out}/coveragefig_{sample}_seg.json");
-                std::fs::write(
-                    &coverage_seg_file,
-                    serde_json::to_string_pretty(&coverage_seg_value)?,
-                )?;
-                println!("  -> saved {coverage_seg_file}");
-            }
-            if want_fig_html {
-                let coverage_seg_html = format!("{out}/coveragefig_{sample}_seg.html");
-                coverage_seg_plot.write_html(&coverage_seg_html);
-                println!("  -> saved {coverage_seg_html}");
-            }
-
-            // Read assignment sankey diagram
-            let sankey_plot = generate_sankey_plot(irma_dir)?;
-            let sankey_value: serde_json::Value = serde_json::from_str(&sankey_plot.to_json())?;
-            if want_fig_json {
-                let sankey_file = format!("{out}/readsfig_{sample}.json");
-                std::fs::write(&sankey_file, serde_json::to_string_pretty(&sankey_value)?)?;
-                println!("  -> read sankey plot json saved to {sankey_file}");
-            }
-            if want_fig_html {
-                let sankey_html = format!("{out}/readsfig_{sample}.html");
-                sankey_plot.write_html(&sankey_html);
-                println!("  -> read sankey plot html saved to {sankey_html}");
-            }
-
-            coverage_json_per_sample.push(SampleCoverageJson {
-                sample_id: sample.clone(),
-                json: coverage_value,
-            });
-            sankey_json_per_sample.push(SampleSankeyJson {
-                sample_id: sample,
-                json: sankey_value,
-            });
+        // Coverage plot (all segments in one figure)
+        let coverage_plot = generate_plot_coverage(irma_dir)?;
+        let coverage_value: serde_json::Value = serde_json::from_str(&coverage_plot.to_json())?;
+        if args.want_figure(FigureFileType::Json) {
+            let coverage_file = format!("{out}/coveragefig_{sample}_linear.json");
+            std::fs::write(
+                &coverage_file,
+                serde_json::to_string_pretty(&coverage_value)?,
+            )?;
+            println!("  -> saved {coverage_file}");
         }
+        if args.want_figure(FigureFileType::Html) {
+            let coverage_html = format!("{out}/coveragefig_{sample}_linear.html");
+            coverage_plot.write_html(&coverage_html);
+            println!("  -> saved {coverage_html}");
+        }
+
+        // Segmented coverage subplots with minor-variant annotation
+        let coverage_seg_plot = generate_plot_coverage_seg(irma_dir)?;
+        let coverage_seg_value: serde_json::Value =
+            serde_json::from_str(&coverage_seg_plot.to_json())?;
+        if args.want_figure(FigureFileType::Json) {
+            let coverage_seg_file = format!("{out}/coveragefig_{sample}_seg.json");
+            std::fs::write(
+                &coverage_seg_file,
+                serde_json::to_string_pretty(&coverage_seg_value)?,
+            )?;
+            println!("  -> saved {coverage_seg_file}");
+        }
+        if args.want_figure(FigureFileType::Html) {
+            let coverage_seg_html = format!("{out}/coveragefig_{sample}_seg.html");
+            coverage_seg_plot.write_html(&coverage_seg_html);
+            println!("  -> saved {coverage_seg_html}");
+        }
+
+        // Read assignment sankey diagram
+        let sankey_plot = generate_sankey_plot(irma_dir)?;
+        let sankey_value: serde_json::Value = serde_json::from_str(&sankey_plot.to_json())?;
+        if args.want_figure(FigureFileType::Json) {
+            let sankey_file = format!("{out}/readsfig_{sample}.json");
+            std::fs::write(&sankey_file, serde_json::to_string_pretty(&sankey_value)?)?;
+            println!("  -> read sankey plot json saved to {sankey_file}");
+        }
+        if args.want_figure(FigureFileType::Html) {
+            let sankey_html = format!("{out}/readsfig_{sample}.html");
+            sankey_plot.write_html(&sankey_html);
+            println!("  -> read sankey plot html saved to {sankey_html}");
+        }
+
+        coverage_json_per_sample.push(SampleCoverageJson {
+            sample_id: sample.clone(),
+            json: coverage_value,
+        });
+        sankey_json_per_sample.push(SampleSankeyJson {
+            sample_id: sample,
+            json: sankey_value,
+        });
     }
+
+    let cov_heatmap_json = coverage_to_heatmap_json(
+        &transformed_cov_data,
+        &sample_list,
+        &args.virus,
+        &format!("{}/", args.output_path.display()),
+        args.want_figure(FigureFileType::Json),
+    );
+
+    let pass_fail_heatmap_json = create_passfail_heatmap(
+        &irma_summary,
+        &sample_list,
+        &args.virus,
+        &format!("{}/", args.output_path.display()),
+        args.want_figure(FigureFileType::Json),
+    );
+
+    let barcode_distribution_json = create_barcode_distribution_figure(
+        &read_data,
+        &format!("{}/", args.output_path.display()),
+        args.want_figure(FigureFileType::Json),
+    );
 
     //////////////////////////////// Create staticHTML ////////////////////////////////
-    if build_figures {
-        // Only write the aggregate figure JSON files when figures json is requested;
-        // otherwise just compute them in memory for the summary report.
-        let cov_heatmap_json = coverage_to_heatmap_json(
-            &transformed_cov_data,
-            &sample_list,
-            &args.virus,
-            &format!("{}/", args.output_path.display()),
-            want_fig_json,
-        );
-
-        let pass_fail_heatmap_json = create_passfail_heatmap(
-            &irma_summary,
-            &sample_list,
-            &args.virus,
-            &format!("{}/", args.output_path.display()),
-            want_fig_json,
-        );
-
-        let barcode_distribution_json = create_barcode_distribution_figure(
-            &read_data,
-            &format!("{}/", args.output_path.display()),
-            want_fig_json,
-        );
-
-        if want_summary {
-            let _ = generate_html_report(
-                &args.output_path,
-                &irma_summary,
-                &dais_vars_data,
-                &minor_variant_data.all_minor_variants,
-                &indel_data,
-                &barcode_distribution_json,
-                &pass_fail_heatmap_json,
-                &cov_heatmap_json,
-                &coverage_json_per_sample,
-                &sankey_json_per_sample,
-                &args.runid,
-                Some(&args.workdir_path),
-                &args.virus,
-            );
-        }
-    }
+    let _ = generate_html_report(
+        &args.output_path,
+        &irma_summary,
+        &dais_vars_data,
+        &minor_variant_data.all_minor_variants,
+        &indel_data,
+        &barcode_distribution_json,
+        &pass_fail_heatmap_json,
+        &cov_heatmap_json,
+        &coverage_json_per_sample,
+        &sankey_json_per_sample,
+        &args.runid,
+        Some(&args.workdir_path),
+        &args.virus,
+    );
 
     Ok(())
 }

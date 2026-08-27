@@ -547,17 +547,6 @@ pub fn generate_plot_coverage(input_directory: &Path) -> Result<Plot, Box<dyn Er
     // Set the figure title
     let layout = Layout::new()
         .template(theme::cdc_template())
-        .title(format!(
-            "Coverage | {}",
-            input_directory
-                .file_name()
-                .unwrap()
-                .to_str()
-                .unwrap()
-                .split('-')
-                .next()
-                .unwrap()
-        ))
         .x_axis(Axis::new().title(Title::with_text("Position")))
         .y_axis(Axis::new().title(Title::with_text("Coverage")));
     plot.set_layout(layout);
@@ -715,7 +704,7 @@ pub fn generate_plot_coverage_seg(input_directory: &Path) -> Result<Plot, Box<dy
                 .font(
                     plotly::common::Font::new()
                         .family(theme::TITLE_FONT)
-                        .size(22)
+                        .size(14)
                         .color(segment_color),
                 )
                 .show_arrow(false),
@@ -737,22 +726,12 @@ pub fn generate_plot_coverage_seg(input_directory: &Path) -> Result<Plot, Box<dy
 
     // Configure subplot layout
     // Create a base layout first
-    let mut layout = Layout::new()
-        .template(theme::cdc_template())
-        .grid(
-            LayoutGrid::new()
-                .rows(rows)
-                .columns(cols)
-                .pattern(GridPattern::Independent),
-        )
-        .title(format!(
-            "Segment Coverage | {}",
-            input_directory
-                .file_name()
-                .unwrap_or_default()
-                .to_str()
-                .unwrap_or("Unknown")
-        ));
+    let mut layout = Layout::new().template(theme::cdc_template()).grid(
+        LayoutGrid::new()
+            .rows(rows)
+            .columns(cols)
+            .pattern(GridPattern::Independent),
+    );
 
     // Add annotations to layout
     layout = layout.annotations(annotations);
@@ -978,17 +957,6 @@ pub fn generate_sankey_plot(input_directory: &Path) -> Result<Plot, Box<dyn Erro
         })
         .collect();
 
-    // Let Snap auto-lay out the columns from the link topology: sink nodes
-    // (Fail QC, No Match and every segment) align on the same right-hand x,
-    // Pass QC sits left of the match nodes, and nodes stay draggable. Height
-    // scales with the sink column so tall diagrams still fit.
-    let source_set: std::collections::HashSet<usize> = source_indices.iter().copied().collect();
-    let sink_count = (0..node_labels.len())
-        .filter(|i| !source_set.contains(i))
-        .count()
-        .max(6);
-    let sankey_height = (sink_count * 70).clamp(500, 1400);
-
     // Outgoing reads per node (also the denominator for a child's "% of parent").
     let mut parent_totals: HashMap<usize, u32> = HashMap::new();
     for (s, v) in source_indices.iter().zip(values.iter()) {
@@ -1067,42 +1035,48 @@ pub fn generate_sankey_plot(input_directory: &Path) -> Result<Plot, Box<dyn Erro
     for &c in &cols {
         col_counts[c] += 1;
     }
-    // Even vertical spread within each column seeds the snap layout ordering.
-    let mut col_seen = vec![0usize; max_col + 1];
-    let mut node_x = Vec::with_capacity(node_labels.len());
-    let mut node_y = Vec::with_capacity(node_labels.len());
-    for &c in &cols {
-        let x = if c == 0 {
-            0.001
-        } else if c == max_col {
-            0.999
-        } else {
-            c as f64 / max_col as f64
-        };
-        node_x.push(x);
-        let j = col_seen[c];
-        col_seen[c] += 1;
-        node_y.push((j as f64 + 1.0) / (col_counts[c] as f64 + 1.0));
-    }
 
-    // Built as raw JSON to control the node/link fields directly.
+    // Compact height driven by the busiest column. With the "snap" arrangement
+    // (below) Plotly auto-stacks each column, so a taller busiest column just
+    // needs a little more room; the node bars scale down to stay short, never
+    // overlap a sibling, and never spill past the frame.
+    let max_col_nodes = col_counts.iter().copied().max().unwrap_or(6).max(6);
+    let sankey_height = (max_col_nodes * 34).clamp(240, 480);
+
+    // Links inherit their source node's color at low opacity so the connecting
+    // paths are clearly visible instead of the near-invisible default gray.
+    let hex_to_rgba = |hex: &str, alpha: f64| -> String {
+        let h = hex.trim_start_matches('#');
+        let r = u8::from_str_radix(h.get(0..2).unwrap_or("00"), 16).unwrap_or(0);
+        let g = u8::from_str_radix(h.get(2..4).unwrap_or("00"), 16).unwrap_or(0);
+        let b = u8::from_str_radix(h.get(4..6).unwrap_or("00"), 16).unwrap_or(0);
+        format!("rgba({r},{g},{b},{alpha})")
+    };
+    let link_colors: Vec<String> = source_indices
+        .iter()
+        .map(|&s| hex_to_rgba(node_colors[s], 0.35))
+        .collect();
+
+    // Built as raw JSON to control the node/link fields directly. Node x/y are
+    // left to Plotly's automatic "snap" layout: it derives the columns from the
+    // link topology and stacks nodes without overlap or overflow, which keeps
+    // the diagram compact. Thin bars + generous padding concentrate the visual.
     let sankey_json = serde_json::json!({
         "type": "sankey",
         "arrangement": "snap",
         "node": {
             "label": node_display,
             "color": node_colors,
-            "x": node_x,
-            "y": node_y,
-            "pad": 15,
-            "thickness": 20,
-            "line": { "color": "black" },
+            "pad": 24,
+            "thickness": 15,
+            "line": { "color": "rgba(0,0,0,0.35)", "width": 0.5 },
             "hovertemplate": "<b>%{label}</b><extra></extra>"
         },
         "link": {
             "source": source_indices,
             "target": target_indices,
             "value": values,
+            "color": link_colors,
             "hoverinfo": "skip"
         }
     });
@@ -1112,14 +1086,6 @@ pub fn generate_sankey_plot(input_directory: &Path) -> Result<Plot, Box<dyn Erro
     // Set layout
     let layout = Layout::new()
         .template(theme::cdc_template())
-        .title(format!(
-            "Read Assignment | {}",
-            input_directory
-                .file_name()
-                .unwrap_or_default()
-                .to_str()
-                .unwrap_or("Unknown")
-        ))
         .height(sankey_height)
         .auto_size(true);
 

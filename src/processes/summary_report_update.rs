@@ -300,8 +300,13 @@ pub fn summary_report_update_process(args: &SummaryUpdateArgs) -> Result<(), Box
     // Udpating the StaticHTML
     let summary_json = update_irma_summary_to_plotly_json(&summary_data, &args.virus);
 
-    let new_summary_html =
-        plotly_table_script("irma_summary_table", &summary_json, "MIRA Summary Table");
+    let new_summary_html = plotly_table_script(
+        "irma_summary_table",
+        &summary_json,
+        "MIRA Summary Table",
+        false,
+        false,
+    );
 
     update_summary_in_html(&args.static_html_path, &new_summary_html)?;
 

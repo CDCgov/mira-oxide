@@ -123,11 +123,23 @@ fn write_sample_plot_html(
 
 // Format plotly table
 #[allow(clippy::must_use_candidate)]
-pub fn plotly_table_script(div_id: &str, table_json: &str, table_title: &str) -> String {
+pub fn plotly_table_script(
+    div_id: &str,
+    table_json: &str,
+    table_title: &str,
+    start_collapsed: bool,
+    colorized: bool,
+) -> String {
     let body_font = theme::BODY_FONT;
     let title_font = theme::TITLE_FONT;
-    let panel = theme::MUTED;
+    let title_color = theme::CDC_NAVY;
+    let bg = if colorized {
+        theme::MUTED
+    } else {
+        theme::WHITE
+    };
     let border = theme::BORDER;
+    let open_attr = if start_collapsed { "" } else { " open" };
     format!(
         r#"
 <style>
@@ -141,6 +153,21 @@ pub fn plotly_table_script(div_id: &str, table_json: &str, table_title: &str) ->
     align-items: center;
 }}
 
+#{div_id}-container > details {{
+    width: 100%;
+}}
+
+#{div_id}-container > details > summary {{
+    cursor: pointer;
+    text-align: center;
+    font-family: {title_font};
+    font-size: 1.17em;
+    font-weight: bold;
+    color: {title_color};
+    margin: 10px 0;
+    list-style-position: inside;
+}}
+
 #{div_id} .scroll-table-window {{
     max-height: 500px;
     overflow-y: auto;
@@ -148,13 +175,13 @@ pub fn plotly_table_script(div_id: &str, table_json: &str, table_title: &str) ->
     margin: 0 auto;
     border-radius: 8px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-    background: {panel};
+    background: {bg};
 }}
 
 #{div_id} table {{
     border-collapse: collapse;
     margin: 0 auto;
-    background: {panel};
+    background: {bg};
 }}
 
 #{div_id} th, #{div_id} td {{
@@ -180,12 +207,14 @@ pub fn plotly_table_script(div_id: &str, table_json: &str, table_title: &str) ->
 
 <!-- Center wrapper -->
 <div id="{div_id}-container">
-  <div id="{div_id}">
-    <h3 style="text-align:center;">{table_title}</h3>
-    <div class="scroll-table-window">
-      <table id="{div_id}_table"></table>
+  <details{open_attr}>
+    <summary>{table_title}</summary>
+    <div id="{div_id}">
+      <div class="scroll-table-window">
+        <table id="{div_id}_table"></table>
+      </div>
     </div>
-  </div>
+  </details>
 </div>
 
 <script type="text/javascript">
@@ -671,17 +700,35 @@ pub fn generate_html_report(
         "irma_summary_table",
         &irma_summary_json,
         "MIRA Summary Table",
+        false,
+        false,
     );
     let dais_vars_json = dais_vars_to_plotly_json(dais_vars_data);
-    let dais_var_html =
-        plotly_table_script("dais_vars_table", &dais_vars_json, "AA Variants Table");
+    let dais_var_html = plotly_table_script(
+        "dais_vars_table",
+        &dais_vars_json,
+        "AA Variants Table",
+        true,
+        true,
+    );
 
     let minorvars_json = alleles_to_plotly_json(minor_variants, virus);
-    let minorvars_table_html =
-        plotly_table_script("minor_vars_table", &minorvars_json, "Minor Variants Table");
+    let minorvars_table_html = plotly_table_script(
+        "minor_vars_table",
+        &minorvars_json,
+        "Minor Variants Table",
+        true,
+        true,
+    );
 
     let indels_json = indels_to_plotly_json(indels, virus);
-    let indels_table_html = plotly_table_script("indels_table", &indels_json, "Minor Indels Table");
+    let indels_table_html = plotly_table_script(
+        "indels_table",
+        &indels_json,
+        "Minor Indels Table",
+        true,
+        true,
+    );
 
     // Coverage links
 
