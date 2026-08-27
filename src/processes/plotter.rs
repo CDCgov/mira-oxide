@@ -1036,6 +1036,25 @@ pub fn generate_sankey_plot(input_directory: &Path) -> Result<Plot, Box<dyn Erro
         col_counts[c] += 1;
     }
 
+    // Explicit x/y per node so the intended columns are actually enforced: "snap"
+    // alone lets topology drift, leaving No Match/Alt Match off Primary Match's
+    // column and Fail QC off Pass QC's. x groups nodes into columns; y stacks
+    // each column's nodes evenly. Kept just inside (0,1) so none clip the frame.
+    let node_x: Vec<f64> = cols
+        .iter()
+        .map(|&c| 0.001 + (c as f64) * (0.998 / max_col as f64))
+        .collect();
+    let mut col_seen = vec![0usize; max_col + 1];
+    let node_y: Vec<f64> = cols
+        .iter()
+        .map(|&c| {
+            let n = col_counts[c].max(1);
+            let k = col_seen[c];
+            col_seen[c] += 1;
+            (k as f64 + 0.5) / n as f64
+        })
+        .collect();
+
     // Compact height driven by the busiest column. With the "snap" arrangement
     // (below) Plotly auto-stacks each column, so a taller busiest column just
     // needs a little more room; the node bars scale down to stay short, never
@@ -1067,6 +1086,8 @@ pub fn generate_sankey_plot(input_directory: &Path) -> Result<Plot, Box<dyn Erro
         "node": {
             "label": node_display,
             "color": node_colors,
+            "x": node_x,
+            "y": node_y,
             "pad": 24,
             "thickness": 15,
             "line": { "color": "rgba(0,0,0,0.35)", "width": 0.5 },
