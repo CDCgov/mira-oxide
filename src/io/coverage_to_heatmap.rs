@@ -74,18 +74,8 @@ fn prepare_heatmap_axes(
 }
 
 fn get_colorscale() -> Vec<(f64, &'static str)> {
-    // CDC's teal scale with darkest blue at end
-    vec![
-        (0.0, "rgb(244, 252, 252)"),
-        (0.125, "rgb(234, 248, 249)"),
-        (0.25, "rgb(213, 247, 249)"),
-        (0.375, "rgb(174, 236, 242)"),
-        (0.5, "rgb(125, 222, 236)"),
-        (0.625, "rgb(0, 177, 206)"),
-        (0.75, "rgb(0, 129, 161)"),
-        (0.875, "rgb(18, 82, 97)"),
-        (1.0, "rgb(3, 38, 89)"),
-    ]
+    // CDC teal scale ending in CDC navy.
+    crate::constants::theme::coverage_colorscale()
 }
 
 fn build_heatmap_json(
@@ -117,8 +107,10 @@ fn build_layout_json(colorscale: &[(f64, &str)]) -> serde_json::Value {
                 }]
             },
             "layout": {
-                "paper_bgcolor": "white",
-                "plot_bgcolor": "#E5ECF6"
+                "font": {"family": crate::constants::theme::BODY_FONT, "color": crate::constants::theme::CHARCOAL, "size": 13},
+                "title": {"font": crate::constants::theme::title_font_json()},
+                "paper_bgcolor": crate::constants::theme::WHITE,
+                "plot_bgcolor": crate::constants::theme::WHITE
             }
         },
         "legend": {
@@ -127,7 +119,8 @@ fn build_layout_json(colorscale: &[(f64, &str)]) -> serde_json::Value {
             "orientation": "h"
         },
         "xaxis": {
-            "side": "top"
+            "side": "top",
+            "tickangle": -80
         }
     })
 }
@@ -138,6 +131,7 @@ pub fn coverage_to_heatmap_json(
     sample_list: &[String],
     virus: &str,
     output_file: &str,
+    write_file: bool,
 ) -> serde_json::Value {
     println!("Building coverage heatmap as JSON");
     let filtered_data = normalize_rsv_segments(coverage_data, virus);
@@ -153,9 +147,11 @@ pub fn coverage_to_heatmap_json(
         "layout": layout
     });
 
-    let file_path = format!("{output_file}heatmap.json");
-    std::fs::write(&file_path, plot_json.to_string()).expect("Failed to write heatmap JSON");
-    println!("  -> coverage heatmap json saved to {file_path}");
+    if write_file {
+        let file_path = format!("{output_file}heatmap.json");
+        std::fs::write(&file_path, plot_json.to_string()).expect("Failed to write heatmap JSON");
+        println!("  -> coverage heatmap json saved to {file_path}");
+    }
 
     // Return the JSON object
     plot_json

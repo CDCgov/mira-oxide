@@ -1,4 +1,5 @@
 use crate::constants::heatmap_ref::get_references_for_virus;
+use crate::constants::theme;
 use crate::utils::data_processing::IRMASummary;
 use serde_json::json;
 use std::fs::File;
@@ -230,11 +231,12 @@ fn plotly_template(colorscale: &Vec<(f64, &str)>) -> serde_json::Value {
         },
         "layout": {
             "autotypenumbers": "strict",
-            "font": {"color": "#2a3f5f"},
+            "font": {"family": crate::constants::theme::BODY_FONT, "color": crate::constants::theme::CHARCOAL, "size": 13},
+            "colorway": crate::constants::theme::colorway(),
             "hovermode": "closest",
             "hoverlabel": {"align": "left"},
-            "paper_bgcolor": "white",
-            "plot_bgcolor": "#E5ECF6",
+            "paper_bgcolor": crate::constants::theme::WHITE,
+            "plot_bgcolor": crate::constants::theme::WHITE,
             "polar": {
                 "bgcolor": "#E5ECF6",
                 "angularaxis": {"gridcolor": "white", "linecolor": "white", "ticks": ""},
@@ -277,7 +279,7 @@ fn plotly_template(colorscale: &Vec<(f64, &str)>) -> serde_json::Value {
             "shapedefaults": {"line": {"color": "#2a3f5f"}},
             "annotationdefaults": {"arrowcolor": "#2a3f5f", "arrowhead": 0, "arrowwidth": 1},
             "geo": {"bgcolor": "white", "landcolor": "#E5ECF6", "subunitcolor": "white", "showland": true, "showlakes": true, "lakecolor": "white"},
-            "title": {"x": 0.05},
+            "title": {"x": 0.05, "font": crate::constants::theme::title_font_json()},
             "mapbox": {"style": "light"}
         }
     });
@@ -292,16 +294,13 @@ pub fn create_passfail_heatmap(
     sample_list: &[String],
     virus: &str,
     output_path: &str,
+    write_file: bool,
 ) -> serde_json::Value {
     println!("Building pass_fail_heatmap as JSON");
 
-    let colorscale = vec![
-        (0.0, "rgb(184, 212, 237)"),
-        (0.25, "rgb(252, 235, 201)"),
-        (0.5, "rgb(251, 126, 56)"),
-        (0.75, "rgb(204, 27, 34)"),
-        (1.0, "rgb(0,0,0)"),
-    ];
+    // QC decision scale: pale blue (pass) -> yellow -> orange -> salmon ->
+    // dark red (worst).
+    let colorscale = theme::qc_colorscale();
 
     let references = get_references_for_virus(virus);
     let records = build_records(summaries, &references, sample_list, virus);
@@ -323,9 +322,9 @@ pub fn create_passfail_heatmap(
 
     let layout = json!({
         "template": plotly_template(&colorscale),
-        "xaxis": {"side": "top"},
-        "paper_bgcolor": "white",
-        "plot_bgcolor": "white"
+        "xaxis": {"side": "top", "tickangle": -80},
+        "paper_bgcolor": theme::WHITE,
+        "plot_bgcolor": theme::WHITE
     });
 
     let plot_json = json!({
@@ -333,12 +332,14 @@ pub fn create_passfail_heatmap(
         "layout": layout
     });
 
-    let file_path = format!("{output_path}pass_fail_heatmap.json");
-    let mut file = File::create(&file_path).expect("Unable to create file");
-    file.write_all(plot_json.to_string().as_bytes())
-        .expect("Unable to write data");
+    if write_file {
+        let file_path = format!("{output_path}pass_fail_heatmap.json");
+        let mut file = File::create(&file_path).expect("Unable to create file");
+        file.write_all(plot_json.to_string().as_bytes())
+            .expect("Unable to write data");
 
-    println!("  -> pass_fail heatmap json saved to {file_path}");
+        println!("  -> pass_fail heatmap json saved to {file_path}");
+    }
 
     // Return the JSON object
     plot_json

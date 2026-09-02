@@ -1,6 +1,6 @@
 use crate::io::data_ingest::ReadsData;
+use crate::processes::plotter::get_segment_color;
 use serde_json::{Value, json};
-use std::collections::HashMap;
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct SampleSankeyJson {
@@ -8,18 +8,8 @@ pub struct SampleSankeyJson {
     pub json: serde_json::Value,
 }
 
-// Placeholder functions for returnStageColors and seg
-fn return_stage_colors(_data: &[ReadsData]) -> HashMap<String, String> {
-    // Implement logic to return stage colors
-    HashMap::new()
-}
-
-fn seg(label: &str) -> std::string::String {
-    // Implement logic to segment the label
-    label.to_string()
-}
 #[allow(clippy::too_many_lines)]
-fn dash_reads_to_sankey(data: &[ReadsData], virus: &str) -> Value {
+fn dash_reads_to_sankey(data: &[ReadsData], _virus: &str) -> Value {
     // Filter out rows where "Stage" is None or "Stage" is 0 or 5
     let filtered_data: Vec<_> = data
         .iter()
@@ -30,25 +20,6 @@ fn dash_reads_to_sankey(data: &[ReadsData], virus: &str) -> Value {
         })
         .cloned()
         .collect();
-
-    // Generate stage colors (placeholder function)
-    let reccolor = return_stage_colors(&filtered_data);
-
-    // 🔹 Flu segment → color map
-    let flu_pattern_colors: Vec<(&str, &str)> = vec![
-        ("HA", "#5796D9"),  // Light Blue
-        ("NA", "#7DDEEC"),  // Teal
-        ("MP", "#B278B2"),  // Purple
-        ("NP", "#FABF61"),  // Yellow
-        ("NS", "#FF9C63"),  // Orange
-        ("PA", "#F0695E"),  // Light Red
-        ("PB1", "#0081A1"), // Dark Teal
-        ("PB2", "#8F4A8F"), // Dark Purple
-    ];
-
-    // Convert to HashMap for easy lookups
-    let flu_color_map: std::collections::HashMap<_, _> =
-        flu_pattern_colors.iter().copied().collect();
 
     // Extract labels
     let labels: Vec<String> = filtered_data.iter().map(|row| row.record.clone()).collect();
@@ -76,37 +47,10 @@ fn dash_reads_to_sankey(data: &[ReadsData], virus: &str) -> Value {
                 color.push("#0057B7".to_string());
             }
             _ => {
-                // Default: stage 4→N nodes
-
-                // 🔹 If virus == flu, try matching segment prefix
-                if virus == "flu" {
-                    let mut applied_flu_color = None;
-
-                    // Try each prefix (HA, NA, ...)
-                    for (seg_prefix, seg_color) in &flu_color_map {
-                        if label.contains(seg_prefix) {
-                            applied_flu_color = Some((*seg_color).to_string());
-                            break;
-                        }
-                    }
-
-                    if let Some(seg_color) = applied_flu_color {
-                        x_pos.push(0.95);
-                        y_pos.push(0.01);
-                        color.push(seg_color);
-                        continue; // Skip fallback logic
-                    }
-                }
-
-                // 🔹 Fallback to reccolor or dark blue
+                // Stage 4->N assignment nodes: color by CDC segment/virus family.
                 x_pos.push(0.95);
                 y_pos.push(0.01);
-
-                let fallback_color = "#032659".to_string();
-                let seg_key = seg(label);
-                let seg_color = reccolor.get(&seg_key).unwrap_or(&fallback_color);
-
-                color.push(seg_color.clone());
+                color.push(get_segment_color(label).to_string());
             }
         }
     }

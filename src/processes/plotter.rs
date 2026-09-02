@@ -3,7 +3,7 @@ use clap::Parser;
 use csv::ReaderBuilder;
 use glob::glob;
 use plotly::{
-    Layout, Plot, Sankey, Scatter,
+    Layout, Plot, Scatter,
     common::{Mode, Title},
     configuration::{ImageButtonFormats, ToImageButtonOptions},
     layout::{Axis, GridPattern, LayoutGrid},
@@ -16,44 +16,374 @@ use std::{
     path::{Path, PathBuf},
 };
 
+/// A raw JSON trace, used where the plotly crate's typed builders lack a field
+/// we need (here: sankey link `customdata`).
+#[derive(Clone, serde::Serialize)]
+#[serde(transparent)]
+struct RawTrace(serde_json::Value);
+
+impl plotly::Trace for RawTrace {
+    fn to_json(&self) -> String {
+        serde_json::to_string(&self.0).unwrap_or_default()
+    }
+}
+
+use crate::constants::theme;
+
+/// Colors for IRMA indels overlaid on coverage subplots.
+const INSERTION_COLOR: &str = "#2CA02C"; // green
+const DELETION_COLOR: &str = "#9467BD"; // purple
+/// Fallback minor-indel frequency thresholds when IRMA run_info.txt is absent.
+const INDEL_FREQ_DEFAULT_ILLUMINA: f32 = 0.05;
+const INDEL_FREQ_DEFAULT_ONT: f32 = 0.30;
+
+/// Read IRMA run parameters (short name -> value) from `<irma>/logs/run_info.txt`.
+fn read_run_info(irma_dir: &Path) -> HashMap<String, String> {
+    let mut map = HashMap::new();
+    if let Ok(content) = std::fs::read_to_string(irma_dir.join("logs/run_info.txt")) {
+        for line in content.lines() {
+            let cols: Vec<&str> = line.split('\t').collect();
+            if cols.len() >= 3 {
+                map.insert(cols[1].to_string(), cols[2].trim().to_string());
+            }
+        }
+    }
+    map
+}
+
+/// One minor-SNV variant: (position, consensus allele, minority allele, consensus count, minority count, minority frequency).
+type VariantRec = (u32, String, String, u32, u32, f32);
+/// One insertion: (position, inserted bases, count, total, frequency).
+type InsertionRec = (u32, String, u32, u32, f32);
+/// One deletion: (position, length, context, count, total, frequency).
+type DeletionRec = (u32, u32, String, u32, u32, f32);
+
+/// Load IRMA minor-SNV variants per segment from `tables/*variants.txt`.
+fn load_variant_data(
+    input_directory: &Path,
+) -> Result<HashMap<String, Vec<VariantRec>>, Box<dyn Error>> {
+    let mut variants_data: HashMap<String, Vec<VariantRec>> = HashMap::new();
+    for variant_path in (glob(&format!(
+        "{}/tables/*variants.txt",
+        input_directory.display()
+    ))?)
+    .flatten()
+    {
+        let file = File::open(&variant_path)?;
+        let mut rdr = ReaderBuilder::new()
+            .delimiter(b'\t')
+            .has_headers(true)
+            .from_reader(file);
+        for result in rdr.records() {
+            let record = result?;
+            if record.len() >= 8 {
+                let segment_name = record[0].to_string();
+                let position: u32 = record[1].parse()?;
+                let consensus_allele: String = record[3].to_string();
+                let minority_allele: String = record[4].to_string();
+                let consensus_count: u32 = record[5].parse()?;
+                let minority_count: u32 = record[6].parse()?;
+                let minority_frequency: f32 = record[8].parse()?;
+                variants_data.entry(segment_name).or_default().push((
+                    position,
+                    consensus_allele,
+                    minority_allele,
+                    consensus_count,
+                    minority_count,
+                    minority_frequency,
+                ));
+            }
+        }
+    }
+    Ok(variants_data)
+}
+
+/// Load IRMA insertions/deletions per segment. Per-type frequency thresholds are
+/// sourced from run_info.txt (MIN_FI/MIN_FD), floored at a platform default so
+/// low IRMA settings do not bury the coverage curve in indel noise.
+#[allow(clippy::type_complexity)]
+fn load_indel_data(
+    input_directory: &Path,
+) -> Result<
+    (
+        HashMap<String, Vec<InsertionRec>>,
+        HashMap<String, Vec<DeletionRec>>,
+    ),
+    Box<dyn Error>,
+> {
+    let run_info = read_run_info(input_directory);
+    let platform_default = if input_directory
+        .components()
+        .any(|c| c.as_os_str().eq_ignore_ascii_case("ont"))
+    {
+        INDEL_FREQ_DEFAULT_ONT
+    } else {
+        INDEL_FREQ_DEFAULT_ILLUMINA
+    };
+    let insertion_min_frequency = run_info
+        .get("MIN_FI")
+        .and_then(|v| v.parse::<f32>().ok())
+        .map_or(platform_default, |v| v.max(platform_default));
+    let deletion_min_frequency = run_info
+        .get("MIN_FD")
+        .and_then(|v| v.parse::<f32>().ok())
+        .map_or(platform_default, |v| v.max(platform_default));
+
+    let mut insertions_data: HashMap<String, Vec<InsertionRec>> = HashMap::new();
+    let mut deletions_data: HashMap<String, Vec<DeletionRec>> = HashMap::new();
+
+    for ins_path in (glob(&format!(
+        "{}/tables/*insertions.txt",
+        input_directory.display()
+    ))?)
+    .flatten()
+    {
+        let file = File::open(&ins_path)?;
+        let mut rdr = ReaderBuilder::new()
+            .delimiter(b'\t')
+            .has_headers(true)
+            .from_reader(file);
+        for result in rdr.records() {
+            let record = result?;
+            if record.len() >= 8 {
+                let frequency: f32 = record[7].parse().unwrap_or(0.0);
+                if frequency < insertion_min_frequency {
+                    continue;
+                }
+                let segment = record[0].to_string();
+                let position: u32 = record[1].parse()?;
+                let insert = record[2].to_string();
+                let count: u32 = record[5].parse()?;
+                let total: u32 = record[6].parse()?;
+                insertions_data
+                    .entry(segment)
+                    .or_default()
+                    .push((position, insert, count, total, frequency));
+            }
+        }
+    }
+
+    for del_path in (glob(&format!(
+        "{}/tables/*deletions.txt",
+        input_directory.display()
+    ))?)
+    .flatten()
+    {
+        let file = File::open(&del_path)?;
+        let mut rdr = ReaderBuilder::new()
+            .delimiter(b'\t')
+            .has_headers(true)
+            .from_reader(file);
+        for result in rdr.records() {
+            let record = result?;
+            if record.len() >= 8 {
+                let frequency: f32 = record[7].parse().unwrap_or(0.0);
+                if frequency < deletion_min_frequency {
+                    continue;
+                }
+                let segment = record[0].to_string();
+                let position: u32 = record[1].parse()?;
+                let length: u32 = record[2].parse()?;
+                let context = record[3].to_string();
+                let count: u32 = record[5].parse()?;
+                let total: u32 = record[6].parse()?;
+                deletions_data
+                    .entry(segment)
+                    .or_default()
+                    .push((position, length, context, count, total, frequency));
+            }
+        }
+    }
+
+    Ok((insertions_data, deletions_data))
+}
+
+/// Evenly spaced points along a vertical line at `x` from `y0` to `y1`, so hover
+/// fires anywhere along the drawn line rather than only at its two ends.
+fn vline(x: u32, y0: u32, y1: u32) -> (Vec<u32>, Vec<u32>) {
+    const STEPS: u32 = 40;
+    let (lo, hi) = (y0.min(y1), y0.max(y1));
+    let span = hi - lo;
+    (0..=STEPS).map(|i| (x, lo + span * i / STEPS)).unzip()
+}
+
+/// Draw the minor-SNV and indel vertical lines for one segment. Every trace
+/// shares `legend_group` (the segment name) so a front end can highlight or
+/// toggle a whole segment independently of Plotly's own legend controls.
+#[allow(clippy::too_many_arguments)]
+fn add_variant_indel_traces(
+    plot: &mut Plot,
+    segment_name: &str,
+    segment_color: &'static str,
+    variants_data: &HashMap<String, Vec<VariantRec>>,
+    insertions_data: &HashMap<String, Vec<InsertionRec>>,
+    deletions_data: &HashMap<String, Vec<DeletionRec>>,
+    xaxis: &str,
+    yaxis: &str,
+    legend_group: &str,
+) {
+    // Minor-SNV variants: solid minority depth, dashed remainder up to total.
+    if let Some(variants) = variants_data.get(segment_name) {
+        for (
+            position,
+            consensus_allele,
+            minority_allele,
+            consensus_count,
+            minority_count,
+            minority_frequency,
+        ) in variants
+        {
+            let total = *consensus_count + *minority_count;
+            let hover = format!(
+                "{}:{}:{} ({:.2}%)<extra></extra>",
+                consensus_allele,
+                position,
+                minority_allele,
+                *minority_frequency * 100.0
+            );
+            let (vx, vy) = vline(*position, 0, *minority_count);
+            let minor_line = Scatter::new(vx, vy)
+                .mode(Mode::Lines)
+                .name(segment_name)
+                .legend_group(legend_group)
+                .line(plotly::common::Line::new().color(segment_color).width(4.0))
+                .hover_template(hover.clone())
+                .x_axis(xaxis)
+                .y_axis(yaxis)
+                .show_legend(false);
+            plot.add_trace(minor_line);
+            let (tx, ty) = vline(*position, *minority_count, total);
+            let total_line = Scatter::new(tx, ty)
+                .mode(Mode::Lines)
+                .name(segment_name)
+                .legend_group(legend_group)
+                .line(
+                    plotly::common::Line::new()
+                        .color(segment_color)
+                        .width(4.0)
+                        .dash(plotly::common::DashType::Dot),
+                )
+                .hover_template(hover.clone())
+                .x_axis(xaxis)
+                .y_axis(yaxis)
+                .show_legend(false);
+            plot.add_trace(total_line);
+        }
+    }
+
+    // Insertions: solid green major count, dashed green indel count.
+    if let Some(insertions) = insertions_data.get(segment_name) {
+        for (position, insert, count, total, frequency) in insertions {
+            let major = total.saturating_sub(*count);
+            let hover = format!(
+                "-:{}:{} ({:.2}%)<extra></extra>",
+                position,
+                insert,
+                *frequency * 100.0
+            );
+            let (mx, my) = vline(*position, 0, major);
+            let major_line = Scatter::new(mx, my)
+                .mode(Mode::Lines)
+                .name("Insertion")
+                .legend_group(legend_group)
+                .line(
+                    plotly::common::Line::new()
+                        .color(INSERTION_COLOR)
+                        .width(3.0),
+                )
+                .hover_template(hover.clone())
+                .x_axis(xaxis)
+                .y_axis(yaxis)
+                .show_legend(false);
+            plot.add_trace(major_line);
+            let (ix, iy) = vline(*position, major, *total);
+            let indel_line = Scatter::new(ix, iy)
+                .mode(Mode::Lines)
+                .name("Insertion")
+                .legend_group(legend_group)
+                .line(
+                    plotly::common::Line::new()
+                        .color(INSERTION_COLOR)
+                        .width(3.0)
+                        .dash(plotly::common::DashType::Dash),
+                )
+                .hover_template(hover.clone())
+                .x_axis(xaxis)
+                .y_axis(yaxis)
+                .show_legend(false);
+            plot.add_trace(indel_line);
+        }
+    }
+
+    // Deletions: solid purple major count, dashed purple indel count.
+    if let Some(deletions) = deletions_data.get(segment_name) {
+        for (position, _length, context, count, total, frequency) in deletions {
+            let major = total.saturating_sub(*count);
+            let dashes = "-".repeat(context.matches('-').count());
+            let hover = format!(
+                "{context}:{position}:{dashes} ({:.2}%)<extra></extra>",
+                *frequency * 100.0
+            );
+            let (mx, my) = vline(*position, 0, major);
+            let major_line = Scatter::new(mx, my)
+                .mode(Mode::Lines)
+                .name("Deletion")
+                .legend_group(legend_group)
+                .line(plotly::common::Line::new().color(DELETION_COLOR).width(3.0))
+                .hover_template(hover.clone())
+                .x_axis(xaxis)
+                .y_axis(yaxis)
+                .show_legend(false);
+            plot.add_trace(major_line);
+            let (ix, iy) = vline(*position, major, *total);
+            let indel_line = Scatter::new(ix, iy)
+                .mode(Mode::Lines)
+                .name("Deletion")
+                .legend_group(legend_group)
+                .line(
+                    plotly::common::Line::new()
+                        .color(DELETION_COLOR)
+                        .width(3.0)
+                        .dash(plotly::common::DashType::Dash),
+                )
+                .hover_template(hover.clone())
+                .x_axis(xaxis)
+                .y_axis(yaxis)
+                .show_legend(false);
+            plot.add_trace(indel_line);
+        }
+    }
+}
+
 // Add this function to generate consistent colors for segment names
 #[must_use]
 pub fn get_segment_color(segment_name: &str) -> &'static str {
-    // This ensures the same segment always gets the same color across all plots
-    // Check if segment_name contains any of our known segment identifiers
-    if segment_name.contains("PB2") {
-        "#3366CC" // blue
-    } else if segment_name.contains("PB1") {
-        "#DC3912" // red
-    } else if segment_name.contains("PA") {
-        "#FF9900" // orange
-    } else if segment_name.contains("HA") {
-        "#109618" // green
-    } else if segment_name.contains("NP") {
-        "#990099" // purple
+    // Two CDC color families (same segment -> same color):
+    //   set1 (red range)       -> HA, NA
+    //   set2 (blue/teal range) -> PB2, PB1, PA, NP, MP, NS
+    if segment_name.contains("HA") {
+        theme::CDC_RED // #CC1B22
     } else if segment_name.contains("NA") {
-        "#3B3EAC" // indigo
+        "#F0695E" // coral (light red)
+    } else if segment_name.contains("PB2") {
+        theme::CDC_NAVY // #032659
+    } else if segment_name.contains("PB1") {
+        theme::CDC_BLUE // #0057B7
+    } else if segment_name.contains("PA") {
+        theme::CDC_BLUE_1 // #3382CF
+    } else if segment_name.contains("NP") {
+        "#5796D9" // light blue
     } else if segment_name.contains("MP") {
-        "#0099C6" // cyan
+        theme::CDC_TEAL // #0081A1
     } else if segment_name.contains("NS") {
-        "#DD4477" // pink
+        "#00B1CE" // light teal
     } else {
-        // For any other segments, use a hash of the segment name to pick a color
+        // Other virus types (RSV, SC2) -> CDC colorway by hash.
         let hash = segment_name
             .bytes()
             .fold(0u32, |acc, b| acc.wrapping_add(u32::from(b)));
-        match hash % 10 {
-            0 => "#3366CC", // blue
-            1 => "#DC3912", // red
-            2 => "#FF9900", // orange
-            3 => "#109618", // green
-            4 => "#990099", // purple
-            5 => "#3B3EAC", // indigo
-            6 => "#0099C6", // cyan
-            7 => "#DD4477", // pink
-            8 => "#66AA00", // lime
-            _ => "#B82E2E", // dark red
-        }
+        let cw = theme::colorway();
+        cw[hash as usize % cw.len()]
     }
 }
 
@@ -104,6 +434,14 @@ pub struct PlotterArgs {
     inline_html: bool,
 
     #[arg(
+        short = 'j',
+        long,
+        default_value_t = false,
+        help = "Emit plotly JSON instead of HTML (written to the -o path with a .json extension, or to stdout when -o is omitted) (Default: false)"
+    )]
+    json: bool,
+
+    #[arg(
         short = 'o',
         long,
         help = "Output standalone HTML file path (Optional)"
@@ -111,9 +449,32 @@ pub struct PlotterArgs {
     output: Option<PathBuf>,
 }
 
+/// Emit a plot as plotly JSON: to `output` (with the given filename suffix and a
+/// `.json` extension) when provided, otherwise to stdout.
+fn emit_plot_json(
+    plot: &Plot,
+    output: Option<&PathBuf>,
+    suffix: &str,
+) -> Result<(), Box<dyn Error>> {
+    let json = plot.to_json();
+    match output {
+        Some(path) => {
+            let stem = path.file_stem().unwrap_or_default().to_string_lossy();
+            let json_file = path.with_file_name(format!("{stem}{suffix}.json"));
+            std::fs::write(json_file, json)?;
+        }
+        None => println!("{json}"),
+    }
+    Ok(())
+}
+
 pub fn generate_plot_coverage(input_directory: &Path) -> Result<Plot, Box<dyn Error>> {
     // Create a Plotly plot
     let mut plot = Plot::new();
+
+    // Load variant/indel overlays once, keyed by segment.
+    let variants_data = load_variant_data(input_directory)?;
+    let (insertions_data, deletions_data) = load_indel_data(input_directory)?;
 
     // Iterate over all coverage files in the input directory
     for entry in glob(&format!(
@@ -136,9 +497,11 @@ pub fn generate_plot_coverage(input_directory: &Path) -> Result<Plot, Box<dyn Er
                 for result in rdr.records() {
                     let record = result?;
                     let x: u32 = record[1].parse()?;
-                    let y: u32 = record[2].parse()?;
+                    // Depth = base-call depth + deletion-spanning reads (true read depth).
+                    let depth: u32 = record[2].parse()?;
+                    let deletions: u32 = record.get(4).and_then(|s| s.parse().ok()).unwrap_or(0);
                     x_values.push(x);
-                    y_values.push(y);
+                    y_values.push(depth + deletions);
                 }
 
                 // Extract segment name
@@ -158,9 +521,24 @@ pub fn generate_plot_coverage(input_directory: &Path) -> Result<Plot, Box<dyn Er
                 let trace = Scatter::new(x_values, y_values)
                     .mode(Mode::Lines)
                     .name(segment_name)
-                    .line(plotly::common::Line::new().color(segment_color));
+                    .legend_group(segment_name)
+                    .line(plotly::common::Line::new().color(segment_color).width(3.0))
+                    .hover_template("<b>Position:</b> %{x}<br><b>Depth:</b> %{y}<extra></extra>");
 
                 plot.add_trace(trace);
+
+                // Overlay minor-SNV variants and indels for this segment.
+                add_variant_indel_traces(
+                    &mut plot,
+                    segment_name,
+                    segment_color,
+                    &variants_data,
+                    &insertions_data,
+                    &deletions_data,
+                    "x",
+                    "y",
+                    segment_name,
+                );
             }
             Err(e) => eprintln!("Error reading file: {e}"),
         }
@@ -168,17 +546,7 @@ pub fn generate_plot_coverage(input_directory: &Path) -> Result<Plot, Box<dyn Er
 
     // Set the figure title
     let layout = Layout::new()
-        .title(format!(
-            "Coverage | {}",
-            input_directory
-                .file_name()
-                .unwrap()
-                .to_str()
-                .unwrap()
-                .split('-')
-                .next()
-                .unwrap()
-        ))
+        .template(theme::cdc_template())
         .x_axis(Axis::new().title(Title::with_text("Position")))
         .y_axis(Axis::new().title(Title::with_text("Coverage")));
     plot.set_layout(layout);
@@ -222,48 +590,12 @@ pub fn generate_plot_coverage_seg(input_directory: &Path) -> Result<Plot, Box<dy
     let rows = 4; //((file_count + 2) as f64).sqrt().ceil() as usize;
     let cols = 2; //(file_count + rows - 1) / rows; // Ceiling division
 
-    // Load variant data into a HashMap keyed by segment name
-    // TODO: consider a struct with named fields
-    let mut variants_data: HashMap<String, Vec<(u32, String, String, u32, u32, f32)>> =
-        HashMap::new();
+    // Load variant/indel overlays once, keyed by segment.
+    let variants_data = load_variant_data(input_directory)?;
+    let (insertions_data, deletions_data) = load_indel_data(input_directory)?;
 
-    // Look for variant files with matching prefixes in the directory
-    for variant_path in (glob(&format!(
-        "{}/tables/*variants.txt",
-        input_directory.display()
-    ))?)
-    .flatten()
-    {
-        let file = File::open(&variant_path)?;
-
-        // Create a TSV reader
-        let mut rdr = ReaderBuilder::new()
-            .delimiter(b'\t')
-            .has_headers(true)
-            .from_reader(file);
-
-        for result in rdr.records() {
-            let record = result?;
-            if record.len() >= 8 {
-                let segment_name = record[0].to_string();
-                let position: u32 = record[1].parse()?;
-                let consensus_allele: String = record[3].to_string();
-                let minority_allele: String = record[4].to_string();
-                let consensus_count: u32 = record[5].parse()?;
-                let minority_count: u32 = record[6].parse()?;
-                let minority_frequency: f32 = record[8].parse()?;
-
-                variants_data.entry(segment_name).or_default().push((
-                    position,
-                    consensus_allele,
-                    minority_allele,
-                    consensus_count,
-                    minority_count,
-                    minority_frequency,
-                ));
-            }
-        }
-    }
+    // Segment title labels, positioned dynamically per subplot.
+    let mut annotations = Vec::new();
 
     // Process each file and create a subplot
     for (idx, path) in file_paths.iter().enumerate() {
@@ -298,17 +630,43 @@ pub fn generate_plot_coverage_seg(input_directory: &Path) -> Result<Plot, Box<dy
         for result in rdr.records() {
             let record = result?;
             let x: u32 = record[1].parse()?;
-            let y: u32 = record[2].parse()?;
+            // Depth = base-call depth + deletion-spanning reads (true read depth).
+            let depth: u32 = record[2].parse()?;
+            let deletions: u32 = record.get(4).and_then(|s| s.parse().ok()).unwrap_or(0);
             x_values.push(x);
-            y_values.push(y);
+            y_values.push(depth + deletions);
         }
+
+        // Pick the emptiest top corner (data coords) for the segment label so
+        // it does not sit on top of the coverage curve or variant lines.
+        let n = y_values.len();
+        let max_y = y_values.iter().copied().max().unwrap_or(1);
+        let min_x = x_values.iter().copied().min().unwrap_or(0);
+        let max_x = x_values.iter().copied().max().unwrap_or(1);
+        let mid = n / 2;
+        let left_peak = y_values[..mid].iter().copied().max().unwrap_or(0);
+        let right_peak = y_values[mid..].iter().copied().max().unwrap_or(0);
+        let (label_x, label_x_anchor, region_peak) = if left_peak <= right_peak {
+            (f64::from(min_x), plotly::common::Anchor::Left, left_peak)
+        } else {
+            (f64::from(max_x), plotly::common::Anchor::Right, right_peak)
+        };
+        // Vertical anchor also varies per subplot so the label clears the data:
+        // low local coverage -> pin to the top; high local coverage -> float
+        // just above the local curve.
+        let (label_y, label_y_anchor) = if region_peak * 2 <= max_y {
+            (f64::from(max_y), plotly::common::Anchor::Top)
+        } else {
+            (f64::from(region_peak), plotly::common::Anchor::Bottom)
+        };
 
         // Create a trace for the current CSV file with consistent color
         let trace = Scatter::new(x_values, y_values.clone())
             .mode(Mode::Lines)
             .name(&segment_name)
-            .line(plotly::common::Line::new().color(segment_color))
-            .hover_template("<b>Position:</b> %{x}<br><b>Coverage:</b> %{y}<br>")
+            .legend_group(&segment_name)
+            .line(plotly::common::Line::new().color(segment_color).width(3.0))
+            .hover_template("<b>Position:</b> %{x}<br><b>Depth:</b> %{y}<extra></extra>")
             .show_legend(false);
 
         // Calculate row and column for this subplot (1-indexed)
@@ -332,128 +690,48 @@ pub fn generate_plot_coverage_seg(input_directory: &Path) -> Result<Plot, Box<dy
         // Add trace to plot
         plot.add_trace(trace);
 
-        // Add variant data as scatter traces if we have data for this segment
-        if let Some(variants) = variants_data.get(&segment_name) {
-            // Collect positions and values for consensus and minority traces
-            let mut variant_positions: Vec<u32> = Vec::new();
-            let mut consensus_values: Vec<u32> = Vec::new();
-            let mut minority_values: Vec<u32> = Vec::new();
-            let mut hover_texts: Vec<String> = Vec::new();
-
-            for &(
-                position,
-                ref consensus_allele,
-                ref minority_allele,
-                consensus_count,
-                minority_count,
-                minority_frequency,
-            ) in variants
-            {
-                variant_positions.push(position);
-                consensus_values.push(consensus_count + minority_count); // Total height
-                minority_values.push(minority_count);
-                hover_texts.push(format!(
-                    "<b>Position:</b> {}<br><br><b>Consensus Allele:</b> {}<br><b>Consensus Count:</b> {}<br><br><b>Minority Allele:</b> {}<br><b>Minority Count:</b> {}<br><b>Minority Frequency:</b> {:.2}%<br><br><b>Total:</b> {}",
-                    position, consensus_allele, consensus_count, minority_allele, minority_count, minority_frequency * 100.0, consensus_count + minority_count
-                ));
-            }
-
-            // Create trace for minority values with consistent color (but with transparency)
-            let minority_trace = Scatter::new(variant_positions, minority_values)
-                .mode(Mode::Markers)
-                .name(&segment_name)
-                .marker(
-                    plotly::common::Marker::new()
-                        .color(segment_color)
-                        .opacity(0.5)
-                        .size(15)
-                        .symbol(plotly::common::MarkerSymbol::TriangleUp),
+        // Segment label anchored in the chosen corner of this subplot.
+        let label = segment_name.split('_').nth(1).unwrap_or(&segment_name);
+        annotations.push(
+            plotly::layout::Annotation::new()
+                .text(label)
+                .x_ref(&xaxis)
+                .y_ref(&yaxis)
+                .x(label_x)
+                .y(label_y)
+                .x_anchor(label_x_anchor)
+                .y_anchor(label_y_anchor)
+                .font(
+                    plotly::common::Font::new()
+                        .family(theme::TITLE_FONT)
+                        .size(14)
+                        .color(segment_color),
                 )
-                .text_array(hover_texts)
-                .x_axis(&xaxis)
-                .y_axis(&yaxis)
-                .show_legend(false);
+                .show_arrow(false),
+        );
 
-            // Add variant traces to plot
-            plot.add_trace(minority_trace);
-        }
+        // Overlay minor-SNV variants and indels for this segment.
+        add_variant_indel_traces(
+            &mut plot,
+            &segment_name,
+            segment_color,
+            &variants_data,
+            &insertions_data,
+            &deletions_data,
+            &xaxis,
+            &yaxis,
+            &segment_name,
+        );
     }
 
     // Configure subplot layout
     // Create a base layout first
-    let mut layout = Layout::new()
-        .grid(
-            LayoutGrid::new()
-                .rows(rows)
-                .columns(cols)
-                .pattern(GridPattern::Independent),
-        )
-        .title(format!(
-            "Segment Coverage | {}",
-            input_directory
-                .file_name()
-                .unwrap_or_default()
-                .to_str()
-                .unwrap_or("Unknown")
-        ));
-
-    // Add annotations for each segment title
-    let mut annotations = Vec::new();
-    for (idx, path) in file_paths.iter().enumerate() {
-        let ctype: Vec<&str> = path
-            .file_name()
-            .unwrap_or_default()
-            .to_str()
-            .unwrap_or("Unknown")
-            .split('-')
-            .next()
-            .unwrap_or("Unknown")
-            .split('_')
-            .collect();
-        let segment_name = ctype[1];
-        /* .file_name()
-        .unwrap_or_default()
-        .to_str()
-        .unwrap_or("Unknown")
-        .split('-')
-        .next()
-        .unwrap_or("Unknown")
-        .split('_')
-        .next()
-        .unwrap_or("Unknown")
-        .next()
-        .unwrap_or("Unknown");
-        */
-        let row = idx / cols;
-        let col = idx % cols;
-
-        // Calculate position for annotation (centered above each subplot)
-        annotations.push(
-            plotly::layout::Annotation::new()
-                .text(segment_name)
-                .x_ref("paper")
-                .y_ref("paper")
-                //.x((col as f64 + 0.5) / cols as f64)
-                .x(match col {
-                    0 => 0.2,
-                    1 => 0.8,
-                    _ => (col as f64 + 0.5) / cols as f64, // fallback formula for other columns
-                })
-                .y(match row {
-                    0 => 1.0,
-                    1 => 0.78,
-                    2 => 0.48,
-                    3 => 0.18,
-                    _ => (row as f64 + 0.5) / rows as f64, // fallback formula for other rows
-                })
-                .font(
-                    plotly::common::Font::new()
-                        .size(22)
-                        .color(get_segment_color(segment_name)),
-                )
-                .show_arrow(false),
-        );
-    }
+    let mut layout = Layout::new().template(theme::cdc_template()).grid(
+        LayoutGrid::new()
+            .rows(rows)
+            .columns(cols)
+            .pattern(GridPattern::Independent),
+    );
 
     // Add annotations to layout
     layout = layout.annotations(annotations);
@@ -665,89 +943,171 @@ pub fn generate_sankey_plot(input_directory: &Path) -> Result<Plot, Box<dyn Erro
     // Prepare Sankey plot
     let mut plot = Plot::new();
 
-    // Create Sankey trace
-    let node_labels_refs: Vec<&str> = node_labels
+    // Node colors: CDC blues for the read-funnel stages, segment/virus colors
+    // (shared with the coverage plots) for the assignment nodes.
+    let node_colors: Vec<&'static str> = node_labels
         .iter()
-        .map(std::string::String::as_str)
+        .map(|label| match label.as_str() {
+            "Initial Reads" => "#87B5E3",   // light blue
+            "Pass QC" => theme::CDC_BLUE_1, // #3382CF
+            "Alt Match" => theme::CDC_TEAL,
+            "Primary Match" => theme::CDC_BLUE, // #0057B7
+            "Fail QC" | "No Match" => theme::GRAY,
+            _ => get_segment_color(label),
+        })
         .collect();
 
-    // Explicitly define x and y positions for each node
-    let n = node_labels.len();
-    let mut x = vec![0.0; n];
-    let mut y = vec![0.0; n];
-    // Assign positions for the first five nodes (Initial Reads, Pass QC, Fail QC, No Match, Alt Match)
-    // Remaining nodes (segments) are stacked vertically in the last column
-    let mut seg_idx = 0;
-    for (i, label) in node_labels.iter().enumerate() {
-        match label.as_str() {
-            "Initial Reads" => {
-                x[i] = 0.0;
-                y[i] = 0.5;
-            }
-            "Pass QC" => {
-                x[i] = 0.2;
-                y[i] = 0.2;
-            }
-            "Fail QC" => {
-                x[i] = 0.2;
-                y[i] = 0.1;
-            }
-            "No Match" => {
-                x[i] = 0.4;
-                y[i] = 0.2;
-            }
-            "Alt Match" => {
-                x[i] = 0.4;
-                y[i] = 0.8;
-            }
-            "Primary Match" => {
-                x[i] = 0.4;
-                y[i] = 0.5;
-            }
-            _ => {
-                // Segment nodes: stack vertically in last column
-                x[i] = 0.7;
-                y[i] = 0.1 + 0.8 * f64::from(seg_idx) / ((n - 5).max(1) as f64);
-                seg_idx += 1;
-            }
-        }
+    // Outgoing reads per node (also the denominator for a child's "% of parent").
+    let mut parent_totals: HashMap<usize, u32> = HashMap::new();
+    for (s, v) in source_indices.iter().zip(values.iter()) {
+        *parent_totals.entry(*s).or_insert(0) += *v;
     }
 
-    let sankey = Sankey::new()
-        .node(
-            plotly::sankey::Node::new()
-                .label(node_labels_refs)
-                .x(x)
-                .y(y)
-                .pad(15)
-                .thickness(20)
-                .line(plotly::sankey::Line::new().color("black"))
-                .hover_template("<b>%{label}</b><br>%{value} reads")
-                .hover_info(plotly::common::HoverInfo::Name),
-        )
-        .link(
-            plotly::sankey::Link::new()
-                .source(source_indices)
-                .target(target_indices)
-                .value(values)
-                //.color(vec!["rgba(0,0,0,0.2)"; values.len()])
-                //.hover_info("all")
-                .hover_info(plotly::common::HoverInfo::None),
-        )
-        .arrangement(plotly::sankey::Arrangement::Snap);
+    // Incoming reads and parents per node, for the label read count and %.
+    let mut node_in: HashMap<usize, u32> = HashMap::new();
+    let mut node_parents: HashMap<usize, std::collections::HashSet<usize>> = HashMap::new();
+    for ((s, t), v) in source_indices
+        .iter()
+        .zip(target_indices.iter())
+        .zip(values.iter())
+    {
+        *node_in.entry(*t).or_insert(0) += *v;
+        node_parents.entry(*t).or_default().insert(*s);
+    }
 
-    plot.add_trace(sankey);
+    // Thousands-separated read count.
+    let commafy = |n: u32| -> String {
+        let s = n.to_string();
+        let len = s.len();
+        s.chars()
+            .enumerate()
+            .flat_map(|(i, c)| {
+                if i > 0 && (len - i) % 3 == 0 {
+                    vec![',', c]
+                } else {
+                    vec![c]
+                }
+            })
+            .collect()
+    };
+
+    // Node labels show name, read count, and % of parent (root has no parent).
+    let node_display: Vec<String> = node_labels
+        .iter()
+        .enumerate()
+        .map(|(i, name)| {
+            let incoming = node_in.get(&i).copied().unwrap_or(0);
+            let outgoing = parent_totals.get(&i).copied().unwrap_or(0);
+            let count = incoming.max(outgoing);
+            let denom: u32 = node_parents
+                .get(&i)
+                .map(|ps| {
+                    ps.iter()
+                        .map(|s| parent_totals.get(s).copied().unwrap_or(0))
+                        .sum()
+                })
+                .unwrap_or(0);
+            if denom > 0 {
+                format!(
+                    "{name} ({} reads, {:.1}%)",
+                    commafy(count),
+                    f64::from(incoming) / f64::from(denom) * 100.0
+                )
+            } else {
+                format!("{name} ({} reads)", commafy(count))
+            }
+        })
+        .collect();
+
+    // Manual columns so Fail QC shares Pass QC's x, and No Match shares the
+    // Primary/Alt Match x. Segments occupy the rightmost column.
+    let col_of = |label: &str| -> usize {
+        match label {
+            "Initial Reads" => 0,
+            "Pass QC" | "Fail QC" => 1,
+            "Primary Match" | "Alt Match" | "No Match" => 2,
+            _ => 3,
+        }
+    };
+    let max_col = 3usize;
+    let cols: Vec<usize> = node_labels.iter().map(|l| col_of(l)).collect();
+    let mut col_counts = vec![0usize; max_col + 1];
+    for &c in &cols {
+        col_counts[c] += 1;
+    }
+
+    // Explicit x/y per node so the intended columns are actually enforced: "snap"
+    // alone lets topology drift, leaving No Match/Alt Match off Primary Match's
+    // column and Fail QC off Pass QC's. x groups nodes into columns; y stacks
+    // each column's nodes evenly. Kept just inside (0,1) so none clip the frame.
+    let node_x: Vec<f64> = cols
+        .iter()
+        .map(|&c| 0.001 + (c as f64) * (0.998 / max_col as f64))
+        .collect();
+    let mut col_seen = vec![0usize; max_col + 1];
+    let node_y: Vec<f64> = cols
+        .iter()
+        .map(|&c| {
+            let n = col_counts[c].max(1);
+            let k = col_seen[c];
+            col_seen[c] += 1;
+            (k as f64 + 0.5) / n as f64
+        })
+        .collect();
+
+    // Compact height driven by the busiest column. With the "snap" arrangement
+    // (below) Plotly auto-stacks each column, so a taller busiest column just
+    // needs a little more room; the node bars scale down to stay short, never
+    // overlap a sibling, and never spill past the frame.
+    let max_col_nodes = col_counts.iter().copied().max().unwrap_or(6).max(6);
+    let sankey_height = (max_col_nodes * 34).clamp(240, 480);
+
+    // Links inherit their source node's color at low opacity so the connecting
+    // paths are clearly visible instead of the near-invisible default gray.
+    let hex_to_rgba = |hex: &str, alpha: f64| -> String {
+        let h = hex.trim_start_matches('#');
+        let r = u8::from_str_radix(h.get(0..2).unwrap_or("00"), 16).unwrap_or(0);
+        let g = u8::from_str_radix(h.get(2..4).unwrap_or("00"), 16).unwrap_or(0);
+        let b = u8::from_str_radix(h.get(4..6).unwrap_or("00"), 16).unwrap_or(0);
+        format!("rgba({r},{g},{b},{alpha})")
+    };
+    let link_colors: Vec<String> = source_indices
+        .iter()
+        .map(|&s| hex_to_rgba(node_colors[s], 0.35))
+        .collect();
+
+    // Built as raw JSON to control the node/link fields directly. Node x/y are
+    // left to Plotly's automatic "snap" layout: it derives the columns from the
+    // link topology and stacks nodes without overlap or overflow, which keeps
+    // the diagram compact. Thin bars + generous padding concentrate the visual.
+    let sankey_json = serde_json::json!({
+        "type": "sankey",
+        "arrangement": "snap",
+        "node": {
+            "label": node_display,
+            "color": node_colors,
+            "x": node_x,
+            "y": node_y,
+            "pad": 24,
+            "thickness": 15,
+            "line": { "color": "rgba(0,0,0,0.35)", "width": 0.5 },
+            "hovertemplate": "<b>%{label}</b><extra></extra>"
+        },
+        "link": {
+            "source": source_indices,
+            "target": target_indices,
+            "value": values,
+            "color": link_colors,
+            "hoverinfo": "skip"
+        }
+    });
+
+    plot.add_trace(Box::new(RawTrace(sankey_json)));
 
     // Set layout
     let layout = Layout::new()
-        .title(format!(
-            "Read Assignment | {}",
-            input_directory
-                .file_name()
-                .unwrap_or_default()
-                .to_str()
-                .unwrap_or("Unknown")
-        ))
+        .template(theme::cdc_template())
+        .height(sankey_height)
         .auto_size(true);
 
     plot.set_layout(layout);
@@ -796,16 +1156,23 @@ pub fn plotter_process(args: PlotterArgs) -> Result<(), Box<dyn Error>> {
     // Check for correct number of arguments
     //let args = PlotterArgs::parse();
 
-    // Get the input directory and output file path from the command line arguments
-    let input_directory = args.irma_dir;
+    // Get the input directory and output file path from the command line arguments.
+    // Accept either an IRMA output directory (contains `tables/`) or a sample
+    // directory whose `IRMA/` subdirectory contains it.
+    let mut input_directory = args.irma_dir;
+    if !input_directory.join("tables").is_dir() && input_directory.join("IRMA/tables").is_dir() {
+        input_directory = input_directory.join("IRMA");
+    }
     let output_html_file = args.output;
 
     // Generate coverage plot if specified
     if args.coverage {
         let plot = generate_plot_coverage(&input_directory)?;
 
-        // Save the plot as an HTML file if output path is provided
-        if let Some(optional_file) = &output_html_file {
+        // Emit plotly JSON if requested, otherwise save as HTML
+        if args.json {
+            emit_plot_json(&plot, output_html_file.as_ref(), "")?;
+        } else if let Some(optional_file) = &output_html_file {
             plot.write_html(optional_file);
         }
 
@@ -824,8 +1191,10 @@ pub fn plotter_process(args: PlotterArgs) -> Result<(), Box<dyn Error>> {
     if args.coverage_seg {
         let plot = generate_plot_coverage_seg(&input_directory)?;
 
-        // Save the plot as an HTML file if output path is provided
-        if let Some(optional_file) = &output_html_file {
+        // Emit plotly JSON if requested, otherwise save as HTML
+        if args.json {
+            emit_plot_json(&plot, output_html_file.as_ref(), "_seg")?;
+        } else if let Some(optional_file) = &output_html_file {
             // Add "_seg" suffix to the filename to distinguish from regular coverage plot
             let seg_file = optional_file.with_file_name(format!(
                 "{}_seg{}",
@@ -854,8 +1223,10 @@ pub fn plotter_process(args: PlotterArgs) -> Result<(), Box<dyn Error>> {
     if args.read_flow {
         let plot = generate_sankey_plot(&input_directory)?;
 
-        // Save the plot as an HTML file if output path is provided
-        if let Some(optional_file) = &output_html_file {
+        // Emit plotly JSON if requested, otherwise save as HTML
+        if args.json {
+            emit_plot_json(&plot, output_html_file.as_ref(), "_read_assignment")?;
+        } else if let Some(optional_file) = &output_html_file {
             let flow_file = optional_file.with_file_name(format!(
                 "{}_read_assignment{}",
                 optional_file
