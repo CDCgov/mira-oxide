@@ -27,8 +27,9 @@ Current subprocesses include:
 - Hamming Distance between all samples
 - Nucleotide Diffs between all samples
 - Find Chemistry, for selecting the correct module and configs for IRMA
+- Prepare Mira Reports, for aggregating the IRMA and DAIS-ribosome outputs made while running Mira-nf
 - Plotter, for plotting,
-- Variants of Interest, for taking DAIS-ribosome outputs and a list of sequences to find mutations that will cause variants
+- Variants, observing nucleotide, codon and amino acid differences
 
 Each subprocess has its own README, found in `docs/`.
 
