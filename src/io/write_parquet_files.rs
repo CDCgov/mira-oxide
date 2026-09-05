@@ -108,8 +108,7 @@ pub fn write_coverage_to_parquet(
     output_file: &str,
 ) -> Result<(), Box<dyn Error>> {
     // Convert values in struct to vector of values
-    let sample_ids_vec: Vec<Option<String>> =
-        extract_field(coverage_data, |item| item.sample_id.clone());
+    let sample_ids_vec = extract_field(coverage_data, |item| item.sample_id.clone());
     let ref_name_vec = extract_field(coverage_data, |item| item.reference_name.clone());
     let position_vec = extract_field(coverage_data, |item| item.position);
     let coverage_depth_vec = extract_field(coverage_data, |item| item.coverage_depth);
