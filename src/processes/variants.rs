@@ -1436,7 +1436,9 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
         /// `calc_query_nt_position` until one matches. Returns None if no raw position maps to it (but that shouldn't happen?).
         /// Filters insertions/deletions by `reference_id` and `product_name` (in addition to `sample_id`
         /// and ctype) so that samples with multiple products/references sharing a ctype don't have
-        /// unrelated indels applied.
+        /// unrelated indels applied. Positions that are alignment gaps in `aligned` are skipped, so
+        /// that at a deletion boundary (where a gap position and the following real base map to the
+        /// same adjusted position) the actual nucleotide is returned rather than the gap.
         #[allow(clippy::too_many_arguments)]
         fn find_raw_query_position(
             aln_len: usize,
@@ -1445,10 +1447,15 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
             ctype: &str,
             reference_id: &str,
             product_name: &str,
+            aligned: &[u8],
             insertions: &[InsertionInput],
             deletions: &[DeletionInput],
         ) -> Option<usize> {
             (1..=aln_len).find(|&raw_pos| {
+                if aligned.get(raw_pos - 1) == Some(&b'-') {
+                    return false;
+                }
+
                 let mut position = i64::try_from(raw_pos).unwrap_or(i64::MAX);
 
                 for ins in insertions {
@@ -1477,6 +1484,33 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
             })
         }
 
+        /// Maps a segment (query consensus) nucleotide position to a CDS-local nucleotide
+        /// position using the DAIS `query_nt_coordinates` field. That field lists the segment
+        /// ranges the CDS spans (each `start..end`), joined by `;` for spliced/multi-exon CDSs.
+        /// Returns None if the position falls outside all of the CDS's ranges. This offset is
+        /// what lets segment-relative minor-variant positions be resolved for CDSs that don't
+        /// begin at segment position 1 (e.g. HA after the signal peptide, or BM2/M2).
+        fn segment_pos_to_cds_local(
+            query_nt_coordinates: &str,
+            segment_pos: usize,
+        ) -> Option<usize> {
+            let mut offset = 0usize;
+            for seg in query_nt_coordinates.split(';') {
+                let seg = seg.trim();
+                if seg.is_empty() {
+                    continue;
+                }
+                let (start, end) = seg.split_once("..")?;
+                let start: usize = start.trim().parse().ok()?;
+                let end: usize = end.trim().parse().ok()?;
+                if start <= segment_pos && segment_pos <= end {
+                    return Some(offset + (segment_pos - start) + 1);
+                }
+                offset += end.saturating_sub(start) + 1;
+            }
+            None
+        }
+
         debug_assert!(args.annotate_minor_variants);
 
         // Minor-variants only will annotate the minor variants CSV with minor_variant_codon
@@ -1499,26 +1533,45 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
 
         for mv in &minor_variants {
             // Find the query dais row matching this minor variant: sample_id contains sample,
-            // ctype == reference. Multiple product rows (e.g. HA-signal, HA, HA1) can share the
-            // same sample_id/ctype, so prefer the one with the longest query_cds_aln, since
-            // shorter fragments (like signal peptides) can't contain large sample_positions.
+            // ctype == reference. Multiple product rows (e.g. HA-signal, HA, HA1, or M1/BM2 on
+            // the MP segment) can share the same sample_id/ctype. sample_position is a segment
+            // (query consensus) coordinate, so prefer the longest query_cds_aln among the
+            // products whose query_nt_coordinates actually span this segment position. This
+            // correctly routes second-ORF positions (e.g. BM2/M2) to their own CDS instead of
+            // defaulting to the longest overall (M1), which cannot contain them.
+            let sample_pos = usize::try_from(mv.sample_position).unwrap_or(0);
             let matching_dais_entry = dais
                 .iter()
                 .filter(|d| d.sample_id.contains(mv.sample.as_str()) && d.ctype == mv.reference)
-                .max_by_key(|d| d.query_cds_aln.len());
+                .filter(|d| segment_pos_to_cds_local(&d.query_nt_coordinates, sample_pos).is_some())
+                .max_by_key(|d| d.query_cds_aln.len())
+                .or_else(|| {
+                    dais.iter()
+                        .filter(|d| {
+                            d.sample_id.contains(mv.sample.as_str()) && d.ctype == mv.reference
+                        })
+                        .max_by_key(|d| d.query_cds_aln.len())
+                });
 
             let (dais_reference, dais_ref_position, consensus_codon, consensus_aa, mv_codon, mv_aa) =
                 if let Some(dais_entry) = matching_dais_entry {
                     let dais_reference = dais_entry.dais_ref_id.clone();
                     let nt_seq: Nucleotides = dais_entry.query_cds_aln.clone().into();
                     let aln_len = nt_seq.len();
+                    // Translate the segment-relative sample_position into this CDS's own
+                    // coordinate frame before resolving the aligned position; fall back to the
+                    // raw segment position if the coordinates can't be parsed.
+                    let cds_local_pos =
+                        segment_pos_to_cds_local(&dais_entry.query_nt_coordinates, sample_pos)
+                            .unwrap_or(sample_pos);
                     let raw_pos = find_raw_query_position(
                         aln_len,
-                        usize::try_from(mv.sample_position).unwrap_or(0),
+                        cds_local_pos,
                         &dais_entry.sample_id,
                         &dais_entry.ctype,
                         &dais_entry.dais_ref_id,
                         &dais_entry.protein,
+                        dais_entry.query_cds_aln.as_bytes(),
                         &insertions,
                         &deletions,
                     );
@@ -1604,7 +1657,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
 
             writeln!(
                 &mut writer,
-                "{}{delim}{}{delim}{dais_reference}{delim}{dais_ref_position}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{consensus_codon}{delim}{mv_codon}{delim}{consensus_aa}{delim}{mv_aa}{delim}{major_aa_vs_minor_aa}{delim}{}{delim}{}{delim}{}",
+                "{}{delim}{}{delim}{dais_reference}{delim}{dais_ref_position}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{consensus_codon}{delim}{mv_codon}{delim}{consensus_aa}{delim}{mv_aa}{delim}{major_aa_vs_minor_aa}{delim}{}{delim}{}",
                 mv.sample,
                 mv.reference,
                 mv.sample_position,

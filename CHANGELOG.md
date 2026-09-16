@@ -3,6 +3,13 @@
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### `Fixed`
+- Fixed `variants --annotate-minor-variants` so segment-relative minor-variant positions are mapped into each CDS's own coordinate frame using `query_nt_coordinates`. This resolves empty annotations for second-ORF products (e.g. MP/BM2, M2) and corrects codon/amino-acid context for any CDS that does not start at segment position 1 (e.g. HA after the signal peptide).
+- Fixed `find_raw_query_position` to skip alignment-gap positions so variants near a deletion boundary map to the actual nucleotide instead of a gap.
+- Fixed column-order misalignment in the `--annotate-minor-variants` output where `minority_frequency` was written in a different position than the header declared.
+
 ## [1.6.0] - 2026-08-22
 - [Amanda Sullivan](https://github.com/mandysulli)
 - [Ben Rambo-Martin](https://github.com/nbx0)
