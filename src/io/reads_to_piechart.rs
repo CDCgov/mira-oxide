@@ -1,3 +1,9 @@
+#![allow(
+    clippy::cast_precision_loss,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss
+)]
+
 use super::data_ingest::ReadsData;
 use crate::constants::theme;
 use serde_json::json;
@@ -22,14 +28,14 @@ pub fn create_barcode_distribution_figure(
             )
         })
         .collect();
-    samples_reads.sort_by(|a, b| b.1.cmp(&a.1));
+    samples_reads.sort_by_key(|a| std::cmp::Reverse(a.1));
 
     // Single blue scale across all bars: darkest CDC navy for the largest read
     // count, fading to a pale CDC blue for the smallest, partitioned by the
     // number of samples.
     let colors = blue_scale(samples_reads.len());
 
-    let total_reads: f64 = samples_reads.iter().map(|(_, r)| *r as f64).sum();
+    let total_reads: f64 = samples_reads.iter().map(|(_, r)| f64::from(*r)).sum();
 
     // Single horizontal 100% stacked bar: one trace per sample so each
     // contribution is its own segment. Bar labels, hover and legend are off;
@@ -43,7 +49,7 @@ pub fn create_barcode_distribution_figure(
     for (i, (sample_label, read_count)) in samples_reads.iter().enumerate() {
         let read_count = *read_count;
         let percent = if total_reads > 0.0 {
-            (read_count as f64 / total_reads) * 100.0
+            (f64::from(read_count) / total_reads) * 100.0
         } else {
             0.0
         };
@@ -62,7 +68,7 @@ pub fn create_barcode_distribution_figure(
         let center = cumulative_percent + percent / 2.0;
 
         // read count in thousands with two decimals
-        let reads_k = read_count as f64 / 1000.0;
+        let reads_k = f64::from(read_count) / 1000.0;
         let text = format!("{sample_label} {reads_k:.2}K ({percent:.1}%)");
         max_text_chars = max_text_chars.max(text.chars().count());
 
