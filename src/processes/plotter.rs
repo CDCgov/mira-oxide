@@ -112,10 +112,16 @@ fn load_indel_data(
     Box<dyn Error>,
 > {
     let run_info = read_run_info(input_directory);
-    let platform_default = if input_directory
-        .components()
-        .any(|c| c.as_os_str().eq_ignore_ascii_case("ont"))
-    {
+    // Prefer IRMA's own platform marker (MinION module) over the input path,
+    // which is absent when the app runs the plotter from a generic run dir.
+    let is_ont = run_info
+        .get("MODULE_CONFIG")
+        .or_else(|| run_info.get("PARAM_FILE_NAME"))
+        .is_some_and(|v| v.to_ascii_lowercase().contains("minion"))
+        || input_directory
+            .components()
+            .any(|c| c.as_os_str().eq_ignore_ascii_case("ont"));
+    let platform_default = if is_ont {
         INDEL_FREQ_DEFAULT_ONT
     } else {
         INDEL_FREQ_DEFAULT_ILLUMINA
