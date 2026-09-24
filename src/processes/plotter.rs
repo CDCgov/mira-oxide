@@ -33,7 +33,7 @@ use crate::constants::theme;
 /// Colors for IRMA indels overlaid on coverage subplots.
 const INSERTION_COLOR: &str = "#2CA02C"; // green
 const DELETION_COLOR: &str = "#9467BD"; // purple
-/// Fallback minor-indel frequency thresholds when IRMA run_info.txt is absent.
+/// Fallback minor-indel frequency thresholds when IRMA `run_info.txt` is absent.
 const INDEL_FREQ_DEFAULT_ILLUMINA: f32 = 0.05;
 const INDEL_FREQ_DEFAULT_ONT: f32 = 0.30;
 
@@ -99,7 +99,7 @@ fn load_variant_data(
 }
 
 /// Load IRMA insertions/deletions per segment. Per-type frequency thresholds are
-/// sourced from run_info.txt (MIN_FI/MIN_FD), floored at a platform default so
+/// sourced from `run_info.txt` (`MIN_FI`/`MIN_FD`), floored at a platform default so
 /// low IRMA settings do not bury the coverage curve in indel noise.
 #[allow(clippy::type_complexity)]
 fn load_indel_data(
@@ -660,7 +660,7 @@ pub fn generate_plot_coverage_seg(input_directory: &Path) -> Result<Plot, Box<dy
         // Vertical anchor also varies per subplot so the label clears the data:
         // low local coverage -> pin to the top; high local coverage -> float
         // just above the local curve.
-        let (label_y, label_y_anchor) = if region_peak * 2 <= max_y {
+        let (label_y, y_label_anchor) = if region_peak * 2 <= max_y {
             (f64::from(max_y), plotly::common::Anchor::Top)
         } else {
             (f64::from(region_peak), plotly::common::Anchor::Bottom)
@@ -706,7 +706,7 @@ pub fn generate_plot_coverage_seg(input_directory: &Path) -> Result<Plot, Box<dy
                 .x(label_x)
                 .y(label_y)
                 .x_anchor(label_x_anchor)
-                .y_anchor(label_y_anchor)
+                .y_anchor(y_label_anchor)
                 .font(
                     plotly::common::Font::new()
                         .family(theme::TITLE_FONT)
@@ -988,7 +988,7 @@ pub fn generate_sankey_plot(input_directory: &Path) -> Result<Plot, Box<dyn Erro
         s.chars()
             .enumerate()
             .flat_map(|(i, c)| {
-                if i > 0 && (len - i) % 3 == 0 {
+                if i > 0 && (len - i).is_multiple_of(3) {
                     vec![',', c]
                 } else {
                     vec![c]
@@ -1005,14 +1005,11 @@ pub fn generate_sankey_plot(input_directory: &Path) -> Result<Plot, Box<dyn Erro
             let incoming = node_in.get(&i).copied().unwrap_or(0);
             let outgoing = parent_totals.get(&i).copied().unwrap_or(0);
             let count = incoming.max(outgoing);
-            let denom: u32 = node_parents
-                .get(&i)
-                .map(|ps| {
-                    ps.iter()
-                        .map(|s| parent_totals.get(s).copied().unwrap_or(0))
-                        .sum()
-                })
-                .unwrap_or(0);
+            let denom: u32 = node_parents.get(&i).map_or(0, |ps| {
+                ps.iter()
+                    .map(|s| parent_totals.get(s).copied().unwrap_or(0))
+                    .sum()
+            });
             if denom > 0 {
                 format!(
                     "{name} ({} reads, {:.1}%)",
