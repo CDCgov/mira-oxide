@@ -839,7 +839,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                                             None => (String::new(), String::new()),
                                         };
                                         let major_aa_vs_minor_aa =
-                                            format!("{aa_mut}:{query_nt_position}:{mv_aa}");
+                                            format!("{aa_mut}:{query_aa_position}:{mv_aa}");
                                         let mv_suffix = format!(
                                             "{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}",
                                             mv.depth,
@@ -985,7 +985,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                                         None => (String::new(), String::new()),
                                     };
                                     let major_aa_vs_minor_aa =
-                                        format!("{aa_mut}:{query_nt_position}:{mv_aa}");
+                                        format!("{aa_mut}:{query_aa_position}:{mv_aa}");
                                     let mv_suffix = format!(
                                         "{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}",
                                         mv.depth,
@@ -1223,7 +1223,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                                                             None => (String::new(), String::new()),
                                                         };
                                                     let major_aa_vs_minor_aa = format!(
-                                                        "{aa_mut}:{query_nt_position}:{mv_aa}"
+                                                        "{aa_mut}:{query_aa_position}:{mv_aa}"
                                                     );
                                                     format!(
                                                         "{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}",
@@ -1379,7 +1379,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                                                         None => (String::new(), String::new()),
                                                     };
                                                 let major_aa_vs_minor_aa = format!(
-                                                    "{aa_mut}:{query_nt_position}:{mv_aa}"
+                                                    "{aa_mut}:{query_aa_position}:{mv_aa}"
                                                 );
                                                 format!(
                                                     "{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}",
@@ -1528,7 +1528,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
 
         writeln!(
             &mut writer,
-            "sample{delim}reference{delim}dais_reference{delim}dais_ref_position{delim}sample_position{delim}depth{delim}consensus_allele{delim}minority_allele{delim}consensus_count{delim}minority_count{delim}minority_frequency{delim}consensus_codon{delim}minor_variant_codon{delim}consensus_aa{delim}minor_variant_aa{delim}major_aa_vs_minor_aa{delim}run_id{delim}instrument"
+            "sample{delim}reference{delim}dais_reference{delim}dais_ref_position{delim}sample_position{delim}depth{delim}consensus_allele{delim}minority_allele{delim}consensus_count{delim}minority_count{delim}consensus_codon{delim}minor_variant_codon{delim}consensus_aa{delim}minor_variant_aa{delim}major_aa_vs_minor_aa{delim}minority_frequency{delim}run_id{delim}instrument"
         )?;
 
         for mv in &minor_variants {
@@ -1553,111 +1553,121 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                         .max_by_key(|d| d.query_cds_aln.len())
                 });
 
-            let (dais_reference, dais_ref_position, consensus_codon, consensus_aa, mv_codon, mv_aa) =
-                if let Some(dais_entry) = matching_dais_entry {
-                    let dais_reference = dais_entry.dais_ref_id.clone();
-                    let nt_seq: Nucleotides = dais_entry.query_cds_aln.clone().into();
-                    let aln_len = nt_seq.len();
-                    // Translate the segment-relative sample_position into this CDS's own
-                    // coordinate frame before resolving the aligned position; fall back to the
-                    // raw segment position if the coordinates can't be parsed.
-                    let cds_local_pos =
-                        segment_pos_to_cds_local(&dais_entry.query_nt_coordinates, sample_pos)
-                            .unwrap_or(sample_pos);
-                    let raw_pos = find_raw_query_position(
-                        aln_len,
-                        cds_local_pos,
-                        &dais_entry.sample_id,
-                        &dais_entry.ctype,
-                        &dais_entry.dais_ref_id,
-                        &dais_entry.protein,
-                        dais_entry.query_cds_aln.as_bytes(),
-                        &insertions,
-                        &deletions,
-                    );
+            let (
+                dais_reference,
+                dais_ref_position,
+                dais_ref_aa_position,
+                consensus_codon,
+                consensus_aa,
+                mv_codon,
+                mv_aa,
+            ) = if let Some(dais_entry) = matching_dais_entry {
+                let dais_reference = dais_entry.dais_ref_id.clone();
+                let nt_seq: Nucleotides = dais_entry.query_cds_aln.clone().into();
+                let aln_len = nt_seq.len();
+                // Translate the segment-relative sample_position into this CDS's own
+                // coordinate frame before resolving the aligned position; fall back to the
+                // raw segment position if the coordinates can't be parsed.
+                let cds_local_pos =
+                    segment_pos_to_cds_local(&dais_entry.query_nt_coordinates, sample_pos)
+                        .unwrap_or(sample_pos);
+                let raw_pos = find_raw_query_position(
+                    aln_len,
+                    cds_local_pos,
+                    &dais_entry.sample_id,
+                    &dais_entry.ctype,
+                    &dais_entry.dais_ref_id,
+                    &dais_entry.protein,
+                    dais_entry.query_cds_aln.as_bytes(),
+                    &insertions,
+                    &deletions,
+                );
 
-                    match raw_pos {
-                        Some(raw_pos) => {
-                            // dais_ref_position is the raw (pre-indel-adjustment) position; the codon
-                            // and amino acid are derived directly from this position.
-                            let dais_ref_position = raw_pos;
-                            let (codons, tail) = nt_seq.as_codons();
-                            let codon_index = (dais_ref_position - 1) / 3;
-                            let position_in_codon = ((dais_ref_position - 1) % 3) + 1;
-                            let codon_bytes: Option<&[u8]> = if codon_index < codons.len() {
-                                Some(&codons[codon_index])
-                            } else if codon_index == codons.len() && !tail.is_empty() {
-                                Some(tail)
-                            } else {
-                                None
-                            };
-                            match codon_bytes {
-                                Some(codon_bytes) => {
-                                    let codon_str = std::str::from_utf8(codon_bytes)
-                                        .unwrap_or_default()
-                                        .to_string();
-                                    // consensus_codon/consensus_aa reflect the reference codon as-is
-                                    // only the minority allele is substituted in to build the minor variant codon/aa.
-                                    let (consensus_codon, consensus_aa) = if codon_str.len() == 3 {
-                                        let aa =
-                                            StdGeneticCode::translate_codon(codon_str.as_bytes())
-                                                as char;
-                                        (codon_str.clone(), aa.to_string())
-                                    } else {
-                                        (String::new(), String::new())
-                                    };
-                                    let (mv_codon, mv_aa) = match build_minor_variant_codon(
-                                        &codon_str,
-                                        position_in_codon,
-                                        &mv.minority_allele,
-                                    ) {
-                                        Some((codon, aa)) => (codon, aa.to_string()),
-                                        None => (String::new(), String::new()),
-                                    };
-                                    (
-                                        dais_reference,
-                                        dais_ref_position.to_string(),
-                                        consensus_codon,
-                                        consensus_aa,
-                                        mv_codon,
-                                        mv_aa,
-                                    )
-                                }
-                                None => (
+                match raw_pos {
+                    Some(raw_pos) => {
+                        // dais_ref_position is the raw (pre-indel-adjustment) position; the codon
+                        // and amino acid are derived directly from this position.
+                        let dais_ref_position = raw_pos;
+                        let (codons, tail) = nt_seq.as_codons();
+                        let codon_index = (dais_ref_position - 1) / 3;
+                        let position_in_codon = ((dais_ref_position - 1) % 3) + 1;
+                        let codon_bytes: Option<&[u8]> = if codon_index < codons.len() {
+                            Some(&codons[codon_index])
+                        } else if codon_index == codons.len() && !tail.is_empty() {
+                            Some(tail)
+                        } else {
+                            None
+                        };
+                        match codon_bytes {
+                            Some(codon_bytes) => {
+                                let codon_str = std::str::from_utf8(codon_bytes)
+                                    .unwrap_or_default()
+                                    .to_string();
+                                // consensus_codon/consensus_aa reflect the reference codon as-is
+                                // only the minority allele is substituted in to build the minor variant codon/aa.
+                                let (consensus_codon, consensus_aa) = if codon_str.len() == 3 {
+                                    let aa = StdGeneticCode::translate_codon(codon_str.as_bytes())
+                                        as char;
+                                    (codon_str.clone(), aa.to_string())
+                                } else {
+                                    (String::new(), String::new())
+                                };
+                                let (mv_codon, mv_aa) = match build_minor_variant_codon(
+                                    &codon_str,
+                                    position_in_codon,
+                                    &mv.minority_allele,
+                                ) {
+                                    Some((codon, aa)) => (codon, aa.to_string()),
+                                    None => (String::new(), String::new()),
+                                };
+                                (
                                     dais_reference,
                                     dais_ref_position.to_string(),
-                                    String::new(),
-                                    String::new(),
-                                    String::new(),
-                                    String::new(),
-                                ),
+                                    (codon_index + 1).to_string(),
+                                    consensus_codon,
+                                    consensus_aa,
+                                    mv_codon,
+                                    mv_aa,
+                                )
                             }
+                            None => (
+                                dais_reference,
+                                dais_ref_position.to_string(),
+                                (codon_index + 1).to_string(),
+                                String::new(),
+                                String::new(),
+                                String::new(),
+                                String::new(),
+                            ),
                         }
-                        None => (
-                            dais_reference,
-                            String::new(),
-                            String::new(),
-                            String::new(),
-                            String::new(),
-                            String::new(),
-                        ),
                     }
-                } else {
-                    (
+                    None => (
+                        dais_reference,
                         String::new(),
                         String::new(),
                         String::new(),
                         String::new(),
                         String::new(),
                         String::new(),
-                    )
-                };
+                    ),
+                }
+            } else {
+                (
+                    String::new(),
+                    String::new(),
+                    String::new(),
+                    String::new(),
+                    String::new(),
+                    String::new(),
+                    String::new(),
+                )
+            };
 
-            let major_aa_vs_minor_aa = format!("{consensus_aa}:{dais_ref_position}:{mv_aa}");
+            let major_aa_vs_minor_aa = format!("{consensus_aa}:{dais_ref_aa_position}:{mv_aa}");
 
             writeln!(
                 &mut writer,
-                "{}{delim}{}{delim}{dais_reference}{delim}{dais_ref_position}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{consensus_codon}{delim}{mv_codon}{delim}{consensus_aa}{delim}{mv_aa}{delim}{major_aa_vs_minor_aa}{delim}{}{delim}{}",
+                "{}{delim}{}{delim}{dais_reference}{delim}{dais_ref_position}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{consensus_codon}{delim}{mv_codon}{delim}{consensus_aa}{delim}{mv_aa}{delim}{major_aa_vs_minor_aa}{delim}{}{delim}{}{delim}{}",
                 mv.sample,
                 mv.reference,
                 mv.sample_position,
