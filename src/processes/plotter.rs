@@ -228,6 +228,42 @@ fn add_variant_indel_traces(
     yaxis: &str,
     legend_group: &str,
 ) {
+    add_minor_snv_traces(
+        plot,
+        segment_name,
+        segment_color,
+        variants_data,
+        xaxis,
+        yaxis,
+        legend_group,
+    );
+    add_insertion_traces(
+        plot,
+        segment_name,
+        insertions_data,
+        xaxis,
+        yaxis,
+        legend_group,
+    );
+    add_deletion_traces(
+        plot,
+        segment_name,
+        deletions_data,
+        xaxis,
+        yaxis,
+        legend_group,
+    );
+}
+
+fn add_minor_snv_traces(
+    plot: &mut Plot,
+    segment_name: &str,
+    segment_color: &'static str,
+    variants_data: &HashMap<String, Vec<VariantRec>>,
+    xaxis: &str,
+    yaxis: &str,
+    legend_group: &str,
+) {
     // Minor-SNV variants: solid minority depth, dashed remainder up to total.
     if let Some(variants) = variants_data.get(segment_name) {
         for (
@@ -276,7 +312,16 @@ fn add_variant_indel_traces(
             plot.add_trace(total_line);
         }
     }
+}
 
+fn add_insertion_traces(
+    plot: &mut Plot,
+    segment_name: &str,
+    insertions_data: &HashMap<String, Vec<InsertionRec>>,
+    xaxis: &str,
+    yaxis: &str,
+    legend_group: &str,
+) {
     // Insertions: solid green major count, dashed green indel count.
     if let Some(insertions) = insertions_data.get(segment_name) {
         for (position, insert, count, total, frequency) in insertions {
@@ -320,7 +365,16 @@ fn add_variant_indel_traces(
             plot.add_trace(indel_line);
         }
     }
+}
 
+fn add_deletion_traces(
+    plot: &mut Plot,
+    segment_name: &str,
+    deletions_data: &HashMap<String, Vec<DeletionRec>>,
+    xaxis: &str,
+    yaxis: &str,
+    legend_group: &str,
+) {
     // Deletions: solid purple major count, dashed purple indel count.
     if let Some(deletions) = deletions_data.get(segment_name) {
         for (position, _length, context, count, total, frequency) in deletions {
