@@ -12,7 +12,24 @@ use super::data_ingest::{
     CoverageData, IndelsData, MinorVariantDataCollection, ReadsData, RunInfo,
 };
 
-//////////////// Function to write CSV ///////////////
+/// Writes selected fields from serializable structs to a CSV file.
+///
+/// The function writes `columns` as the CSV header, then serializes every item
+/// in `data` to JSON and writes a row using the fields named in
+/// `struct_values`. Each entry in `struct_values` corresponds positionally to
+/// the output column at the same index. Fields that are absent from an item's
+/// serialized JSON representation are written as empty cells.
+///
+/// ## Arguments
+///
+/// - `data` - Values to serialize and write as rows.
+/// - `columns` - Column names to write as the CSV header.
+/// - `struct_values` - JSON field names to extract from each serialized value.
+///
+/// ## Errors
+///
+/// Returns an error if the file cannot be created or written, a value in
+/// `data` cannot be serialized to JSON, or a CSV record cannot be written.
 pub fn write_structs_to_csv_file<T: Serialize>(
     file_path: &str,
     data: &[T],
@@ -47,7 +64,7 @@ pub fn write_structs_to_csv_file<T: Serialize>(
     Ok(())
 }
 
-//////////////// Function to collection and write out all CSV files ///////////////
+/// Function to collect and write out all CSV files
 #[allow(clippy::too_many_lines, clippy::too_many_arguments)]
 pub fn write_out_all_csv_mira_reports(
     output_path: &Path,
@@ -427,8 +444,8 @@ pub fn write_out_all_csv_mira_reports(
     Ok(())
 }
 
-//////////////// Function to collection and write out all CSV files ///////////////
-#[allow(clippy::too_many_lines, clippy::too_many_arguments)]
+/// Function to collect and write out all CSV files
+#[allow(clippy::too_many_lines)]
 pub fn write_out_updated_summary_csv(
     summary_data: &[UpdatedIRMASummary],
     virus: &str,

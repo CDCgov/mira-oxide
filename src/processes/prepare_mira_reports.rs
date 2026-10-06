@@ -238,7 +238,7 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
             return Err(e);
         }
     };
-    // Keeping function for segment data extraction, though segset abd segcolor not currently used
+    // Keeping function for segment data extraction, though segset and segcolor not currently used
     let (_segments, _segset, _segcolor) = return_seg_data(extract_field(&coverage_data, |item| {
         item.reference_name.clone()
     }));
@@ -666,7 +666,7 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
     );
 
     //////////////////////////////// Create staticHTML ////////////////////////////////
-    let _ = generate_html_report(
+    generate_html_report(
         &args.output_path,
         &irma_summary,
         &dais_vars_data,
@@ -680,7 +680,7 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
         &args.runid,
         Some(&args.workdir_path),
         &args.virus,
-    );
+    )?;
 
     Ok(())
 }
