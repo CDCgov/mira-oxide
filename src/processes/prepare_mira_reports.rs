@@ -279,7 +279,8 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
     }
 
     // Calculating the % coverage and median coverage for summary
-    let melted_reads_vec = melt_reads_data(&read_data);
+    let is_flu = args.virus.eq_ignore_ascii_case("flu");
+    let melted_reads_vec = melt_reads_data(&read_data, is_flu);
     let mut calculated_cov_vec: Vec<ProcessedCoverage> = Vec::new();
     let mut calculated_position_cov_vec: Vec<ProcessedCoverage> = Vec::new();
 
@@ -322,6 +323,7 @@ pub fn prepare_mira_reports_process(args: &ReportsArgs) -> Result<(), Box<dyn Er
         &analysis_metadata,
         Some(&calculated_position_cov_vec),
         &di_stats_data,
+        is_flu,
     )?;
 
     let mut qc_values = QCSettings {
