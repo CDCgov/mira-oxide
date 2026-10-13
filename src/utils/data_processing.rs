@@ -757,6 +757,7 @@ pub fn melt_reads_data(records: &[ReadsData], collect_secondary_hits: bool) -> V
 
     for (sample_id, secondary_name, secondary_count) in secondary_hits {
         if let Some(segment) = get_segment_from_reference(&secondary_name) {
+            let secondary_hit_label = format_secondary_hit_reference(&secondary_name);
             for primary_hit in &mut result {
                 if primary_hit.sample_id == sample_id
                     && get_segment_from_reference(&primary_hit.reference) == Some(segment.clone())
@@ -767,7 +768,10 @@ pub fn melt_reads_data(records: &[ReadsData], collect_secondary_hits: bool) -> V
                     // clippy suggestion; this is writing to the string
                     // `primary_hit.secondary_hits`, and is infallible, so we
                     // don't need to handle the result created
-                    let _ = write!(primary_hit.secondary_hits, "{segment}:{secondary_count}");
+                    let _ = write!(
+                        primary_hit.secondary_hits,
+                        "{secondary_hit_label}:{secondary_count}"
+                    );
                 }
             }
         }
@@ -788,6 +792,19 @@ fn get_segment_from_reference(reference: &str) -> Option<String> {
         2 | 3 => Some(parts[1].to_string()),
         _ => None,
     }
+}
+
+/// Formats a secondary-hit reference for the summary report.
+///
+/// Numbered influenza-A HA and NA references omit the segment in the output:
+/// `A_HA_H5` becomes `A_H5`, and `A_NA_N2` becomes `A_N2`.
+fn format_secondary_hit_reference(reference: &str) -> String {
+    let parts: Vec<&str> = reference.split('_').collect();
+    if parts.len() == 3 && parts[0] == "A" && matches!(parts[1], "HA" | "NA") {
+        return format!("{}_{}", parts[0], parts[2]);
+    }
+
+    reference.to_string()
 }
 
 fn calculate_median(values: &[i32]) -> i32 {
@@ -1697,6 +1714,7 @@ pub fn transform_coverage_to_heatmap(
     transformed_data
 }
 
+// making sure i got the logic right for outputting the secondary hits names
 #[test]
 fn test_get_segment() {
     assert_eq!(
@@ -1708,12 +1726,15 @@ fn test_get_segment() {
         get_segment_from_reference("B_PB2"),
         Some(String::from("PB2"))
     );
+    assert_eq!(format_secondary_hit_reference("A_HA_H5"), "A_H5");
+    assert_eq!(format_secondary_hit_reference("A_NA_N2"), "A_N2");
+    assert_eq!(format_secondary_hit_reference("B_HA"), "B_HA");
 }
 
 // i made a mistake where the secondary hits were getting combined between
 // different samples, so this is to make sure that i fixed that
 #[test]
-fn test_melt_reads_data_associates_secondary_hits_with_their_sample() {
+fn test_melt_reads_data_not_redundant() {
     let read_record = |sample_id: &str, record: &str, reads: i32| ReadsData {
         sample_id: Some(sample_id.to_string()),
         record: record.to_string(),
@@ -1730,6 +1751,7 @@ fn test_melt_reads_data_associates_secondary_hits_with_their_sample() {
         read_record("s1", "2-passQC", 90),
         read_record("s1", "4-A_HA_H3", 80),
         read_record("s1", "5-B_HA", 10),
+        read_record("s1", "5-A_HA_H5", 12),
         read_record("s2", "1-initial", 100),
         read_record("s2", "2-passQC", 90),
         read_record("s2", "4-A_HA_H3", 80),
@@ -1737,7 +1759,7 @@ fn test_melt_reads_data_associates_secondary_hits_with_their_sample() {
 
     let melted = melt_reads_data(&records, true);
 
-    assert_eq!(melted[0].secondary_hits, "HA:10");
+    assert_eq!(melted[0].secondary_hits, "B_HA:10;A_H5:12");
     assert_eq!(melted[1].secondary_hits, "");
 
     let melted_without_secondary_hits = melt_reads_data(&records, false);
