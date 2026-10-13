@@ -3,6 +3,7 @@ use serde::{self, Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
     error::Error,
+    fmt::Write,
     fs::File,
     hash::BuildHasher,
     io::{self, BufRead},
@@ -63,6 +64,7 @@ pub struct MeltedRecord {
     reads_mapped: i32,
     total_reads: i32,
     pass_qc: i32,
+    secondary_hits: String,
 }
 
 /// Processed Cov Calcs
@@ -74,7 +76,11 @@ pub struct ProcessedCoverage {
     pub percent_reference_covered: Option<f64>,
 }
 
-/// IRMA struct
+/// IRMA struct, used to write out IRMA summary csv in
+/// [`write_out_all_csv_mira_reports`], and other places
+///
+/// [`write_out_all_csv_mira_reports`]:
+///     crate::io::write_csv_files::write_out_all_csv_mira_reports
 #[derive(Serialize, Debug, Clone)]
 pub struct IRMASummary {
     pub sample_id: String,
@@ -85,7 +91,9 @@ pub struct IRMASummary {
     pub percent_reference_coverage: Option<f64>,
     pub median_coverage: Option<i32>,
     pub count_minor_snv_at_or_over_5_pct: Option<i32>,
+    /// Only used for `CoV` data
     pub spike_percent_coverage: Option<f64>,
+    /// Only used for `CoV` data
     pub spike_median_coverage: Option<i32>,
     pub pass_fail_reason: Option<String>,
     pub subtype: Option<String>,
@@ -93,6 +101,8 @@ pub struct IRMASummary {
     pub runid: Option<String>,
     pub instrument: Option<String>,
     pub di_ratios_5prime_3prime: Option<String>,
+    /// Only used for flu data
+    pub secondary_hits: Option<String>,
 }
 
 /// Variant Count struct
@@ -693,9 +703,10 @@ pub fn extract_subtype_rsv(dais_vars: &[DaisVarsData]) -> Result<Vec<Subtype>, B
 }
 
 //////////////// Functions used to create irma_summary ///////////////
+
 /// Flip orientation of the reads structs
 #[must_use]
-pub fn melt_reads_data(records: &[ReadsData]) -> Vec<MeltedRecord> {
+pub fn melt_reads_data(records: &[ReadsData], collect_secondary_hits: bool) -> Vec<MeltedRecord> {
     let mut result = Vec::new();
     let mut sample_data: HashMap<String, (i32, i32)> = HashMap::new();
 
@@ -708,6 +719,8 @@ pub fn melt_reads_data(records: &[ReadsData]) -> Vec<MeltedRecord> {
             }
         }
     }
+
+    let mut secondary_hits = Vec::new();
 
     for record in records {
         if let Some(sample_id) = &record.sample_id
@@ -725,11 +738,73 @@ pub fn melt_reads_data(records: &[ReadsData]) -> Vec<MeltedRecord> {
                 reads_mapped: record.reads,
                 total_reads,
                 pass_qc,
+                secondary_hits: String::new(),
             });
+        // Collect secondary hits with their sample IDs so they can only be
+        // associated with primary hits from the same sample.
+        } else if collect_secondary_hits
+            && let Some(sample_id) = &record.sample_id
+            && record.record.starts_with("5-")
+        {
+            let reference = record
+                .record
+                .strip_prefix("5-")
+                .unwrap_or(&record.record)
+                .to_string();
+            secondary_hits.push((sample_id.clone(), reference, record.reads));
+        }
+    }
+
+    for (sample_id, secondary_name, secondary_count) in secondary_hits {
+        if let Some(segment) = get_segment_from_reference(&secondary_name) {
+            let secondary_hit_label = format_secondary_hit_reference(&secondary_name);
+            for primary_hit in &mut result {
+                if primary_hit.sample_id == sample_id
+                    && get_segment_from_reference(&primary_hit.reference) == Some(segment.clone())
+                {
+                    if !primary_hit.secondary_hits.is_empty() {
+                        primary_hit.secondary_hits.push(';');
+                    }
+                    // clippy suggestion; this is writing to the string
+                    // `primary_hit.secondary_hits`, and is infallible, so we
+                    // don't need to handle the result created
+                    let _ = write!(
+                        primary_hit.secondary_hits,
+                        "{secondary_hit_label}:{secondary_count}"
+                    );
+                }
+            }
         }
     }
 
     result
+}
+
+/// Gets the segment from a flu reference ctype,
+///
+/// ## Examples:
+/// - `A_HA_H3` -> HA
+/// - `B_HA` -> HA
+/// - `B_PB1` -> PB1
+fn get_segment_from_reference(reference: &str) -> Option<String> {
+    let parts: Vec<&str> = reference.split('_').collect();
+    match parts.len() {
+        2 | 3 => Some(parts[1].to_string()),
+        _ => None,
+    }
+}
+
+/// Formats a secondary-hit reference for the summary report.
+///
+/// Numbered influenza-A HA and NA references omit the segment in the output:
+/// `A_HA_H5` becomes `A_H5`, and `A_NA_N2` becomes `A_N2`.
+fn format_secondary_hit_reference(reference: &str) -> String {
+    let parts: Vec<&str> = reference.split('_').collect();
+    if parts.len() == 3 && parts[0] == "A" && matches!(parts[1], "HA" | "NA") {
+        return format!("{}_{}", parts[0], parts[2]);
+    }
+
+    reference.to_string()
 }
 
 fn calculate_median(values: &[i32]) -> i32 {
@@ -966,6 +1041,7 @@ pub fn collect_analysis_metadata(
 }
 
 /////////////// Final IRMA summary file creation ///////////////
+
 /// Combine all vec to create IRMA summary
 #[allow(clippy::too_many_arguments)]
 pub fn create_irma_summary_vec(
@@ -977,6 +1053,7 @@ pub fn create_irma_summary_vec(
     metadata: &Metadata,
     pos_calc_cov_vec: Option<&[ProcessedCoverage]>,
     di_stats: &[DIStatData],
+    include_secondary_hits: bool,
 ) -> Result<Vec<IRMASummary>, Box<dyn Error>> {
     let mut irma_summary: Vec<IRMASummary> = Vec::new();
     let filtered_minor_vars_count = count_minor_variants(filtered_minor_vars_vec);
@@ -1004,6 +1081,7 @@ pub fn create_irma_summary_vec(
                     runid: Some(metadata.runid.clone()),
                     instrument: Some(metadata.instrument.clone()),
                     di_ratios_5prime_3prime: None,
+                    secondary_hits: include_secondary_hits.then(|| entry.secondary_hits.clone()),
                 });
             }
         }
@@ -1026,6 +1104,7 @@ pub fn create_irma_summary_vec(
                 runid: Some(metadata.runid.clone()),
                 instrument: Some(metadata.instrument.clone()),
                 di_ratios_5prime_3prime: None,
+                secondary_hits: None,
             });
         }
     }
@@ -1633,4 +1712,60 @@ pub fn transform_coverage_to_heatmap(
     }
 
     transformed_data
+}
+
+// making sure i got the logic right for outputting the secondary hits names
+#[test]
+fn test_get_segment() {
+    assert_eq!(
+        get_segment_from_reference("A_HA_H3"),
+        Some(String::from("HA"))
+    );
+    assert_eq!(get_segment_from_reference("B_HA"), Some(String::from("HA")));
+    assert_eq!(
+        get_segment_from_reference("B_PB2"),
+        Some(String::from("PB2"))
+    );
+    assert_eq!(format_secondary_hit_reference("A_HA_H5"), "A_H5");
+    assert_eq!(format_secondary_hit_reference("A_NA_N2"), "A_N2");
+    assert_eq!(format_secondary_hit_reference("B_HA"), "B_HA");
+}
+
+// i made a mistake where the secondary hits were getting combined between
+// different samples, so this is to make sure that i fixed that
+#[test]
+fn test_melt_reads_data_not_redundant() {
+    let read_record = |sample_id: &str, record: &str, reads: i32| ReadsData {
+        sample_id: Some(sample_id.to_string()),
+        record: record.to_string(),
+        reads,
+        patterns: None,
+        pairs_and_windows: None,
+        stage: None,
+        run_id: None,
+        instrument: None,
+        percent_mapping: None,
+    };
+    let records = vec![
+        read_record("s1", "1-initial", 100),
+        read_record("s1", "2-passQC", 90),
+        read_record("s1", "4-A_HA_H3", 80),
+        read_record("s1", "5-B_HA", 10),
+        read_record("s1", "5-A_HA_H5", 12),
+        read_record("s2", "1-initial", 100),
+        read_record("s2", "2-passQC", 90),
+        read_record("s2", "4-A_HA_H3", 80),
+    ];
+
+    let melted = melt_reads_data(&records, true);
+
+    assert_eq!(melted[0].secondary_hits, "B_HA:10;A_H5:12");
+    assert_eq!(melted[1].secondary_hits, "");
+
+    let melted_without_secondary_hits = melt_reads_data(&records, false);
+    assert!(
+        melted_without_secondary_hits
+            .iter()
+            .all(|record| record.secondary_hits.is_empty())
+    );
 }

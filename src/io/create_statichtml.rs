@@ -2,7 +2,7 @@
 use super::coverage_json_per_sample::SampleCoverageJson;
 use super::data_ingest::{IndelsData, MinorVariantsData};
 use super::reads_to_sankey_json::SampleSankeyJson;
-use crate::constants::theme;
+use crate::constants::{summary_schema::summary_schema, theme};
 use crate::processes::summary_report_update::UpdatedIRMASummary;
 use crate::utils::data_processing::{DaisVarsData, IRMASummary};
 use glob::glob;
@@ -41,9 +41,7 @@ fn base64_encode(input: &[u8]) -> String {
 }
 
 fn base64_img(path: &Path) -> String {
-    read(path)
-        .map(|bytes| base64_encode(&bytes))
-        .unwrap_or_default()
+    read(path).map_or_default(|bytes| base64_encode(&bytes))
 }
 
 // Helper to read plotly JSON value
@@ -255,116 +253,49 @@ pub fn plotly_table_script(
 // functions to read in table data and render as HTML table
 #[allow(clippy::must_use_candidate)]
 pub fn irma_summary_to_plotly_json(summary: &[IRMASummary], virus: &str) -> String {
-    // Determine headers dynamically based on virus type
-    let headers: Vec<&str> = match virus {
-        "sc2-wgs" => vec![
-            "Sample",
-            "Total Reads",
-            "Pass QC",
-            "Reads Mapped",
-            "Reference",
-            "% Reference Covered",
-            "Median Coverage",
-            "Count of Minor SNVs >= 0.05",
-            "Spike % Coverage",
-            "Spike Median Coverage",
-            "Pass/Fail Reason",
-            "Subtype",
-            "MIRA module",
-            "Run ID",
-            "Instrument",
-        ],
-        "flu" => vec![
-            "Sample",
-            "Total Reads",
-            "Pass QC",
-            "Reads Mapped",
-            "Reference",
-            "% Reference Covered",
-            "Median Coverage",
-            "Count of Minor SNVs >= 0.05",
-            "DI Ratios 5'/3'",
-            "Pass/Fail Reason",
-            "Subtype",
-            "MIRA module",
-            "Run ID",
-            "Instrument",
-        ],
-        _ => vec![
-            "Sample",
-            "Total Reads",
-            "Pass QC",
-            "Reads Mapped",
-            "Reference",
-            "% Reference Covered",
-            "Median Coverage",
-            "Count of Minor SNVs >= 0.05",
-            "Pass/Fail Reason",
-            "Subtype",
-            "MIRA module",
-            "Run ID",
-            "Instrument",
-        ],
-    };
-
-    let mut columns: Vec<Vec<String>> = vec![Vec::new(); headers.len()];
+    let summary_schema = summary_schema(virus);
+    let headers: Vec<_> = summary_schema
+        .iter()
+        .map(|column| column.display_name)
+        .collect();
+    let mut columns: Vec<Vec<String>> = vec![Vec::new(); summary_schema.len()];
 
     for row in summary {
-        columns[0].push(row.sample_id.clone());
-        columns[1].push(row.total_reads.map_or(String::new(), |v| v.to_string()));
-        columns[2].push(row.pass_qc.map_or(String::new(), |v| v.to_string()));
-        columns[3].push(row.reads_mapped.map_or(String::new(), |v| v.to_string()));
-        columns[4].push(row.reference.as_deref().unwrap_or("").to_string());
-        columns[5].push(
-            row.percent_reference_coverage
-                .map_or(String::new(), |v| format!("{v:.2}")),
-        );
-        columns[6].push(row.median_coverage.map_or(String::new(), |v| v.to_string()));
-        columns[7].push(
-            row.count_minor_snv_at_or_over_5_pct
-                .map_or(String::new(), |v| v.to_string()),
-        );
-
-        // Virus-specific extra columns
-        let mut col_index = 8;
-        if virus == "sc2-wgs" {
-            columns[col_index].push(
-                row.spike_percent_coverage
+        for (index, column) in summary_schema.iter().enumerate() {
+            let value = match column.field {
+                "sample_id" => row.sample_id.clone(),
+                "total_reads" => row.total_reads.map_or(String::new(), |v| v.to_string()),
+                "pass_qc" => row.pass_qc.map_or(String::new(), |v| v.to_string()),
+                "reads_mapped" => row.reads_mapped.map_or(String::new(), |v| v.to_string()),
+                "reference" => row.reference.as_deref().unwrap_or("").to_string(),
+                "percent_reference_coverage" => row
+                    .percent_reference_coverage
                     .map_or(String::new(), |v| format!("{v:.2}")),
-            );
-            col_index += 1;
-            columns[col_index].push(
-                row.spike_median_coverage
+                "median_coverage" => row.median_coverage.map_or(String::new(), |v| v.to_string()),
+                "count_minor_snv_at_or_over_5_pct" => row
+                    .count_minor_snv_at_or_over_5_pct
                     .map_or(String::new(), |v| v.to_string()),
-            );
-            col_index += 1;
-        }
-
-        // Correct placement of DI Ratios for flu
-        if virus == "flu" {
-            columns[col_index].push(
-                row.di_ratios_5prime_3prime
+                "spike_percent_coverage" => row
+                    .spike_percent_coverage
+                    .map_or(String::new(), |v| format!("{v:.2}")),
+                "spike_median_coverage" => row
+                    .spike_median_coverage
+                    .map_or(String::new(), |v| v.to_string()),
+                "di_ratios_5prime_3prime" => row
+                    .di_ratios_5prime_3prime
                     .as_deref()
                     .unwrap_or("")
                     .to_string(),
-            );
-            col_index += 1;
+                "secondary_hits" => row.secondary_hits.as_deref().unwrap_or("").to_string(),
+                "pass_fail_reason" => row.pass_fail_reason.as_deref().unwrap_or("").to_string(),
+                "subtype" => row.subtype.as_deref().unwrap_or("").to_string(),
+                "mira_module" => row.mira_module.as_deref().unwrap_or("").to_string(),
+                "runid" => row.runid.as_deref().unwrap_or("").to_string(),
+                "instrument" => row.instrument.as_deref().unwrap_or("").to_string(),
+                _ => unreachable!("summary schema contains an unsupported field"),
+            };
+            columns[index].push(value);
         }
-
-        // Common columns after spike
-        columns[col_index].push(row.pass_fail_reason.as_deref().unwrap_or("").to_string());
-        col_index += 1;
-
-        columns[col_index].push(row.subtype.as_deref().unwrap_or("").to_string());
-        col_index += 1;
-
-        columns[col_index].push(row.mira_module.as_deref().unwrap_or("").to_string());
-        col_index += 1;
-
-        columns[col_index].push(row.runid.as_deref().unwrap_or("").to_string());
-        col_index += 1;
-
-        columns[col_index].push(row.instrument.as_deref().unwrap_or("").to_string());
     }
 
     json!({

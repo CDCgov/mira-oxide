@@ -33,7 +33,7 @@ use crate::constants::theme;
 /// Colors for IRMA indels overlaid on coverage subplots.
 const INSERTION_COLOR: &str = "#2CA02C"; // green
 const DELETION_COLOR: &str = "#9467BD"; // purple
-/// Fallback minor-indel frequency thresholds when IRMA run_info.txt is absent.
+/// Fallback minor-indel frequency thresholds when IRMA `run_info.txt` is absent.
 const INDEL_FREQ_DEFAULT_ILLUMINA: f32 = 0.05;
 const INDEL_FREQ_DEFAULT_ONT: f32 = 0.30;
 
@@ -99,7 +99,7 @@ fn load_variant_data(
 }
 
 /// Load IRMA insertions/deletions per segment. Per-type frequency thresholds are
-/// sourced from run_info.txt (MIN_FI/MIN_FD), floored at a platform default so
+/// sourced from `run_info.txt` (`MIN_FI`/`MIN_FD`), floored at a platform default so
 /// low IRMA settings do not bury the coverage curve in indel noise.
 #[allow(clippy::type_complexity)]
 fn load_indel_data(
@@ -228,6 +228,42 @@ fn add_variant_indel_traces(
     yaxis: &str,
     legend_group: &str,
 ) {
+    add_minor_snv_traces(
+        plot,
+        segment_name,
+        segment_color,
+        variants_data,
+        xaxis,
+        yaxis,
+        legend_group,
+    );
+    add_insertion_traces(
+        plot,
+        segment_name,
+        insertions_data,
+        xaxis,
+        yaxis,
+        legend_group,
+    );
+    add_deletion_traces(
+        plot,
+        segment_name,
+        deletions_data,
+        xaxis,
+        yaxis,
+        legend_group,
+    );
+}
+
+fn add_minor_snv_traces(
+    plot: &mut Plot,
+    segment_name: &str,
+    segment_color: &'static str,
+    variants_data: &HashMap<String, Vec<VariantRec>>,
+    xaxis: &str,
+    yaxis: &str,
+    legend_group: &str,
+) {
     // Minor-SNV variants: solid minority depth, dashed remainder up to total.
     if let Some(variants) = variants_data.get(segment_name) {
         for (
@@ -276,7 +312,16 @@ fn add_variant_indel_traces(
             plot.add_trace(total_line);
         }
     }
+}
 
+fn add_insertion_traces(
+    plot: &mut Plot,
+    segment_name: &str,
+    insertions_data: &HashMap<String, Vec<InsertionRec>>,
+    xaxis: &str,
+    yaxis: &str,
+    legend_group: &str,
+) {
     // Insertions: solid green major count, dashed green indel count.
     if let Some(insertions) = insertions_data.get(segment_name) {
         for (position, insert, count, total, frequency) in insertions {
@@ -320,7 +365,16 @@ fn add_variant_indel_traces(
             plot.add_trace(indel_line);
         }
     }
+}
 
+fn add_deletion_traces(
+    plot: &mut Plot,
+    segment_name: &str,
+    deletions_data: &HashMap<String, Vec<DeletionRec>>,
+    xaxis: &str,
+    yaxis: &str,
+    legend_group: &str,
+) {
     // Deletions: solid purple major count, dashed purple indel count.
     if let Some(deletions) = deletions_data.get(segment_name) {
         for (position, _length, context, count, total, frequency) in deletions {
@@ -660,7 +714,7 @@ pub fn generate_plot_coverage_seg(input_directory: &Path) -> Result<Plot, Box<dy
         // Vertical anchor also varies per subplot so the label clears the data:
         // low local coverage -> pin to the top; high local coverage -> float
         // just above the local curve.
-        let (label_y, label_y_anchor) = if region_peak * 2 <= max_y {
+        let (label_y, y_label_anchor) = if region_peak * 2 <= max_y {
             (f64::from(max_y), plotly::common::Anchor::Top)
         } else {
             (f64::from(region_peak), plotly::common::Anchor::Bottom)
@@ -706,7 +760,7 @@ pub fn generate_plot_coverage_seg(input_directory: &Path) -> Result<Plot, Box<dy
                 .x(label_x)
                 .y(label_y)
                 .x_anchor(label_x_anchor)
-                .y_anchor(label_y_anchor)
+                .y_anchor(y_label_anchor)
                 .font(
                     plotly::common::Font::new()
                         .family(theme::TITLE_FONT)
@@ -988,7 +1042,7 @@ pub fn generate_sankey_plot(input_directory: &Path) -> Result<Plot, Box<dyn Erro
         s.chars()
             .enumerate()
             .flat_map(|(i, c)| {
-                if i > 0 && (len - i) % 3 == 0 {
+                if i > 0 && (len - i).is_multiple_of(3) {
                     vec![',', c]
                 } else {
                     vec![c]
@@ -1005,14 +1059,11 @@ pub fn generate_sankey_plot(input_directory: &Path) -> Result<Plot, Box<dyn Erro
             let incoming = node_in.get(&i).copied().unwrap_or(0);
             let outgoing = parent_totals.get(&i).copied().unwrap_or(0);
             let count = incoming.max(outgoing);
-            let denom: u32 = node_parents
-                .get(&i)
-                .map(|ps| {
-                    ps.iter()
-                        .map(|s| parent_totals.get(s).copied().unwrap_or(0))
-                        .sum()
-                })
-                .unwrap_or(0);
+            let denom: u32 = node_parents.get(&i).map_or(0, |ps| {
+                ps.iter()
+                    .map(|s| parent_totals.get(s).copied().unwrap_or(0))
+                    .sum()
+            });
             if denom > 0 {
                 format!(
                     "{name} ({} reads, {:.1}%)",

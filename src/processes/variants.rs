@@ -564,7 +564,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
     println!(
         "Read {} entries from the insertion file: {:?}",
         insertions.len(),
-        &args.query_insertion_file.display()
+        args.query_insertion_file.display()
     );
 
     let del_reader = create_reader(Some(&args.query_deletion_file))?;
@@ -572,7 +572,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
     println!(
         "Read {} entries from the deletion file: {:?}",
         deletions.len(),
-        &args.query_deletion_file.display()
+        args.query_deletion_file.display()
     );
 
     // Optional: minor variants (.csv, with headers)
@@ -605,8 +605,8 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
 
         println!(
             "Processing all nucleotide differences for input file: {:?} and reference file: {:?}",
-            &args.query_dais_file.display(),
-            &ref_dais_file.display()
+            args.query_dais_file.display(),
+            ref_dais_file.display()
         );
 
         // positions-of-interest is optional in this mode.
@@ -636,7 +636,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
         println!(
             "Read {} entries from the reference insertion file: {:?}",
             ref_insertions.len(),
-            &ref_insertion_file.display()
+            ref_insertion_file.display()
         );
 
         let ref_del_reader = create_reader(Some(&ref_deletion_file))?;
@@ -644,7 +644,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
         println!(
             "Read {} entries from the reference deletion file: {:?}",
             ref_deletions.len(),
-            &ref_deletion_file.display()
+            ref_deletion_file.display()
         );
 
         let mut writer = if let Some(ref file_path) = args.output_xsv {
@@ -1027,9 +1027,9 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
 
         println!(
             "Processing positions of interest for input file: {:?}, reference file: {:?}, and variants file: {:?}",
-            &args.query_dais_file.display(),
-            &ref_dais_file.display(),
-            &muts_path.display()
+            args.query_dais_file.display(),
+            ref_dais_file.display(),
+            muts_path.display()
         );
 
         let muts_reader = create_reader(Some(muts_path))?;
@@ -1051,7 +1051,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
         println!(
             "Read {} entries from the reference insertion file: {:?}",
             ref_insertions.len(),
-            &ref_insertion_file.display()
+            ref_insertion_file.display()
         );
 
         let ref_del_reader = create_reader(Some(&ref_deletion_file))?;
@@ -1059,7 +1059,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
         println!(
             "Read {} entries from the reference deletion file: {:?}",
             ref_deletions.len(),
-            &ref_deletion_file.display()
+            ref_deletion_file.display()
         );
 
         let mut writer = if let Some(ref file_path) = args.output_xsv {
