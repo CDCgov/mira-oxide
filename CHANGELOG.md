@@ -5,99 +5,153 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### `Changed`
-- Moved `minority_frequency` to the third-from-last column of the `--annotate-minor-variants` output, immediately before `run_id` and `instrument`.
+- [Amanda Sullivan](https://github.com/mandysulli)
+- [Sam Wiley](https://github.com/samcwiley)
+
+### `Added`
+
+- [PR #107](https://github.com/CDCgov/mira-oxide/pull/107) - Added
+  `secondary_hits` column in MIRA reports for reporting flu reads on the same
+  segment as the primary hit
 
 ### `Fixed`
-- Fixed `major_aa_vs_minor_aa` so the position between the two amino acids is the amino-acid position rather than the nucleotide position. Affects `--all-diffs`, `--positions-of-interest` and `--annotate-minor-variants`.
-- Fixed `variants --annotate-minor-variants` so segment-relative minor-variant positions are mapped into each CDS's own coordinate frame using `query_nt_coordinates`. This resolves empty annotations for second-ORF products (e.g. MP/BM2, M2) and corrects codon/amino-acid context for any CDS that does not start at segment position 1 (e.g. HA after the signal peptide).
-- Fixed `find_raw_query_position` to skip alignment-gap positions so variants near a deletion boundary map to the actual nucleotide instead of a gap.
-- Fixed column-order misalignment in the `--annotate-minor-variants` output where `minority_frequency` was written in a different position than the header declared.
+
+- Fixed `variants --annotate-minor-variants` so segment-relative minor-variant
+  positions are mapped into each CDS's own coordinate frame using
+  `query_nt_coordinates`. This resolves empty annotations for second-ORF
+  products (e.g. MP/BM2, M2) and corrects codon/amino-acid context for any CDS
+  that does not start at segment position 1 (e.g. HA after the signal peptide).
+- Fixed `find_raw_query_position` to skip alignment-gap positions so variants
+  near a deletion boundary map to the actual nucleotide instead of a gap.
+- Fixed column-order misalignment in the `--annotate-minor-variants` output
+  where `minority_frequency` was written in a different position than the header
+  declared.
+- Fixed `major_aa_vs_minor_aa` so the position between the two amino acids is
+  the amino-acid position rather than the nucleotide position. Affects
+  `--all-diffs`, `--positions-of-interest` and `--annotate-minor-variants`.
+
+### `Changed`
+
+- [PR #107](https://github.com/CDCgov/mira-oxide/pull/107) - Restructured output
+  schema for MIRA reports
+- Moved `minority_frequency` to the third-from-last column of the
+  `--annotate-minor-variants` output, immediately before `run_id` and
+  `instrument`.
 
 ## [1.6.0] - 2026-08-22
+
 - [Amanda Sullivan](https://github.com/mandysulli)
 - [Ben Rambo-Martin](https://github.com/nbx0)
 
 ### `Added`
-- [PR #105](https://github.com/CDCgov/mira-oxide/pull/105) - Added the `varaints` subprocess, that is replacing the `positions-of-interest` and `variants-of-interest` subprocesses. See `docs/variants_readme/md` for more information about usage.
+
+- [PR #105](https://github.com/CDCgov/mira-oxide/pull/105) - Added the
+  `varaints` subprocess, that is replacing the `positions-of-interest` and
+  `variants-of-interest` subprocesses. See `docs/variants_readme/md` for more
+  information about usage.
 
 ## [1.5.10] - 2026-08-11
+
 - [Amanda Sullivan](https://github.com/mandysulli)
 - [William Chettleburgh](https://github.com/willchet)
 
 ### `Fixed`
-- [PR #104](https://github.com/CDCgov/mira-oxide/pull/104) - Fixed sorting to work with new dais-ribosome alignments
+
+- [PR #104](https://github.com/CDCgov/mira-oxide/pull/104) - Fixed sorting to
+  work with new dais-ribosome alignments
 
 ## [1.5.9] - 2026-07-24
+
 - [Amanda Sullivan](https://github.com/mandysulli)
 - [William Chettleburgh](https://github.com/willchet)
 
 ### `Added`
+
 - [PR #100](https://github.com/CDCgov/mira-oxide/pull/100) - Added logic to createstatictml to print individual html's for the barcode, passfail_heatmap and coverage_heatmap graphs for Mira GUI
 - [PR #100](https://github.com/CDCgov/mira-oxide/pull/100) - Added updated path reading logic to allow for easier data passing within Mira-nf
 
 ### `Dependencies`
+
 - [PR #99](https://github.com/CDCgov/mira-oxide/pull/99) - Zoe version bump v0.0.31
 
 ## [1.5.8] - 2026-07-09
+
 - [Amanda Sullivan](https://github.com/mandysulli)
 
 ### `Added`
-- [PR #98](https://github.com/CDCgov/mira-oxide/pull/98) - Add custom-qc to summary if a custom qc yaml is used. 
+
+- [PR #98](https://github.com/CDCgov/mira-oxide/pull/98) - Add custom-qc to summary if a custom qc yaml is used.
 
 ## [1.5.7] - 2026-07-07
+
 - [Amanda Sullivan](https://github.com/mandysulli)
 
 ### `Added`
+
 - [PR #97](https://github.com/CDCgov/mira-oxide/pull/97) - Add FLU-AD as experiemnt and ad as irma_config as inputs for findchemistry process
 
 ## [1.5.6] - 2026-06-22
+
 - [Amanda Sullivan](https://github.com/mandysulli)
 
 ### `Fixed`
-- [PR #96](https://github.com/CDCgov/mira-oxide/pull/96) - Updated gh action to create draft first, then publish relase to no longer get immutable release error. 
+
+- [PR #96](https://github.com/CDCgov/mira-oxide/pull/96) - Updated gh action to create draft first, then publish relase to no longer get immutable release error.
 
 ## [1.5.5] - 2026-05-13
+
 - [William Chettleburgh](https://github.com/willchet)
 - [Amanda Sullivan](https://github.com/mandysulli)
 
 ### `Changed`
+
 - [PR #88](https://github.com/CDCgov/mira-oxide/pull/88) - Internally, `DaisSeqData`, `DaisVarsData`, and `IRMASummary` now hold a non-optional sample ID
 - [PR #89](https://github.com/CDCgov/mira-oxide/pull/89) - Internally, filtering for the spike protein in `compute_cvv_dais_variants` happens sooner
 - [PR #90](https://github.com/CDCgov/mira-oxide/pull/90) - Internally, reduce allocations inside `return_seg_data`
 
 ### `Fixed`
+
 - [PR #90](https://github.com/CDCgov/mira-oxide/pull/90) - fixed the mira coverage plot links within the static html
 
 ## [1.5.4] - 2026-04-13
+
 - [William Chettleburgh](https://github.com/willchet)
 
 ### `Fixed`
+
 - [PR #84](https://github.com/CDCgov/mira-oxide/pull/84) - Fixed sorting of merged data for RSV
 
 ## [1.5.3] - 2026-03-31
+
 - [Amanda Sullivan](https://github.com/mandysulli)
 
 ### `Fixed`
+
 - [PR #83](https://github.com/CDCgov/mira-oxide/pull/83) - Added rewrite for adding nextclade information to account for changes in nextclade output with version bump.
 
 ## [1.5.2] - 2026-03-27
+
 - [Amanda Sullivan](https://github.com/mandysulli)
 
 ### `Fixed`
+
 - [PR #82](https://github.com/CDCgov/mira-oxide/pull/82) - Added rewrite the `irma_summary.json` file into the the `summary-report-update` subprocess.
 
 ## [1.5.1] - 2026-03-26
+
 - [Amanda Sullivan](https://github.com/mandysulli)
 
 ### `Fixed`
+
 - [PR #81](https://github.com/CDCgov/mira-oxide/pull/81) - fixed bug in summary-reports-update where the di_stat values get dropped and return as null.
 
 ## [1.5.0] - 2026-03-24
+
 - [Amanda Sullivan](https://github.com/mandysulli)
 - [Kristine Lacek](https://github.com/kristinelacek)
 
 ### `Added`
+
 - [PR #49](https://github.com/CDCgov/mira-oxide/pull/49) - new subprocess call `di-stats` that calculates the DI stats for flu genomes.
 
 ## [1.4.4] - 2026-03-09
@@ -105,9 +159,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [Amanda Sullivan](https://github.com/mandysulli)
 
 ### `Added`
+
 - [PR #76](https://github.com/CDCgov/mira-oxide/pull/76) - the columns `aa_reference_is` and `positional_refrence_id` to the aavars outputs.
 
 ### `Fixed`
+
 - [PR #76](https://github.com/CDCgov/mira-oxide/pull/76) - Fixed bug that called premature stop codon when reference was just shorter.
 
 ## [1.4.3] - 2026-03-05
@@ -115,9 +171,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [Amanda Sullivan](https://github.com/mandysulli)
 
 ### `Added`
+
 - [PR #74](https://github.com/CDCgov/mira-oxide/pull/74) - allow sample_id ot sample in the samplesheet for AMD Platform compatibility.
 
 ### `Fixed`
+
 - [PR #73](https://github.com/CDCgov/mira-oxide/pull/73) - Update pass fail logic so that it does not Pass HA/NA with "premature stop codon"
 
 ## [1.4.2] - 2026-03-04
@@ -125,17 +183,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [Amanda Sullivan](https://github.com/mandysulli)
 
 ### `Added`
+
 - [PR #71](https://github.com/CDCgov/mira-oxide/pull/71) - added the column "" to summary.csv and summary.parq if nextclade is run
 
 ### `Fixed`
-- [PR #71](https://github.com/CDCgov/mira-oxide/pull/71) - No longer printing undetermined for smaples that didn't run. Now the line is left empty. 
+
+- [PR #71](https://github.com/CDCgov/mira-oxide/pull/71) - No longer printing undetermined for smaples that didn't run. Now the line is left empty.
 
 ## [1.4.1] - 2026-02-26
 
 - [Amanda Sullivan](https://github.com/mandysulli)
 
-
 ### `Fixed`
+
 - [PR #68](https://github.com/CDCgov/mira-oxide/pull/68) - Remove indel count collumn from statichtml since we no longer make that value
 
 ## [1.4.0] - 2026-02-12
@@ -144,19 +204,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [Sam Wiley](https://github.com/samcwiley)
 
 ### `Added`
+
 - [PR #64](https://github.com/CDCgov/mira-oxide/pull/64) - Added create_nextflow_samplesheet.rs to replace create_nextflow_samplesheet_i.py and create_nextflow_samplesheet+o.py in MIRA-NF. Takes the input samplesheet and fastq files and puts them into the nextflow sampleseet format.
 - [PR #64](https://github.com/CDCgov/mira-oxide/pull/64) - Added added functionality to create_nextflow_samplesheet.rs that tells user when fastq files are missing or empty
 - [PR #64](https://github.com/CDCgov/mira-oxide/pull/64) - Zoe alignment to use simd instead of scalar
 - [PR #65](https://github.com/CDCgov/mira-oxide/pull/65) - replaced alleles.json with minor_variants.json - may break MIRA GUI
 
 ### `Fixed`
+
 - [PR #65](https://github.com/CDCgov/mira-oxide/pull/65) - reading in the allAlleles.txt files for the all_alleles.parq now - may break schemas
 - [PR #67](https://github.com/CDCgov/mira-oxide/pull/67) - updated github actions so that it no longer fails
 
 ### `Dependencies`
+
 - [PR #64](https://github.com/CDCgov/mira-oxide/pull/64) - Zoe alignment syntax to be compatible with update
 
 ### `Deprecated`
+
 - [PR #65](https://github.com/CDCgov/mira-oxide/pull/65) - No longer making alleles.json or all_alleles.csv
 - [PR #65](https://github.com/CDCgov/mira-oxide/pull/65) - minor_variants.csv and minor_variants.parq no longer filtered to frequency of 0.05
 - [PR #65](https://github.com/CDCgov/mira-oxide/pull/65) - the minor_indel_count column has been removed from summary.csv, summary.json and summary.parq - may break schemas
@@ -166,14 +230,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [Amanda Sullivan](https://github.com/mandysulli)
 
 ### `Fixed`
-- [PR #63](https://github.com/CDCgov/mira-oxide/pull/63) - Fix low median coverage flag call and made BYAM subtype call stricter (need 100% of HA segment now).
 
+- [PR #63](https://github.com/CDCgov/mira-oxide/pull/63) - Fix low median coverage flag call and made BYAM subtype call stricter (need 100% of HA segment now).
 
 ## [1.3.1] - 2026-01-13
 
 - [Amanda Sullivan](https://github.com/mandysulli)
 
 ### `Fixed`
+
 - [PR #62](https://github.com/CDCgov/mira-oxide/pull/62) - Fix compatibility with MIRA-NF.
 
 ## [1.3.0] - 2026-01-13
@@ -181,6 +246,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [Amanda Sullivan](https://github.com/mandysulli)
 
 ### `Added`
+
 - [PR #60](https://github.com/CDCgov/mira-oxide/pull/60) - Added divide_nt_into_nextclade_vec and write_out_nextclade_fasta_files funcitons to write out nextclade fastsa files that are divided by subtype( and segment for flu).
 - [PR #60](https://github.com/CDCgov/mira-oxide/pull/60) - Added summary_report_update function to add the nextclade clade results back into the summary.csv and sumary.parq files.
 
@@ -190,6 +256,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [Kristine Lacek](https://github.com/kristinelacek)
 
 ### `Fixed`
+
 - [PR #58](https://github.com/CDCgov/mira-oxide/pull/58) - Add assembly_time coumn to the run_info.parq
 
 ## [1.2.2] - 2025-12-23
@@ -198,6 +265,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [Kristine Lacek](https://github.com/kristinelacek)
 
 ### `Fixed`
+
 - [PR #57](https://github.com/CDCgov/mira-oxide/pull/57) - Fix samplesheet.parq schema fix for handling Illumina.
 
 ## [1.2.1] - 2025-12-18
@@ -205,6 +273,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [Amanda Sullivan](https://github.com/mandysulli)
 
 ### `Fixed`
+
 - [PR #55](https://github.com/CDCgov/mira-oxide/pull/55) - Fix filepath, subtype and spike coverage logic in prepare-mira-reports subrocess to be compatible with MIRA-MF
 
 ## [1.2.0] - 2025-12-15
@@ -215,10 +284,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [William Chettleburgh](https://github.com/willchet)
 
 ### `Added`
+
 - [PR #40](https://github.com/CDCgov/mira-oxide/pull/40) - Added `prepare_mira_reports.rs` to proccesses and supporting files to src/io, src/utils and src/constants. Made to replace prepareIRMAjson.py, irma2pandas.py, dais2pandas.py and parquet_maker.py within MIRA-NF.
 - [PR #52](https://github.com/CDCgov/mira-oxide/pull/52) - Added additional logic to `prepare_mira_reports.rs` to replace static_reports.py within MIRA-NF
 
 ### `Fixed`
+
 - [PR #53](https://github.com/CDCgov/mira-oxide/pull/53) - Fix github trigger to run upon tagging. Not merging from dev.
 
 ## [1.1.3] - 2025-11-26
@@ -253,3 +324,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <!-- Versions -->
 
 [1.1.1]: https://github.com/CDCgov/mira-oxide/compare/f824940...v1.1.1
+[1.1.2]: https://github.com/CDCgov/mira-oxide/compare/v1.1.1...v1.1.2
+[1.1.3]: https://github.com/CDCgov/mira-oxide/compare/v1.1.2...v1.1.3
+[1.2.0]: https://github.com/CDCgov/mira-oxide/compare/v1.1.3...v1.2.0
+[1.2.1]: https://github.com/CDCgov/mira-oxide/compare/v1.2.0...v1.2.1
+[1.2.2]: https://github.com/CDCgov/mira-oxide/compare/v1.2.1...v1.2.2
+[1.2.3]: https://github.com/CDCgov/mira-oxide/compare/v1.2.2...v1.2.3
+[1.3.0]: https://github.com/CDCgov/mira-oxide/compare/v1.2.3...v1.3.0
+[1.3.1]: https://github.com/CDCgov/mira-oxide/compare/v1.3.0...v1.3.1
+[1.3.2]: https://github.com/CDCgov/mira-oxide/compare/v1.3.1...v1.3.2
+[1.4.0]: https://github.com/CDCgov/mira-oxide/compare/v1.3.2...v1.4.0
+[1.4.1]: https://github.com/CDCgov/mira-oxide/compare/v1.4.0...v1.4.1
+[1.4.2]: https://github.com/CDCgov/mira-oxide/compare/v1.4.1...v1.4.2
+[1.4.3]: https://github.com/CDCgov/mira-oxide/compare/v1.4.2...v1.4.3
+[1.4.4]: https://github.com/CDCgov/mira-oxide/compare/v1.4.3...v1.4.4
+[1.5.0]: https://github.com/CDCgov/mira-oxide/compare/v1.4.4...v1.5.0
+[1.5.1]: https://github.com/CDCgov/mira-oxide/compare/v1.5.0...v1.5.1
+[1.5.2]: https://github.com/CDCgov/mira-oxide/compare/v1.5.1...v1.5.2
+[1.5.3]: https://github.com/CDCgov/mira-oxide/compare/v1.5.2...v1.5.3
+[1.5.4]: https://github.com/CDCgov/mira-oxide/compare/v1.5.3...v1.5.4
+[1.5.5]: https://github.com/CDCgov/mira-oxide/compare/v1.5.4...v1.5.5
+[1.5.6]: https://github.com/CDCgov/mira-oxide/compare/v1.5.5...v1.5.6
+[1.5.7]: https://github.com/CDCgov/mira-oxide/compare/v1.5.6...v1.5.7
+[1.5.8]: https://github.com/CDCgov/mira-oxide/compare/v1.5.7...v1.5.8
+[1.5.9]: https://github.com/CDCgov/mira-oxide/compare/v1.5.8...v1.5.9
+[1.5.10]: https://github.com/CDCgov/mira-oxide/compare/v1.5.9...v1.5.10
+[1.6.0]: https://github.com/CDCgov/mira-oxide/compare/v1.5.10...v1.6.0
