@@ -103,6 +103,7 @@ pub struct UpdatedIRMASummary {
     pub spike_median_coverage: Option<i32>,
     #[serde(rename = "di_5prime;di_3prime")]
     pub di_ratios_5prime_3prime: Option<String>,
+    pub secondary_hits: Option<String>,
     pub pass_fail_reason: Option<String>,
     pub subtype: Option<String>,
     #[serde(rename = "mira_version;module;irma_config")]

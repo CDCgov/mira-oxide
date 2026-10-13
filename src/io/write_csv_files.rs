@@ -4,6 +4,7 @@ use serde_json::Value;
 use std::{error::Error, path::Path};
 
 use crate::{
+    constants::summary_schema::summary_schema,
     processes::summary_report_update::UpdatedIRMASummary,
     utils::data_processing::{AASequences, DaisVarsData, IRMASummary, NTSequences},
 };
@@ -130,19 +131,18 @@ pub fn write_out_all_csv_mira_reports(
     )?;
 
     // write out the mira_{runid}_summary.csv
-    let (summary_columns, summary_struct_values) = if virus == "sc2-wgs" {
-        SUMMARY_WGS_SCHEMA
-    } else if virus == "flu" {
-        SUMMARY_FLU_SCHEMA
-    } else {
-        SUMMARY_DEFAULT_SCHEMA
-    };
+    let summary_schema = summary_schema(virus);
+    let summary_columns: Vec<_> = summary_schema
+        .iter()
+        .map(|column| column.output_name)
+        .collect();
+    let summary_struct_values: Vec<_> = summary_schema.iter().map(|column| column.field).collect();
 
     write_structs_to_csv_file(
         &format!("{}/mira_{runid}_summary.csv", output_path.display()),
         irma_summary,
-        summary_columns,
-        summary_struct_values,
+        &summary_columns,
+        &summary_struct_values,
     )?;
 
     // write out the amended_consensus
@@ -357,111 +357,6 @@ const AAVARS_COLUMNS: &[&str] = &[
 
 const AAVARS_SCHEMA: CsvSchema = (AAVARS_COLUMNS, AAVARS_COLUMNS);
 
-const SUMMARY_WGS_SCHEMA: CsvSchema = (
-    &[
-        "sample_id",
-        "total_reads",
-        "pass_qc",
-        "reads_mapped",
-        "reference",
-        "percent_reference_coverage",
-        "median_coverage",
-        "count_minor_snv_at_or_over_5_pct",
-        "spike_percent_coverage",
-        "spike_median_coverage",
-        "pass_fail_reason",
-        "subtype",
-        "mira_version;module;irma_config",
-        "runid",
-        "instrument",
-    ],
-    &[
-        "sample_id",
-        "total_reads",
-        "pass_qc",
-        "reads_mapped",
-        "reference",
-        "percent_reference_coverage",
-        "median_coverage",
-        "count_minor_snv_at_or_over_5_pct",
-        "spike_percent_coverage",
-        "spike_median_coverage",
-        "pass_fail_reason",
-        "subtype",
-        "mira_module",
-        "runid",
-        "instrument",
-    ],
-);
-
-const SUMMARY_FLU_SCHEMA: CsvSchema = (
-    &[
-        "sample_id",
-        "total_reads",
-        "pass_qc",
-        "reads_mapped",
-        "reference",
-        "percent_reference_coverage",
-        "median_coverage",
-        "count_minor_snv_at_or_over_5_pct",
-        "di_5prime;di_3prime",
-        "pass_fail_reason",
-        "subtype",
-        "mira_version;module;irma_config",
-        "runid",
-        "instrument",
-    ],
-    &[
-        "sample_id",
-        "total_reads",
-        "pass_qc",
-        "reads_mapped",
-        "reference",
-        "percent_reference_coverage",
-        "median_coverage",
-        "count_minor_snv_at_or_over_5_pct",
-        "di_ratios_5prime_3prime",
-        "pass_fail_reason",
-        "subtype",
-        "mira_module",
-        "runid",
-        "instrument",
-    ],
-);
-
-const SUMMARY_DEFAULT_SCHEMA: CsvSchema = (
-    &[
-        "sample_id",
-        "total_reads",
-        "pass_qc",
-        "reads_mapped",
-        "reference",
-        "percent_reference_coverage",
-        "median_coverage",
-        "count_minor_snv_at_or_over_5_pct",
-        "pass_fail_reason",
-        "subtype",
-        "mira_version;module;irma_config",
-        "runid",
-        "instrument",
-    ],
-    &[
-        "sample_id",
-        "total_reads",
-        "pass_qc",
-        "reads_mapped",
-        "reference",
-        "percent_reference_coverage",
-        "median_coverage",
-        "count_minor_snv_at_or_over_5_pct",
-        "pass_fail_reason",
-        "subtype",
-        "mira_module",
-        "runid",
-        "instrument",
-    ],
-);
-
 const SEQUENCE_COLUMNS: &[&str] = &[
     "sample_id",
     "reference",
@@ -562,6 +457,7 @@ const UPDATED_SUMMARY_FLU_SCHEMA: CsvSchema = (
         "median_coverage",
         "count_minor_snv_at_or_over_5_pct",
         "di_5prime;di_3prime",
+        "secondary_hits",
         "pass_fail_reason",
         "subtype",
         "mira_version;module;irma_config",
@@ -581,6 +477,7 @@ const UPDATED_SUMMARY_FLU_SCHEMA: CsvSchema = (
         "median_coverage",
         "count_minor_snv_at_or_over_5_pct",
         "di_5prime;di_3prime",
+        "secondary_hits",
         "pass_fail_reason",
         "subtype",
         "mira_version;module;irma_config",
