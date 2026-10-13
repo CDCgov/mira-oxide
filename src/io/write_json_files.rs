@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use crate::{
+    constants::summary_schema::summary_schema,
     processes::summary_report_update::UpdatedIRMASummary,
     utils::data_processing::{
         DaisVarsData, IRMASummary, NTSequences, ProcessedRecord, filter_struct_by_ids,
@@ -389,112 +390,13 @@ pub fn write_out_all_json_files(
         neg_control_list,
     )?;
 
-    // write out the summary.json
-    let summary_struct_values: Vec<&str> = if virus == "sc2-wgs" {
-        vec![
-            "sample_id",
-            "total_reads",
-            "pass_qc",
-            "reads_mapped",
-            "reference",
-            "percent_reference_coverage",
-            "median_coverage",
-            "count_minor_snv_at_or_over_5_pct",
-            "spike_percent_coverage",
-            "spike_median_coverage",
-            "pass_fail_reason",
-            "subtype",
-            "mira_module",
-            "runid",
-            "instrument",
-        ]
-    } else if virus == "flu" {
-        vec![
-            "sample_id",
-            "total_reads",
-            "pass_qc",
-            "reads_mapped",
-            "reference",
-            "percent_reference_coverage",
-            "median_coverage",
-            "count_minor_snv_at_or_over_5_pct",
-            "di_ratios_5prime_3prime",
-            "pass_fail_reason",
-            "subtype",
-            "mira_module",
-            "runid",
-            "instrument",
-        ]
-    } else {
-        vec![
-            "sample_id",
-            "total_reads",
-            "pass_qc",
-            "reads_mapped",
-            "reference",
-            "percent_reference_coverage",
-            "median_coverage",
-            "count_minor_snv_at_or_over_5_pct",
-            "pass_fail_reason",
-            "subtype",
-            "mira_module",
-            "runid",
-            "instrument",
-        ]
-    };
-
-    let summary_columns: Vec<&str> = if virus == "sc2-wgs" {
-        vec![
-            "sample_id",
-            "total_reads",
-            "pass_qc",
-            "reads_mapped",
-            "reference",
-            "percent_reference_coverage",
-            "median_coverage",
-            "count_minor_snv_at_or_over_5_pct",
-            "spike_percent_coverage",
-            "spike_median_coverage",
-            "pass_fail_reason",
-            "subtype",
-            "mira_version;module;irma_config",
-            "runid",
-            "instrument",
-        ]
-    } else if virus == "flu" {
-        vec![
-            "sample_id",
-            "total_reads",
-            "pass_qc",
-            "reads_mapped",
-            "reference",
-            "percent_reference_coverage",
-            "median_coverage",
-            "count_minor_snv_at_or_over_5_pct",
-            "di_5prime;di_3prime",
-            "pass_fail_reason",
-            "subtype",
-            "mira_version;module;irma_config",
-            "runid",
-            "instrument",
-        ]
-    } else {
-        vec![
-            "sample_id",
-            "total_reads",
-            "pass_qc",
-            "reads_mapped",
-            "reference",
-            "percent_reference_coverage",
-            "median_coverage",
-            "count_minor_snv_at_or_over_5_pct",
-            "pass_fail_reason",
-            "subtype",
-            "mira_version;module;irma_config",
-            "runid",
-            "instrument",
-        ]
-    };
+    // Write out the summary.json using the same per-virus schema as CSV.
+    let summary_schema = summary_schema(virus);
+    let summary_columns: Vec<_> = summary_schema
+        .iter()
+        .map(|column| column.output_name)
+        .collect();
+    let summary_struct_values: Vec<_> = summary_schema.iter().map(|column| column.field).collect();
 
     write_structs_to_split_json_file(
         &format!("{}/irma_summary.json", output_path.display()),
@@ -565,6 +467,7 @@ pub fn write_out_updated_json_files(
             "median_coverage",
             "count_minor_snv_at_or_over_5_pct",
             "di_5prime;di_3prime",
+            "secondary_hits",
             "pass_fail_reason",
             "subtype",
             "mira_version;module;irma_config",
@@ -627,6 +530,7 @@ pub fn write_out_updated_json_files(
             "median_coverage",
             "count_minor_snv_at_or_over_5_pct",
             "di_5prime;di_3prime",
+            "secondary_hits",
             "pass_fail_reason",
             "subtype",
             "mira_version;module;irma_config",

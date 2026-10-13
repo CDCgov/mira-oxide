@@ -248,6 +248,7 @@ pub struct SeqData {
 }
 
 /////////////// Structs to hold dais-ribosome data ///////////////
+
 /// Dais Sequence Data
 #[derive(Deserialize, Debug)]
 pub struct DaisSeqData {
@@ -295,6 +296,7 @@ pub struct DIStatData {
 }
 
 /////////////// Structs to hold nextcalde data ///////////////
+
 /// Nextclade Data
 #[derive(Serialize, Deserialize, Debug)]
 pub struct NextcladeData {
@@ -317,6 +319,7 @@ pub struct NextcladeData {
 }
 
 /////////////// Imp for the process_txt_with_sample_function ///////////////
+
 /// Define a trait for structs that have a `sample_id` field
 trait GetSampleId {
     fn set_sample_id(&mut self, sample_id: String);
@@ -358,6 +361,7 @@ impl GetSampleId for AllAllelesData {
 }
 
 /////////////// Data reading functions for IRMA///////////////
+
 /// Creating a reader for processing files
 pub fn create_reader(path: &PathBuf) -> io::Result<BufReader<Either<File, Stdin>>> {
     if path.to_str() == Some("-") {
@@ -422,6 +426,9 @@ fn extract_sample_name(path: &Path) -> Result<String, Box<dyn Error>> {
 }
 
 /// Read tab-delimited data and include the sample name
+///
+/// This builds a csv reader and tacks on the provided `sample_id` to the
+/// deserialized struct created for each row in the csv
 fn process_txt_with_sample<R, T>(
     reader: R,
     has_headers: bool,
@@ -530,7 +537,7 @@ pub fn coverage_data_collection(
     Ok(cov_data)
 }
 
-///  Collect read data created by IRMA and save to vector of `ReadsData`
+/// Collect read data created by IRMA and save to vector of `ReadsData`
 pub fn reads_data_collection(
     irma_path: impl AsRef<Path>,
     platform: &str,
@@ -565,6 +572,7 @@ pub fn reads_data_collection(
     }
     Ok(reads_data)
 }
+
 /// Collecting minor vairant data created by IRMA and save to two vectors of `MinorVariantsData`
 /// One vector contains filtered minor variants (frequency >= 0.05), and the other contains all minor variants.
 pub fn minor_variant_data_collection(
@@ -892,12 +900,12 @@ fn format_timestamp(secs: u64, nanos: u32) -> String {
     )
 }
 
-// Helper function to determine if a year is a leap year
+/// Helper function to determine if a year is a leap year
 fn is_leap_year(year: u64) -> bool {
     (year.is_multiple_of(4) && !year.is_multiple_of(100)) || year.is_multiple_of(400)
 }
 
-// Helper function to calculate the number of days in a year
+/// Helper function to calculate the number of days in a year
 fn days_in_year(year: u64) -> u64 {
     if is_leap_year(year) { 366 } else { 365 }
 }
@@ -939,6 +947,7 @@ pub fn run_info_collection(
 }
 
 /////////////// Data reading functions for DAIS-ribosome ///////////////
+
 /// Read tab-delimited data a without including sample name
 pub fn process_txt<R, T>(reader: R, has_headers: bool) -> Result<Vec<T>, Box<dyn std::error::Error>>
 where
@@ -1048,6 +1057,7 @@ pub fn di_stat_data_collection(
 }
 
 /////////////// Data reading functions for Nextclade ///////////////
+
 /// Collect read data created by IRMA and save to vector of `NextcladeData`
 pub fn nextclade_data_collection(
     work_path: impl AsRef<Path>,
