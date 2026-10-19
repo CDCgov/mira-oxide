@@ -2,7 +2,7 @@ use clap::Parser;
 use either::Either;
 use std::{
     fs::OpenOptions,
-    io::{BufReader, BufWriter, Write, stdin, stdout},
+    io::{BufWriter, Write, stdin, stdout},
     path::PathBuf,
 };
 use zoe::{
@@ -39,14 +39,14 @@ pub fn all_sample_nt_diffs_process(args: &NTDiffsArgs) {
 
     //read in fasta file
     let reader = if let Some(ref file_path) = args.input_fasta {
-        FastaReader::new(BufReader::new(Either::Left(
+        FastaReader::new(Either::Left(
             OpenOptions::new()
                 .read(true)
                 .open(file_path)
                 .expect("File opening error"),
-        )))
+        ))
     } else {
-        FastaReader::new(BufReader::new(Either::Right(stdin())))
+        FastaReader::new(Either::Right(stdin()))
     };
 
     //output
