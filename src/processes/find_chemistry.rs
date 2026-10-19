@@ -5,7 +5,7 @@ use std::{
     io::{BufWriter, Write},
     path::{Path, PathBuf},
 };
-use zoe::prelude::*;
+use zoe::data::views::Len;
 
 use crate::utils::fastq_read::open_fastq_file;
 
