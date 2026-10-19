@@ -5,7 +5,7 @@ use std::{
     io::{BufReader, BufWriter, Write, stdin, stdout},
     path::PathBuf,
 };
-use zoe::{data::fasta::FastaNT, distance::dna::NucleotidesDistance, prelude::*};
+use zoe::{data::fasta::Fasta, distance::dna::NucleotidesDistance, prelude::*};
 
 #[derive(Debug, Parser)]
 #[command(
@@ -65,9 +65,9 @@ pub fn all_sample_hd_process(args: &HammingArgs) -> Result<(), std::io::Error> {
         .map(|record|
             // TODO: don't translate, instead defer until later
             record.map(|r| {
-                let FastaNT { name, sequence } = r.recode_to_dna();
+                let Fasta { header, sequence } = r.recode_to_dna();
                 ValidSeq {
-                    name,
+                    name: header,
                     sequence,
                 }
               }))

@@ -6,8 +6,7 @@ use std::{
     path::PathBuf,
 };
 use zoe::{
-    data::fasta::FastaNT,
-    prelude::*,
+    data::fasta::{Fasta}, prelude::*,
 };
 
 #[derive(Debug, Parser)]
@@ -68,9 +67,9 @@ pub fn all_sample_nt_diffs_process(args: &NTDiffsArgs) {
         .map(|record|
             // TODO: don't translate, instead defer until later
             record.map(|r| {
-                let FastaNT { name, sequence } = r.recode_to_dna();
+                let Fasta { header, sequence } = r.recode_to_dna();
                 ValidSeq {
-                    name, 
+                    name: header, 
                     sequence,
                 }
               }))
