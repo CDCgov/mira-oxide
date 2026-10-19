@@ -12,13 +12,12 @@ use std::{
     path::{Path, PathBuf},
 };
 use zoe::{
-    alignment::{ScalarProfile, sw::sw_scalar_align},
     data::{
         WeightMatrix,
         mappings::{ByteIndexMap, StdGeneticCode},
         nucleotides::GetCodons,
     },
-    prelude::{Len, Nucleotides},
+    prelude::{Len, NucleotidesView},
 };
 
 use crate::io::data_ingest::read_csv;
@@ -675,8 +674,8 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                     && dais_entry.dais_ref_id == ref_entry.dais_ref_id
                     && dais_entry.protein == ref_entry.protein
                 {
-                    let nt_seq1: Nucleotides = ref_entry.ref_cds_aln.clone().into();
-                    let nt_seq2: Nucleotides = dais_entry.query_cds_aln.clone().into();
+                    let nt_seq1 = NucleotidesView::from(ref_entry.ref_cds_aln.as_str());
+                    let nt_seq2 = NucleotidesView::from(dais_entry.query_cds_aln.as_str());
 
                     if nt_seq1.len() != nt_seq2.len() {
                         println!(
@@ -1086,8 +1085,8 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                     && dais_entry.dais_ref_id == ref_entry.dais_ref_id
                     && dais_entry.protein == ref_entry.protein
                 {
-                    let nt_seq1: Nucleotides = ref_entry.ref_cds_aln.clone().into();
-                    let nt_seq2: Nucleotides = dais_entry.query_cds_aln.clone().into();
+                    let nt_seq1 = NucleotidesView::from(ref_entry.ref_cds_aln.as_str());
+                    let nt_seq2 = NucleotidesView::from(dais_entry.query_cds_aln.as_str());
 
                     if nt_seq1.len() == nt_seq2.len() {
                         let mut entry = Entry {
@@ -1563,7 +1562,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                 mv_aa,
             ) = if let Some(dais_entry) = matching_dais_entry {
                 let dais_reference = dais_entry.dais_ref_id.clone();
-                let nt_seq: Nucleotides = dais_entry.query_cds_aln.clone().into();
+                let nt_seq = NucleotidesView::from(dais_entry.query_cds_aln.as_str());
                 let aln_len = nt_seq.len();
                 // Translate the segment-relative sample_position into this CDS's own
                 // coordinate frame before resolving the aligned position; fall back to the
