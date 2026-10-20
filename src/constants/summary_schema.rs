@@ -202,11 +202,6 @@ const FLU_SUMMARY_SCHEMA: &[SummaryColumn] = &[
         display_name: "DI Ratios 5'/3'",
     },
     SummaryColumn {
-        field: "secondary_hits",
-        output_name: "secondary_hits",
-        display_name: "Secondary Hits",
-    },
-    SummaryColumn {
         field: "pass_fail_reason",
         output_name: "pass_fail_reason",
         display_name: "Pass/Fail Reason",
@@ -230,6 +225,11 @@ const FLU_SUMMARY_SCHEMA: &[SummaryColumn] = &[
         field: "instrument",
         output_name: "instrument",
         display_name: "Instrument",
+    },
+    SummaryColumn {
+        field: "secondary_hits",
+        output_name: "secondary_hits",
+        display_name: "Secondary Hits",
     },
 ];
 

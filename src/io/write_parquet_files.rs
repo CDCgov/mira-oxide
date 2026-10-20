@@ -981,15 +981,6 @@ pub fn write_updated_irma_summary_to_parquet(
             insert_idx,
             Arc::new(StringArray::from(di_ratios_vec)) as ArrayRef,
         );
-
-        fields.insert(
-            insert_idx + 1,
-            Field::new("secondary_hits", DataType::Utf8, true),
-        );
-        arrays.insert(
-            insert_idx + 1,
-            Arc::new(StringArray::from(secondary_hits_vec)) as ArrayRef,
-        );
     }
 
     // Virus-specific Nextclade fields
@@ -1031,6 +1022,13 @@ pub fn write_updated_irma_summary_to_parquet(
             fields.push(Field::new("clade", DataType::Utf8, true));
             arrays.push(Arc::new(StringArray::from(clade_vec)) as ArrayRef);
         }
+    }
+
+    // Secondary hits are available for flu reports and go at the end, to not
+    // affect existing schema that might read in these reports
+    if virus == "flu" {
+        fields.push(Field::new("secondary_hits", DataType::Utf8, true));
+        arrays.push(Arc::new(StringArray::from(secondary_hits_vec)) as ArrayRef);
     }
 
     // Write parquet

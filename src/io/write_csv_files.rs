@@ -461,7 +461,6 @@ const UPDATED_SUMMARY_FLU_SCHEMA: CsvSchema = (
         "median_coverage",
         "count_minor_snv_at_or_over_5_pct",
         "di_5prime;di_3prime",
-        "secondary_hits",
         "pass_fail_reason",
         "subtype",
         "mira_version;module;irma_config",
@@ -470,6 +469,7 @@ const UPDATED_SUMMARY_FLU_SCHEMA: CsvSchema = (
         "subclade",
         "nextclade_alias",
         "nextclade_version;dataset;tag",
+        "secondary_hits",
     ],
     &[
         "sample_id",
@@ -481,7 +481,6 @@ const UPDATED_SUMMARY_FLU_SCHEMA: CsvSchema = (
         "median_coverage",
         "count_minor_snv_at_or_over_5_pct",
         "di_5prime;di_3prime",
-        "secondary_hits",
         "pass_fail_reason",
         "subtype",
         "mira_version;module;irma_config",
@@ -490,6 +489,7 @@ const UPDATED_SUMMARY_FLU_SCHEMA: CsvSchema = (
         "nextclade_field_1",
         "nextclade_field_2",
         "nextclade_info",
+        "secondary_hits",
     ],
 );
 
