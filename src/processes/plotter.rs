@@ -76,14 +76,17 @@ fn load_variant_data(
             .from_reader(file);
         for result in rdr.records() {
             let record = result?;
-            if record.len() >= 8 {
+            if record.len() >= 9 {
                 let segment_name = record[0].to_string();
                 let position: u32 = record[1].parse()?;
                 let consensus_allele: String = record[3].to_string();
                 let minority_allele: String = record[4].to_string();
                 let consensus_count: u32 = record[5].parse()?;
                 let minority_count: u32 = record[6].parse()?;
-                let minority_frequency: f32 = record[8].parse()?;
+                let Ok(minority_frequency) = record[8].parse::<f32>() else {
+                    // irma frequency is missing, no minor variant
+                    continue;
+                };
                 variants_data.entry(segment_name).or_default().push((
                     position,
                     consensus_allele,
@@ -152,7 +155,10 @@ fn load_indel_data(
         for result in rdr.records() {
             let record = result?;
             if record.len() >= 8 {
-                let frequency: f32 = record[7].parse().unwrap_or(0.0);
+                let Ok(frequency) = record[7].parse::<f32>() else {
+                    // irma frequency missing, no indel
+                    continue;
+                };
                 if frequency < insertion_min_frequency {
                     continue;
                 }
@@ -183,7 +189,10 @@ fn load_indel_data(
         for result in rdr.records() {
             let record = result?;
             if record.len() >= 8 {
-                let frequency: f32 = record[7].parse().unwrap_or(0.0);
+                let Ok(frequency) = record[7].parse::<f32>() else {
+                    // irma frequency missing, no indel
+                    continue;
+                };
                 if frequency < deletion_min_frequency {
                     continue;
                 }

@@ -61,6 +61,21 @@ where
     }
 }
 
+/// Deserialize IRMA frequency values, treating `NA` markers as null
+pub fn deserialize_optional_frequency<'de, D>(deserializer: D) -> Result<Option<f64>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = Option::<String>::deserialize(deserializer)?;
+    match value.as_deref().map(str::trim) {
+        None | Some("" | "NA") => Ok(None),
+        Some(value) => value
+            .parse::<f64>()
+            .map(Some)
+            .map_err(serde::de::Error::custom),
+    }
+}
+
 /// Coverage struct
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct CoverageData {
@@ -136,7 +151,8 @@ pub struct MinorVariantsData {
     #[serde(rename = "Minority_Count")]
     pub minority_count: i32,
     #[serde(rename = "Minority_Frequency")]
-    pub minority_frequency: f64,
+    #[serde(default, deserialize_with = "deserialize_optional_frequency")]
+    pub minority_frequency: Option<f64>,
     #[serde(rename = "Run_ID")]
     pub run_id: Option<String>,
     #[serde(rename = "Instrument")]
@@ -174,7 +190,8 @@ pub struct IndelsData {
     #[serde(rename = "Total")]
     pub total: i32,
     #[serde(rename = "Frequency")]
-    pub frequency: f64,
+    #[serde(default, deserialize_with = "deserialize_optional_frequency")]
+    pub frequency: Option<f64>,
     #[serde(rename = "Average_Quality")]
     pub average_quality: Option<String>,
     #[serde(rename = "ConfidenceNotMacErr")]
@@ -205,7 +222,8 @@ pub struct AllAllelesData {
     #[serde(rename = "Total")]
     pub total_count: i32,
     #[serde(rename = "Frequency")]
-    pub allele_frequency: f64,
+    #[serde(default, deserialize_with = "deserialize_optional_frequency")]
+    pub allele_frequency: Option<f64>,
     #[serde(rename = "Average_Quality")]
     pub average_quality: String,
     #[serde(rename = "ConfidenceNotMacErr")]
@@ -602,14 +620,18 @@ pub fn minor_variant_data_collection(
                     record.instrument = Some(platform.to_string());
                     record.run_id = Some(runid.to_string());
 
-                    // Round minority_frequency to 3 decimal places
-                    record.minority_frequency =
-                        (record.minority_frequency * 1000.0).round() / 1000.0;
+                    // Round minority_frequency to 3 decimal places when IRMA supplied it.
+                    record.minority_frequency = record
+                        .minority_frequency
+                        .map(|frequency| (frequency * 1000.0).round() / 1000.0);
                 }
 
                 // Separate records into filtered and unfiltered vectors
                 for record in records {
-                    if record.minority_frequency >= 0.05 {
+                    if record
+                        .minority_frequency
+                        .is_some_and(|frequency| frequency >= 0.05)
+                    {
                         filtered_minor_variants.push(record.clone());
                     }
                     all_minor_variants.push(record);
@@ -1110,4 +1132,41 @@ pub fn nextclade_data_collection(
     }
 
     Ok(nextclade_data)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // bogus struct for testing deserialization of irma frequencies
+    #[derive(Debug, Deserialize)]
+    struct FrequencyRecord {
+        #[serde(
+            rename = "Frequency",
+            deserialize_with = "deserialize_optional_frequency"
+        )]
+        frequency: Option<f64>,
+        #[serde(rename = "Label")]
+        _label: String,
+    }
+
+    // tests tsv reading of frequency data with `NA`/empty values
+    #[test]
+    fn deserializes_irma_na_and_blank_frequencies_as_null() {
+        let input = b"Frequency\tLabel\nNA\tna_frequency\n\tempty_frequency\n0.125\tcorrect_f64\n";
+        let mut reader = ReaderBuilder::new()
+            .delimiter(b'\t')
+            .has_headers(true)
+            .from_reader(&input[..]);
+
+        let records: Vec<FrequencyRecord> = reader
+            .deserialize()
+            .collect::<Result<_, _>>()
+            .expect("frequency rows should deserialize");
+
+        assert_eq!(records.len(), 3);
+        assert_eq!(records[0].frequency, None);
+        assert_eq!(records[1].frequency, None);
+        assert_eq!(records[2].frequency, Some(0.125));
+    }
 }

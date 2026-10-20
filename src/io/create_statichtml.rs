@@ -375,7 +375,10 @@ fn alleles_to_plotly_json(data: &[MinorVariantsData], virus: &str) -> String {
             columns[5].push(row.minority_allele.clone());
             columns[6].push(row.consensus_count.to_string());
             columns[7].push(row.minority_count.to_string());
-            columns[8].push(format!("{:.4}", row.minority_frequency));
+            columns[8].push(
+                row.minority_frequency
+                    .map_or_else(String::new, |frequency| format!("{frequency:.4}")),
+            );
             columns[9].push(row.run_id.as_deref().unwrap_or("").to_string());
             columns[10].push(row.instrument.as_deref().unwrap_or("").to_string());
         } else {
@@ -387,7 +390,10 @@ fn alleles_to_plotly_json(data: &[MinorVariantsData], virus: &str) -> String {
             columns[5].push(row.minority_allele.clone());
             columns[6].push(row.consensus_count.to_string());
             columns[7].push(row.minority_count.to_string());
-            columns[8].push(format!("{:.4}", row.minority_frequency));
+            columns[8].push(
+                row.minority_frequency
+                    .map_or_else(String::new, |frequency| format!("{frequency:.4}")),
+            );
             columns[9].push(row.run_id.as_deref().unwrap_or("").to_string());
             columns[10].push(row.instrument.as_deref().unwrap_or("").to_string());
         }
@@ -448,7 +454,10 @@ fn indels_to_plotly_json(data: &[IndelsData], virus: &str) -> String {
             columns[5].push(row.context.clone());
             columns[6].push(row.count.to_string());
             columns[7].push(row.total.to_string());
-            columns[8].push(format!("{:.2}", row.frequency));
+            columns[8].push(
+                row.frequency
+                    .map_or_else(String::new, |frequency| format!("{frequency:.2}")),
+            );
             columns[9].push(row.run_id.as_deref().unwrap_or("").to_string());
             columns[10].push(row.instrument.as_deref().unwrap_or("").to_string());
         } else {
@@ -465,7 +474,10 @@ fn indels_to_plotly_json(data: &[IndelsData], virus: &str) -> String {
             columns[5].push(row.context.clone());
             columns[6].push(row.count.to_string());
             columns[7].push(row.total.to_string());
-            columns[8].push(format!("{:.2}", row.frequency));
+            columns[8].push(
+                row.frequency
+                    .map_or_else(String::new, |frequency| format!("{frequency:.2}")),
+            );
             columns[9].push(row.run_id.as_deref().unwrap_or("").to_string());
             columns[10].push(row.instrument.as_deref().unwrap_or("").to_string());
         }

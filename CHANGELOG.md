@@ -37,6 +37,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Moved `minority_frequency` to the third-from-last column of the
   `--annotate-minor-variants` output, immediately before `run_id` and
   `instrument`.
+- Made IRMA frequency input optional for possibility of `NA` values expected in
+  IRMA v1.4.0
+
+### `Dependencies`
+
+- [PR #107](https://github.com/CDCgov/mira-oxide/pull/107) - Updated zoe
+  dependency to 0.0.35
 
 ## [1.6.0] - 2026-08-22
 

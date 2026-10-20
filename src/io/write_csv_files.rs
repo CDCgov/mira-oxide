@@ -50,9 +50,13 @@ pub fn write_structs_to_csv_file<T: Serialize>(
         let row: Vec<String> = struct_values
             .iter()
             .map(|field| {
-                json_value
-                    .get(*field)
-                    .map_or(String::new(), |v| v.to_string().replace('"', ""))
+                json_value.get(*field).map_or(String::new(), |v| {
+                    if v.is_null() {
+                        String::new()
+                    } else {
+                        v.to_string().replace('"', "")
+                    }
+                })
             })
             .collect();
 
