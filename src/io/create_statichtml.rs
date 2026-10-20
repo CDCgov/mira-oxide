@@ -942,6 +942,7 @@ pub fn update_irma_summary_to_plotly_json(summary: &[UpdatedIRMASummary], virus:
             "Subclade",
             "Nextclade Alias",
             "Nextclade Info",
+            "Secondary Hits",
         ]
     } else {
         vec![
@@ -1039,6 +1040,8 @@ pub fn update_irma_summary_to_plotly_json(summary: &[UpdatedIRMASummary], virus:
             columns[col].push(row.nextclade_field_2.as_deref().unwrap_or("").to_string());
             col += 1;
             columns[col].push(row.nextclade_info.as_deref().unwrap_or("").to_string());
+            col += 1;
+            columns[col].push(row.secondary_hits.as_deref().unwrap_or("").to_string());
         } else {
             columns[col].push(row.nextclade_info.as_deref().unwrap_or("").to_string());
         }
