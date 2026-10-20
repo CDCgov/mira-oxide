@@ -20,7 +20,7 @@ use zoe::{
     prelude::{Len, NucleotidesView},
 };
 
-use crate::io::data_ingest::read_csv;
+use crate::io::data_ingest::{deserialize_optional_frequency, read_csv};
 use crate::utils::get_dais_refs::assign_dais_refs;
 
 #[derive(Debug, Parser)]
@@ -202,7 +202,8 @@ pub struct MinorVariantInput {
     minority_allele: String,
     consensus_count: i64,
     minority_count: i64,
-    minority_frequency: f64,
+    #[serde(default, deserialize_with = "deserialize_optional_frequency")]
+    minority_frequency: Option<f64>,
     run_id: String,
     instrument: String,
 }
@@ -219,6 +220,11 @@ pub struct Entry<'a> {
     aa_position: usize,
     aa_mut: char,
     variant_of_interest: bool,
+}
+
+// unwraps `Option<f64>` into printable `f64` or empty string
+fn format_optional_frequency(frequency: Option<f64>) -> String {
+    frequency.map_or_else(String::new, |frequency| frequency.to_string())
 }
 
 impl Entry<'_> {
@@ -845,7 +851,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                                             mv.minority_allele,
                                             mv.consensus_count,
                                             mv.minority_count,
-                                            mv.minority_frequency,
+                                            format_optional_frequency(mv.minority_frequency),
                                             mv_codon,
                                             mv_aa
                                         );
@@ -991,7 +997,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                                         mv.minority_allele,
                                         mv.consensus_count,
                                         mv.minority_count,
-                                        mv.minority_frequency,
+                                        format_optional_frequency(mv.minority_frequency),
                                         mv_codon,
                                         mv_aa
                                     );
@@ -1230,7 +1236,9 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                                                         mv.minority_allele,
                                                         mv.consensus_count,
                                                         mv.minority_count,
-                                                        mv.minority_frequency,
+                                                        format_optional_frequency(
+                                                            mv.minority_frequency
+                                                        ),
                                                         mv_codon,
                                                         mv_aa,
                                                         major_aa_vs_minor_aa
@@ -1387,7 +1395,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                                                     mv.minority_allele,
                                                     mv.consensus_count,
                                                     mv.minority_count,
-                                                    mv.minority_frequency,
+                                                    format_optional_frequency(mv.minority_frequency),
                                                     consensus_codon,
                                                     consensus_aa,
                                                     mv_codon,
@@ -1675,7 +1683,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                 mv.minority_allele,
                 mv.consensus_count,
                 mv.minority_count,
-                mv.minority_frequency,
+                format_optional_frequency(mv.minority_frequency),
                 mv.run_id,
                 mv.instrument,
             )?;
