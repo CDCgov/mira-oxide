@@ -828,10 +828,11 @@ pub fn melt_reads_data(records: &[ReadsData], collect_secondary_hits: bool) -> V
     }
 
     for hit in secondary_hits {
-        if let Some(segment) = get_segment_from_reference(&hit.reference.clone()) {
+        if let Some(segment) = get_segment_from_reference(&hit.reference) {
             for primary_hit in &mut result {
                 if primary_hit.sample_id == hit.name
-                    && get_segment_from_reference(&primary_hit.reference) == Some(segment.clone())
+                    && get_segment_from_reference(&primary_hit.reference).as_deref()
+                        == Some(segment.as_str())
                 {
                     primary_hit.secondary_hits.push(hit.clone());
                 }
@@ -1149,7 +1150,7 @@ pub fn create_irma_summary_vec(
                     instrument: Some(metadata.instrument.clone()),
                     di_ratios_5prime_3prime: None,
                     secondary_hits: include_secondary_hits
-                        .then(|| write_secondary_hits(&entry.secondary_hits.clone())),
+                        .then(|| write_secondary_hits(&entry.secondary_hits)),
                 });
             }
         }
@@ -1180,7 +1181,8 @@ pub fn create_irma_summary_vec(
     //Update irma_summary with data from other dataframes
     for sample in &mut irma_summary {
         for entry in calc_cov_vec {
-            if sample.sample_id == entry.sample && sample.reference == Some(entry.reference.clone())
+            if sample.sample_id == entry.sample
+                && sample.reference.as_deref() == Some(entry.reference.as_str())
             {
                 sample.percent_reference_coverage = entry.percent_reference_covered;
                 sample.median_coverage = Some(entry.median_coverage);
@@ -1190,7 +1192,7 @@ pub fn create_irma_summary_vec(
         if let Some(result) = pos_calc_cov_vec {
             if let Some(entry) = result.iter().find(|entry| {
                 sample.sample_id == entry.sample
-                    && sample.reference == Some(entry.reference.clone())
+                    && sample.reference.as_deref() == Some(entry.reference.as_str())
             }) {
                 sample.spike_percent_coverage =
                     Some(entry.percent_reference_covered.unwrap_or(0.0));
@@ -1203,7 +1205,7 @@ pub fn create_irma_summary_vec(
 
         for entry in &filtered_minor_vars_count {
             if Some(&sample.sample_id) == entry.sample_id.as_ref()
-                && sample.reference == Some(entry.reference.clone())
+                && sample.reference.as_deref() == Some(entry.reference.as_str())
             {
                 sample.count_minor_snv_at_or_over_5_pct = Some(entry.minor_variant_count);
             }
@@ -1211,7 +1213,7 @@ pub fn create_irma_summary_vec(
 
         if let Some(entry) = subtype_vec
             .iter()
-            .find(|entry| entry.sample_id == Some(sample.sample_id.clone()))
+            .find(|entry| entry.sample_id.as_deref() == Some(sample.sample_id.as_str()))
         {
             sample.subtype = Some(entry.subtype.clone());
         } else {
@@ -1261,7 +1263,7 @@ impl IRMASummary {
                     };
 
                     sample_match
-                        && self.reference == Some(entry.ctype.clone())
+                        && self.reference.as_deref() == Some(entry.ctype.as_str())
                         && entry
                             .aa_variants
                             .chars()
@@ -1417,7 +1419,7 @@ pub fn create_nt_seq_vec(
 
                     for record in irma_summary_vec {
                         if sample_id == *record.sample_id
-                            && record.reference == Some(sample.original_ref.clone())
+                            && record.reference.as_deref() == Some(sample.original_ref.as_str())
                             && assigned_segment == sample.ref_type
                         {
                             nt_seq_vec.push(NTSequences {
@@ -1535,7 +1537,9 @@ pub fn create_aa_seq_vec(
             let sample_id = parts[1].to_string();
 
             for sample in irma_summary_vec {
-                if sample_id == sample.sample_id && Some(entry.ctype.clone()) == sample.reference {
+                if sample_id == sample.sample_id
+                    && sample.reference.as_deref() == Some(entry.ctype.as_str())
+                {
                     aa_seq_vec.push(AASequences {
                         sample_id: sample_id.clone(),
                         sequence: entry.aa_seq.clone(),
@@ -1552,7 +1556,7 @@ pub fn create_aa_seq_vec(
         for entry in aa_data {
             for sample in irma_summary_vec {
                 if entry.sample_id == sample.sample_id
-                    && Some(entry.ctype.clone()) == sample.reference
+                    && sample.reference.as_deref() == Some(entry.ctype.as_str())
                 {
                     aa_seq_vec.push(AASequences {
                         sample_id: entry.sample_id.clone(),

@@ -908,9 +908,9 @@ pub fn write_updated_irma_summary_to_parquet(
 
     let mut fields = vec![
         Field::new("sample_id", DataType::Utf8, true),
-        Field::new("total_reads", DataType::Int32, true),
-        Field::new("pass_qc", DataType::Int32, true),
-        Field::new("reads_mapped", DataType::Int32, true),
+        Field::new("total_reads", DataType::UInt32, true),
+        Field::new("pass_qc", DataType::UInt32, true),
+        Field::new("reads_mapped", DataType::UInt32, true),
         Field::new("reference", DataType::Utf8, true),
         Field::new("percent_reference_coverage", DataType::Float64, true),
         Field::new("median_coverage", DataType::Int32, true),
@@ -919,9 +919,9 @@ pub fn write_updated_irma_summary_to_parquet(
 
     let mut arrays: Vec<ArrayRef> = vec![
         Arc::new(StringArray::from(sample_id_vec)) as ArrayRef,
-        Arc::new(Int32Array::from(total_reads_vec)) as ArrayRef,
-        Arc::new(Int32Array::from(pass_qc_vec)) as ArrayRef,
-        Arc::new(Int32Array::from(reads_mapped_vec)) as ArrayRef,
+        Arc::new(UInt32Array::from(total_reads_vec)) as ArrayRef,
+        Arc::new(UInt32Array::from(pass_qc_vec)) as ArrayRef,
+        Arc::new(UInt32Array::from(reads_mapped_vec)) as ArrayRef,
         Arc::new(StringArray::from(reference_vec)) as ArrayRef,
         Arc::new(Float64Array::from(percent_reference_coverage_vec)) as ArrayRef,
         Arc::new(Int32Array::from(median_coverage_vec)) as ArrayRef,

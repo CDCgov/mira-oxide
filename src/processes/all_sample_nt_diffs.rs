@@ -5,9 +5,7 @@ use std::{
     io::{BufWriter, Write, stdin, stdout},
     path::PathBuf,
 };
-use zoe::{
-    data::fasta::{Fasta}, prelude::*,
-};
+use zoe::{data::fasta::Fasta, prelude::*};
 
 #[derive(Debug, Parser)]
 #[command(
@@ -69,37 +67,36 @@ pub fn all_sample_nt_diffs_process(args: &NTDiffsArgs) {
             record.map(|r| {
                 let Fasta { header, sequence } = r.recode_to_dna();
                 ValidSeq {
-                    name: header, 
+                    name: header,
                     sequence,
                 }
               }))
         .collect::<Result<Vec<_>, _>>()
         .unwrap_or_die("Could not process other data.");
-    
-        writeln!(
-            &mut writer,
-            "sequence_1{delim}sequence_2{delim}nt_sequence_1{delim}position{delim}nt_sequence_2"
-        ).unwrap();
-#[allow(clippy::needless_for_each)]
-        all_sequences.iter().for_each(|f| {
-            let name_1 = &f.name;
-            let seq1 = &f.sequence;
-            all_sequences.iter().for_each(|f| {
-                let name_2 = &f.name;
-                let seq2 = &f.sequence;
-                for (i, (nt1, nt2)) in seq1.iter().zip(seq2.iter()).enumerate() {
-                    if nt1 != nt2 {
-                        let nucleotide1 = char::from(*nt1);
-                        let nucleotide2 = char::from(*nt2);
-                        writeln!(
-                            &mut writer,
-                            "{name_1}{delim}{name_2}{delim}{nucleotide1}{delim}{i}{delim}{nucleotide2}"
-                        )
-                        .unwrap();
-                    }
-                }
-            });
-        });
-        
 
+    writeln!(
+        &mut writer,
+        "sequence_1{delim}sequence_2{delim}nt_sequence_1{delim}position{delim}nt_sequence_2"
+    )
+    .unwrap();
+    #[allow(clippy::needless_for_each)]
+    all_sequences.iter().for_each(|f| {
+        let name_1 = &f.name;
+        let seq1 = &f.sequence;
+        all_sequences.iter().for_each(|f| {
+            let name_2 = &f.name;
+            let seq2 = &f.sequence;
+            for (i, (nt1, nt2)) in seq1.iter().zip(seq2.iter()).enumerate() {
+                if nt1 != nt2 {
+                    let nucleotide1 = char::from(*nt1);
+                    let nucleotide2 = char::from(*nt2);
+                    writeln!(
+                        &mut writer,
+                        "{name_1}{delim}{name_2}{delim}{nucleotide1}{delim}{i}{delim}{nucleotide2}"
+                    )
+                    .unwrap();
+                }
+            }
+        });
+    });
 }
