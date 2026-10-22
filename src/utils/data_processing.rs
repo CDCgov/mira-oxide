@@ -3,7 +3,7 @@ use serde::{self, Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
     error::Error,
-    fmt::Write,
+    fmt::{Display, Write},
     fs::File,
     hash::BuildHasher,
     io::{self, BufRead},
@@ -56,15 +56,36 @@ pub struct Metadata {
     pub instrument: String,
 }
 
-//Melted Reads vec
+/// Melted Reads vec
 #[derive(Debug)]
 pub struct MeltedRecord {
     sample_id: String,
     reference: String,
-    reads_mapped: i32,
-    total_reads: i32,
-    pass_qc: i32,
-    secondary_hits: String,
+    reads_mapped: u32,
+    total_reads: u32,
+    pass_qc: u32,
+    /// a vector of all secondary matches that share a segment with the primary
+    /// match
+    secondary_hits: Vec<SecondaryHit>,
+}
+
+impl MeltedRecord {
+    /// Gets the sum of all read counts across primary and secondary matches for
+    /// a given segment, and uses that to calculate frequencies of each
+    /// secondary hit.
+    ///
+    /// This should be used after all secondary hits are tabulated.
+    fn tabulate_secondary_frequencies(&mut self) {
+        let total_reads = self.reads_mapped
+            + self
+                .secondary_hits
+                .iter()
+                .map(|hit| hit.read_count)
+                .sum::<u32>();
+        for secondary_hit in &mut self.secondary_hits {
+            secondary_hit.frequency = secondary_hit.read_count as f32 / total_reads as f32;
+        }
+    }
 }
 
 /// Processed Cov Calcs
@@ -84,9 +105,9 @@ pub struct ProcessedCoverage {
 #[derive(Serialize, Debug, Clone)]
 pub struct IRMASummary {
     pub sample_id: String,
-    pub total_reads: Option<i32>,
-    pub pass_qc: Option<i32>,
-    pub reads_mapped: Option<i32>,
+    pub total_reads: Option<u32>,
+    pub pass_qc: Option<u32>,
+    pub reads_mapped: Option<u32>,
     pub reference: Option<String>,
     pub percent_reference_coverage: Option<f64>,
     pub median_coverage: Option<i32>,
@@ -101,7 +122,8 @@ pub struct IRMASummary {
     pub runid: Option<String>,
     pub instrument: Option<String>,
     pub di_ratios_5prime_3prime: Option<String>,
-    /// Only used for flu data
+    /// Only used for flu data. A vec of [`SecondaryHit`]s is converted into a
+    /// string via [`write_secondary_hits`]
     pub secondary_hits: Option<String>,
 }
 
@@ -593,6 +615,8 @@ pub fn extract_subtype_flu(
         let sample_ha = hold_sample[..hold_sample.len() - 2].to_string();
 
         let ha = if entry.protein == "HA" {
+            // TODO: use the ctype field for FLU-A ctypes rather than matching
+            // on the reference name
             match entry.positional_reference_id.as_str() {
                 "CALI07" => "H1",
                 "ANNARBOR60" => "H2",
@@ -702,13 +726,53 @@ pub fn extract_subtype_rsv(dais_vars: &[DaisVarsData]) -> Result<Vec<Subtype>, B
     Ok(subtype_data)
 }
 
+/// Struct for holding secondary matches from the `READ_COUNTS` IRMA output
+#[derive(Debug, Clone)]
+pub struct SecondaryHit {
+    pub name: String,
+    pub reference: String,
+    pub read_count: u32,
+    pub frequency: f32,
+}
+
+impl Display for SecondaryHit {
+    /// Formats a secondary hit in the format of "ctype:count:frequency", e.g.
+    /// `B_HA:3578:0.044`
+    ///
+    /// The frequency is rounded to 3 decimal places
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}:{}:{:.3}",
+            format_secondary_hit_reference(&self.reference),
+            self.read_count,
+            self.frequency
+        )
+    }
+}
+
+/// Creates a string from a slice of [`SecondaryHit`]s. Each secondary hit is
+/// formatted via the Display impl, and multiple hits are separated by a
+/// semicolon
+#[must_use]
+pub fn write_secondary_hits(secondary_hits: &[SecondaryHit]) -> String {
+    let mut hits = String::new();
+    for secondary_hit in secondary_hits {
+        if !hits.is_empty() {
+            hits.push(';');
+        }
+        let _ = write!(hits, "{secondary_hit}");
+    }
+    hits
+}
+
 //////////////// Functions used to create irma_summary ///////////////
 
 /// Flip orientation of the reads structs
 #[must_use]
 pub fn melt_reads_data(records: &[ReadsData], collect_secondary_hits: bool) -> Vec<MeltedRecord> {
     let mut result = Vec::new();
-    let mut sample_data: HashMap<String, (i32, i32)> = HashMap::new();
+    let mut sample_data: HashMap<String, (u32, u32)> = HashMap::new();
 
     for record in records {
         if let Some(sample_id) = &record.sample_id {
@@ -720,6 +784,7 @@ pub fn melt_reads_data(records: &[ReadsData], collect_secondary_hits: bool) -> V
         }
     }
 
+    // holds secondary hits. Vec<(sample id, reference, reads, frequency)
     let mut secondary_hits = Vec::new();
 
     for record in records {
@@ -738,7 +803,7 @@ pub fn melt_reads_data(records: &[ReadsData], collect_secondary_hits: bool) -> V
                 reads_mapped: record.reads,
                 total_reads,
                 pass_qc,
-                secondary_hits: String::new(),
+                secondary_hits: Vec::new(),
             });
         // Collect secondary hits with their sample IDs so they can only be
         // associated with primary hits from the same sample.
@@ -751,30 +816,32 @@ pub fn melt_reads_data(records: &[ReadsData], collect_secondary_hits: bool) -> V
                 .strip_prefix("5-")
                 .unwrap_or(&record.record)
                 .to_string();
-            secondary_hits.push((sample_id.clone(), reference, record.reads));
+            // let frequency = record.reads / (record.reads + total_segment_reads);
+            let secondary_hit = SecondaryHit {
+                name: sample_id.clone(),
+                reference,
+                read_count: record.reads,
+                frequency: 0.0,
+            };
+            secondary_hits.push(secondary_hit);
         }
     }
 
-    for (sample_id, secondary_name, secondary_count) in secondary_hits {
-        if let Some(segment) = get_segment_from_reference(&secondary_name) {
-            let secondary_hit_label = format_secondary_hit_reference(&secondary_name);
+    for hit in secondary_hits {
+        if let Some(segment) = get_segment_from_reference(&hit.reference.clone()) {
             for primary_hit in &mut result {
-                if primary_hit.sample_id == sample_id
+                if primary_hit.sample_id == hit.name
                     && get_segment_from_reference(&primary_hit.reference) == Some(segment.clone())
                 {
-                    if !primary_hit.secondary_hits.is_empty() {
-                        primary_hit.secondary_hits.push(';');
-                    }
-                    // clippy suggestion; this is writing to the string
-                    // `primary_hit.secondary_hits`, and is infallible, so we
-                    // don't need to handle the result created
-                    let _ = write!(
-                        primary_hit.secondary_hits,
-                        "{secondary_hit_label}:{secondary_count}"
-                    );
+                    primary_hit.secondary_hits.push(hit.clone());
                 }
             }
         }
+    }
+
+    // at the end, calculate the frequencies for all of the secondary hits
+    for melted_record in &mut result {
+        melted_record.tabulate_secondary_frequencies();
     }
 
     result
@@ -1081,7 +1148,8 @@ pub fn create_irma_summary_vec(
                     runid: Some(metadata.runid.clone()),
                     instrument: Some(metadata.instrument.clone()),
                     di_ratios_5prime_3prime: None,
-                    secondary_hits: include_secondary_hits.then(|| entry.secondary_hits.clone()),
+                    secondary_hits: include_secondary_hits
+                        .then(|| write_secondary_hits(&entry.secondary_hits.clone())),
                 });
             }
         }
@@ -1735,7 +1803,7 @@ fn test_get_segment() {
 // different samples, so this is to make sure that i fixed that
 #[test]
 fn test_melt_reads_data_not_redundant() {
-    let read_record = |sample_id: &str, record: &str, reads: i32| ReadsData {
+    let read_record = |sample_id: &str, record: &str, reads: u32| ReadsData {
         sample_id: Some(sample_id.to_string()),
         record: record.to_string(),
         reads,
@@ -1759,8 +1827,11 @@ fn test_melt_reads_data_not_redundant() {
 
     let melted = melt_reads_data(&records, true);
 
-    assert_eq!(melted[0].secondary_hits, "B_HA:10;A_H5:12");
-    assert_eq!(melted[1].secondary_hits, "");
+    assert_eq!(
+        write_secondary_hits(&melted[0].secondary_hits),
+        "B_HA:10:0.098;A_H5:12:0.118"
+    );
+    assert_eq!(write_secondary_hits(&melted[1].secondary_hits), "");
 
     let melted_without_secondary_hits = melt_reads_data(&records, false);
     assert!(

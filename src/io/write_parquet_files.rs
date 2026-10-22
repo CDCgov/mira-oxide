@@ -3,7 +3,7 @@ use crate::io::data_ingest::{AllAllelesData, ReadsData};
 use crate::processes::prepare_mira_reports::Samplesheet;
 use crate::processes::summary_report_update::UpdatedIRMASummary;
 use crate::utils::data_processing::{AASequences, IRMASummary, NTSequences, extract_field};
-use arrow::array::Float64Array;
+use arrow::array::{Float64Array, UInt32Array};
 use arrow::{
     array::{ArrayRef, Float32Array, Int32Array, StringArray},
     datatypes::{DataType, Field, Schema},
@@ -202,7 +202,7 @@ pub fn write_reads_to_parquet(
     // Convert the vectors into Arrow columns
     let sample_array: ArrayRef = Arc::new(StringArray::from(sample_ids_vec));
     let record_array: ArrayRef = Arc::new(StringArray::from(record_vec));
-    let reads_array: ArrayRef = Arc::new(Int32Array::from(reads_vec));
+    let reads_array: ArrayRef = Arc::new(UInt32Array::from(reads_vec));
     let patterns_array: ArrayRef = Arc::new(Float32Array::from(patterns_vec));
     let pairs_and_windows_array: ArrayRef = Arc::new(Float32Array::from(pairs_and_windows_vec));
     let stage_array: ArrayRef = Arc::new(Int32Array::from(stages_vec));
@@ -213,7 +213,7 @@ pub fn write_reads_to_parquet(
     let fields = vec![
         Field::new("sample_id", DataType::Utf8, true),
         Field::new("stage", DataType::Utf8, true),
-        Field::new("readcount", DataType::Int32, true),
+        Field::new("readcount", DataType::UInt32, true),
         Field::new("patterns", DataType::Float32, true),
         Field::new("pairsandwindows", DataType::Float32, true),
         Field::new("stagenum", DataType::Int32, true),
@@ -536,9 +536,9 @@ pub fn write_irma_summary_to_parquet(
     let instrument_vec = extract_field(irma_summary_data, |item| item.instrument.clone());
 
     let sample_array: ArrayRef = Arc::new(StringArray::from(sample_ids_vec));
-    let total_reads_array: ArrayRef = Arc::new(Int32Array::from(total_reads_vec));
-    let pass_qc_array: ArrayRef = Arc::new(Int32Array::from(pass_qc_vec));
-    let reads_mapped_array: ArrayRef = Arc::new(Int32Array::from(reads_mapped_vec));
+    let total_reads_array: ArrayRef = Arc::new(UInt32Array::from(total_reads_vec));
+    let pass_qc_array: ArrayRef = Arc::new(UInt32Array::from(pass_qc_vec));
+    let reads_mapped_array: ArrayRef = Arc::new(UInt32Array::from(reads_mapped_vec));
     let reference_array: ArrayRef = Arc::new(StringArray::from(reference_vec));
     let percent_reference_coverage_array: ArrayRef =
         Arc::new(Float64Array::from(percent_reference_coverage_vec));
@@ -562,9 +562,9 @@ pub fn write_irma_summary_to_parquet(
     for column in summary_schema(virus) {
         let (data_type, array): (DataType, ArrayRef) = match column.field {
             "sample_id" => (DataType::Utf8, sample_array.clone()),
-            "total_reads" => (DataType::Int32, total_reads_array.clone()),
-            "pass_qc" => (DataType::Int32, pass_qc_array.clone()),
-            "reads_mapped" => (DataType::Int32, reads_mapped_array.clone()),
+            "total_reads" => (DataType::UInt32, total_reads_array.clone()),
+            "pass_qc" => (DataType::UInt32, pass_qc_array.clone()),
+            "reads_mapped" => (DataType::UInt32, reads_mapped_array.clone()),
             "reference" => (DataType::Utf8, reference_array.clone()),
             "percent_reference_coverage" => {
                 (DataType::Float64, percent_reference_coverage_array.clone())

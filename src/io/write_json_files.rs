@@ -137,7 +137,7 @@ pub fn negative_qc_statement(
             if let Some(sample_id) = &sample.sample_id {
                 let reads_stage_1 = sample.reads;
 
-                let total_reads_stage_3: i32 = filtered_reads_data
+                let total_reads_stage_3: u32 = filtered_reads_data
                     .iter()
                     .filter(|d| {
                         d.sample_id == Some(sample_id.clone())

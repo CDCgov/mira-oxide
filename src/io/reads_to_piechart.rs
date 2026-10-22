@@ -18,7 +18,7 @@ pub fn create_barcode_distribution_figure(
     println!("Building barcode distribution stacked bar figure as JSON");
 
     // Prepare (sample, reads) pairs, ordered left-to-right by descending reads.
-    let mut samples_reads: Vec<(String, i32)> = summaries
+    let mut samples_reads: Vec<(String, u32)> = summaries
         .iter()
         .filter(|s| s.record == "1-initial")
         .map(|s| {
