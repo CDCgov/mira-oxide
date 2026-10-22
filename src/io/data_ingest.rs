@@ -114,7 +114,7 @@ pub struct ReadsData {
     #[serde(rename = "Record")]
     pub record: String,
     #[serde(rename = "Reads")]
-    pub reads: i32,
+    pub reads: u32,
     #[serde(rename = "Patterns")]
     pub patterns: Option<String>,
     #[serde(rename = "PairsAndWidows")]
@@ -648,7 +648,9 @@ pub fn minor_variant_data_collection(
 }
 
 /// Collect indel data and save to vector of `IndelsData`
-/// Note that insertions and deletions are being added  to the same Vec<Indelsdata>
+///
+/// Note that insertions and deletions are being added to the same
+/// `Vec<Indelsdata>`
 pub fn indels_data_collection(
     irma_path: impl AsRef<Path>,
     platform: &str,
@@ -800,7 +802,7 @@ pub fn amended_consensus_data_collection(
     Ok(seq_data)
 }
 
-// Function to collect reference lengths from IRMA outputs
+/// Function to collect reference lengths from IRMA outputs
 pub fn get_reference_lens(
     irma_path: impl AsRef<Path>,
 ) -> Result<HashMap<String, usize>, Box<dyn std::error::Error>> {
@@ -849,8 +851,9 @@ pub fn get_reference_lens(
     Ok(ref_len_map)
 }
 
-// Function to get the current timestamp in the desired format
-// For irma_config file - ingest of run_info.txt
+/// Function to get the current timestamp in the desired format
+///
+/// For `irma_config` file - ingest of `run_info.txt`
 fn get_current_timestamp() -> String {
     let now = SystemTime::now();
     match now.duration_since(UNIX_EPOCH) {
@@ -863,9 +866,9 @@ fn get_current_timestamp() -> String {
     }
 }
 
-// Function to get timestamp into correct format for CDP
-// Accounts for leap years
-// For irma_config file - ingest of run_info.txt
+/// Function to get timestamp into correct format for CDP.
+///
+/// Accounts for leap years. For `irma_config` file - ingest of `run_info.txt`
 fn format_timestamp(secs: u64, nanos: u32) -> String {
     const SECONDS_IN_MINUTE: u64 = 60;
     const SECONDS_IN_HOUR: u64 = 3600;
