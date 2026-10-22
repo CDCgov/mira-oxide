@@ -140,7 +140,7 @@ pub fn negative_qc_statement(
                 let total_reads_stage_3: u32 = filtered_reads_data
                     .iter()
                     .filter(|d| {
-                        d.sample_id == Some(sample_id.clone())
+                        d.sample_id.as_deref() == Some(sample_id.as_str())
                             && (d.record == "3-match" || d.record == "3-altmatch")
                     })
                     .map(|d| d.reads)
