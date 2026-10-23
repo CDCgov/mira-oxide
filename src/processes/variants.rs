@@ -1535,7 +1535,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
 
         writeln!(
             &mut writer,
-            "sample{delim}reference{delim}dais_reference{delim}dais_ref_position{delim}sample_position{delim}depth{delim}consensus_allele{delim}minority_allele{delim}consensus_count{delim}minority_count{delim}consensus_codon{delim}minor_variant_codon{delim}consensus_aa{delim}minor_variant_aa{delim}major_aa_vs_minor_aa{delim}minority_frequency{delim}run_id{delim}instrument"
+            "sample{delim}reference{delim}numbering_reference{delim}numbering_ref_position{delim}sample_position{delim}depth{delim}consensus_allele{delim}minority_allele{delim}consensus_count{delim}minority_count{delim}consensus_codon{delim}minor_variant_codon{delim}consensus_aa{delim}minor_variant_aa{delim}major_aa_vs_minor_aa{delim}minority_frequency{delim}run_id{delim}instrument"
         )?;
 
         for mv in &minor_variants {
@@ -1561,15 +1561,17 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                 });
 
             let (
-                dais_reference,
-                dais_ref_position,
-                dais_ref_aa_position,
+                numbering_reference,
+                numbering_ref_position,
+                numbering_ref_aa_position,
                 consensus_codon,
                 consensus_aa,
                 mv_codon,
                 mv_aa,
             ) = if let Some(dais_entry) = matching_dais_entry {
-                let dais_reference = dais_entry.dais_ref_id.clone();
+                // The numbering frame is the CDS alignment of this sequence, so report its
+                // original FASTA header rather than the DAIS reference ID.
+                let numbering_reference = dais_entry.sample_id.clone();
                 let nt_seq = NucleotidesView::from(dais_entry.query_cds_aln.as_str());
                 let aln_len = nt_seq.len();
                 // Translate the segment-relative sample_position into this CDS's own
@@ -1592,12 +1594,12 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
 
                 match raw_pos {
                     Some(raw_pos) => {
-                        // dais_ref_position is the raw (pre-indel-adjustment) position; the codon
-                        // and amino acid are derived directly from this position.
-                        let dais_ref_position = raw_pos;
+                        // numbering_ref_position is the raw (pre-indel-adjustment) position; the
+                        // codon and amino acid are derived directly from this position.
+                        let numbering_ref_position = raw_pos;
                         let (codons, tail) = nt_seq.as_codons();
-                        let codon_index = (dais_ref_position - 1) / 3;
-                        let position_in_codon = ((dais_ref_position - 1) % 3) + 1;
+                        let codon_index = (numbering_ref_position - 1) / 3;
+                        let position_in_codon = ((numbering_ref_position - 1) % 3) + 1;
                         let codon_bytes: Option<&[u8]> = if codon_index < codons.len() {
                             Some(&codons[codon_index])
                         } else if codon_index == codons.len() && !tail.is_empty() {
@@ -1628,8 +1630,8 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                                     None => (String::new(), String::new()),
                                 };
                                 (
-                                    dais_reference,
-                                    dais_ref_position.to_string(),
+                                    numbering_reference,
+                                    numbering_ref_position.to_string(),
                                     (codon_index + 1).to_string(),
                                     consensus_codon,
                                     consensus_aa,
@@ -1638,8 +1640,8 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                                 )
                             }
                             None => (
-                                dais_reference,
-                                dais_ref_position.to_string(),
+                                numbering_reference,
+                                numbering_ref_position.to_string(),
                                 (codon_index + 1).to_string(),
                                 String::new(),
                                 String::new(),
@@ -1649,7 +1651,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                         }
                     }
                     None => (
-                        dais_reference,
+                        numbering_reference,
                         String::new(),
                         String::new(),
                         String::new(),
@@ -1670,11 +1672,12 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                 )
             };
 
-            let major_aa_vs_minor_aa = format!("{consensus_aa}:{dais_ref_aa_position}:{mv_aa}");
+            let major_aa_vs_minor_aa =
+                format!("{consensus_aa}:{numbering_ref_aa_position}:{mv_aa}");
 
             writeln!(
                 &mut writer,
-                "{}{delim}{}{delim}{dais_reference}{delim}{dais_ref_position}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{consensus_codon}{delim}{mv_codon}{delim}{consensus_aa}{delim}{mv_aa}{delim}{major_aa_vs_minor_aa}{delim}{}{delim}{}{delim}{}",
+                "{}{delim}{}{delim}{numbering_reference}{delim}{numbering_ref_position}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{consensus_codon}{delim}{mv_codon}{delim}{consensus_aa}{delim}{mv_aa}{delim}{major_aa_vs_minor_aa}{delim}{}{delim}{}{delim}{}",
                 mv.sample,
                 mv.reference,
                 mv.sample_position,

@@ -34,6 +34,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - [PR #107](https://github.com/CDCgov/mira-oxide/pull/107) - Restructured output
   schema for MIRA reports
+- Renamed the `--annotate-minor-variants` columns `dais_reference` and
+  `dais_ref_position` to `numbering_reference` and `numbering_ref_position`, and
+  `numbering_reference` now holds the original FASTA header of the sequence
+  whose CDS alignment defines the numbering frame instead of the DAIS reference
+  ID.
 - Moved `minority_frequency` to the third-from-last column of the
   `--annotate-minor-variants` output, immediately before `run_id` and
   `instrument`.

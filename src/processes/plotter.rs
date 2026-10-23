@@ -1009,6 +1009,30 @@ pub fn generate_sankey_plot(input_directory: &Path) -> Result<Plot, Box<dyn Erro
         values.push(no_match);
     }
 
+    // Plotly drops link-less nodes (e.g. a zero-read "No Match") from its
+    // internal graph but still reads node.x/node.y by the original node order,
+    // so every node after a dropped one lands in the wrong column. Prune them
+    // here and remap the link indices to keep the arrays aligned.
+    {
+        let used: std::collections::HashSet<usize> = source_indices
+            .iter()
+            .chain(target_indices.iter())
+            .copied()
+            .collect();
+        let mut remap = vec![usize::MAX; node_labels.len()];
+        let mut kept = Vec::with_capacity(used.len());
+        for (old, label) in node_labels.iter().enumerate() {
+            if used.contains(&old) {
+                remap[old] = kept.len();
+                kept.push(label.clone());
+            }
+        }
+        node_labels = kept;
+        for idx in source_indices.iter_mut().chain(target_indices.iter_mut()) {
+            *idx = remap[*idx];
+        }
+    }
+
     // Prepare Sankey plot
     let mut plot = Plot::new();
 
@@ -1110,21 +1134,39 @@ pub fn generate_sankey_plot(input_directory: &Path) -> Result<Plot, Box<dyn Erro
         .iter()
         .map(|&c| 0.001 + (c as f64) * (0.998 / max_col as f64))
         .collect();
-    let mut col_seen = vec![0usize; max_col + 1];
+
+    // Every column stacks by read count, highest at the top.
+    let mut rank = vec![0usize; cols.len()];
+    for c in 0..=max_col {
+        let mut members: Vec<usize> = cols
+            .iter()
+            .enumerate()
+            .filter_map(|(i, &nc)| (nc == c).then_some(i))
+            .collect();
+        members.sort_by(|&a, &b| {
+            node_in
+                .get(&b)
+                .copied()
+                .unwrap_or(0)
+                .cmp(&node_in.get(&a).copied().unwrap_or(0))
+                .then_with(|| node_labels[a].cmp(&node_labels[b]))
+        });
+        for (k, &i) in members.iter().enumerate() {
+            rank[i] = k;
+        }
+    }
+
     let node_y: Vec<f64> = cols
         .iter()
-        .map(|&c| {
+        .enumerate()
+        .map(|(i, &c)| {
             let n = col_counts[c].max(1);
-            let k = col_seen[c];
-            col_seen[c] += 1;
-            (k as f64 + 0.5) / n as f64
+            (rank[i] as f64 + 0.5) / n as f64
         })
         .collect();
 
-    // Compact height driven by the busiest column. With the "snap" arrangement
-    // (below) Plotly auto-stacks each column, so a taller busiest column just
-    // needs a little more room; the node bars scale down to stay short, never
-    // overlap a sibling, and never spill past the frame.
+    // Compact height driven by the busiest column: each node gets an even
+    // vertical slot, so a taller busiest column just needs a little more room.
     let max_col_nodes = col_counts.iter().copied().max().unwrap_or(6).max(6);
     let sankey_height = (max_col_nodes * 34).clamp(240, 480);
 
@@ -1142,13 +1184,13 @@ pub fn generate_sankey_plot(input_directory: &Path) -> Result<Plot, Box<dyn Erro
         .map(|&s| hex_to_rgba(node_colors[s], 0.35))
         .collect();
 
-    // Built as raw JSON to control the node/link fields directly. Node x/y are
-    // left to Plotly's automatic "snap" layout: it derives the columns from the
-    // link topology and stacks nodes without overlap or overflow, which keeps
-    // the diagram compact. Thin bars + generous padding concentrate the visual.
+    // Built as raw JSON to control the node/link fields directly. "fixed" keeps
+    // the explicit node x/y above: "snap" re-derives columns from the link
+    // topology, which drifts terminal segment nodes out of the right-hand
+    // column. Thin bars + generous padding concentrate the visual.
     let sankey_json = serde_json::json!({
         "type": "sankey",
-        "arrangement": "snap",
+        "arrangement": "fixed",
         "node": {
             "label": node_display,
             "color": node_colors,
