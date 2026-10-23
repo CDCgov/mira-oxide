@@ -810,13 +810,13 @@ pub fn melt_reads_data(records: &[ReadsData], collect_secondary_hits: bool) -> V
         } else if collect_secondary_hits
             && let Some(sample_id) = &record.sample_id
             && record.record.starts_with("5-")
+            && record.reads > 0
         {
             let reference = record
                 .record
                 .strip_prefix("5-")
                 .unwrap_or(&record.record)
                 .to_string();
-            // let frequency = record.reads / (record.reads + total_segment_reads);
             let secondary_hit = SecondaryHit {
                 name: sample_id.clone(),
                 reference,
@@ -1827,6 +1827,7 @@ fn test_melt_reads_data_not_redundant() {
         read_record("s2", "1-initial", 100),
         read_record("s2", "2-passQC", 90),
         read_record("s2", "4-A_HA_H3", 80),
+        read_record("s2", "5-A_HA_H1", 0),
     ];
 
     let melted = melt_reads_data(&records, true);
