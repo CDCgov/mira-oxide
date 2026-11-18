@@ -732,16 +732,13 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
 
                         // Only used to populate variant_of_interest when requested; the row
                         // itself is still emitted regardless of whether this matches.
-                        let matched_poi = if include_variant_of_interest {
-                            entry.update_entry(
+                        let matched_poi = include_variant_of_interest
+                            && entry.update_entry(
                                 &ref_entry.dais_ref_id,
                                 ref_aa,
                                 query_aa,
                                 &muts_interest,
-                            )
-                        } else {
-                            false
-                        };
+                            );
                         let _ = matched_poi;
 
                         let Entry {
