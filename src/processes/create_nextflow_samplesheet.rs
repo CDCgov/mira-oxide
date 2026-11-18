@@ -24,6 +24,10 @@ pub struct SamplesheetArgs {
     /// Experiment type
     #[arg(short = 'e', long)]
     pub experiment_type: String,
+
+    /// Skips sleep for testing or other purposes
+    #[arg(long)]
+    pub skip_sleep: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -52,8 +56,9 @@ pub fn find_fastq(patterns: &[String]) -> Option<PathBuf> {
 #[allow(clippy::format_push_string)]
 #[allow(clippy::manual_let_else)]
 pub fn create_nextflow_samplesheet(args: &SamplesheetArgs) -> io::Result<()> {
-    thread::sleep(Duration::from_mins(1));
-
+    if !args.skip_sleep {
+        thread::sleep(Duration::from_mins(1));
+    }
     let mut rdr = Reader::from_path(&args.samplesheet)?;
     let mut output = String::new();
 
