@@ -6,6 +6,8 @@ use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
 
+const DI_STAT_WINDOW_LENGTH: usize = 300;
+
 /// A Rust utility for calculating DI metric statistics from IRMA output
 #[derive(Parser, Debug)]
 #[command(about = "Tool for calculating DI stats")]
@@ -100,7 +102,7 @@ pub fn di_stat_assembly(
                     .nth(1)
                     .and_then(|s| s.split('-').next())
                 {
-                    match di_stat(&cov_path, 300) {
+                    match di_stat(&cov_path, DI_STAT_WINDOW_LENGTH) {
                         Ok((prime5, prime3)) => {
                             writeln!(
                                 writer,
