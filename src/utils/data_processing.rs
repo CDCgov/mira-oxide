@@ -1252,11 +1252,7 @@ impl IRMASummary {
                         // Take the last two characters off entry.sample_id before comparing
                         let entry_id = &entry.sample_id;
 
-                        if entry_id.len() > 2 {
-                            entry_id[..entry_id.len() - 2] == self.sample_id
-                        } else {
-                            false
-                        }
+                        entry_id.len() > 2 && entry_id[..entry_id.len() - 2] == self.sample_id
                     } else {
                         // Regular comparison
                         self.sample_id == entry.sample_id
