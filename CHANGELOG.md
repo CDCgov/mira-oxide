@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [PR #107](https://github.com/CDCgov/mira-oxide/pull/107) - Added
   `secondary_hits` column in MIRA reports for reporting flu reads on the same
   segment as the primary hit
+- [PR #110](https://github.com/CDCgov/mira-oxide/pull/110) - Added optional flag
+  to `create_nextflow_samplesheet` subprocess to skip the sleep
 
 ### `Fixed`
 
@@ -48,7 +50,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### `Dependencies`
 
 - [PR #107](https://github.com/CDCgov/mira-oxide/pull/107) - Updated zoe
-  dependency to 0.0.35
+  dependency to 0.0.37
+-
 
 ## [1.6.0] - 2026-08-22
 

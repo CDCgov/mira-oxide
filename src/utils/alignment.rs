@@ -1,5 +1,5 @@
 use zoe::{
-    alignment::{ByteSeq, LocalProfiles, MaybeAligned},
+    alignment::{ByteSeq, LocalProfiles, MaybeAligned, ScoreParams},
     data::{WeightMatrix, mappings::ByteIndexMap},
     prelude::{ProfileSets, SeqSrc},
 };
@@ -14,8 +14,9 @@ pub fn align_sequences<Q: ByteSeq, R: ByteSeq>(query: Q, reference: R) -> (R::Ow
     const GAP_OPEN: i8 = -1;
     const GAP_EXTEND: i8 = 0;
 
-    let profile = LocalProfiles::new_with_w256(query.as_ref(), &WEIGHTS, GAP_OPEN, GAP_EXTEND)
-        .expect("Alignment profile failed");
+    let params = ScoreParams::new(&WEIGHTS, GAP_OPEN, GAP_EXTEND)
+        .expect("Alignment scoring parameters are invalid");
+    let profile = LocalProfiles::new_with_w256(query.as_ref(), &params);
     let alignment = profile.sw_align_from_i8(SeqSrc::Reference(reference.as_ref()));
     let alignment = match alignment {
         MaybeAligned::Some(alignment) => alignment,
