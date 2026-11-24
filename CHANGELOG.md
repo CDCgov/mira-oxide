@@ -49,9 +49,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### `Dependencies`
 
-- [PR #107](https://github.com/CDCgov/mira-oxide/pull/107) - Updated zoe
+- [PR #111](https://github.com/CDCgov/mira-oxide/pull/111) - Updated zoe
   dependency to 0.0.37
--
 
 ## [1.6.0] - 2026-08-22
 
