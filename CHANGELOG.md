@@ -3,49 +3,57 @@
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.6.1] - 2026-11-25
 
 - [Amanda Sullivan](https://github.com/mandysulli)
 - [Sam Wiley](https://github.com/samcwiley)
+- [Ben Rambo-Martin](https://github.com/nbx0)
 
 ### `Added`
 
-- [PR #107](https://github.com/CDCgov/mira-oxide/pull/107) - Added
-  `secondary_hits` column in MIRA reports for reporting flu reads on the same
-  segment as the primary hit
+- [PR #107](https://github.com/CDCgov/mira-oxide/pull/107) - Added `secondary_hits`
+  column in MIRA reports for reporting flu reads on the same segment as the
+  primary hit
 - [PR #110](https://github.com/CDCgov/mira-oxide/pull/110) - Added optional flag
   to `create_nextflow_samplesheet` subprocess to skip the sleep
 
 ### `Fixed`
 
-- Fixed `variants --annotate-minor-variants` so segment-relative minor-variant
+- [PR #100](https://github.com/CDCgov/mira-oxide/pull/112) - Fixed
+  `variants --annotate-minor-variants` so segment-relative minor-variant
   positions are mapped into each CDS's own coordinate frame using
   `query_nt_coordinates`. This resolves empty annotations for second-ORF
   products (e.g. MP/BM2, M2) and corrects codon/amino-acid context for any CDS
   that does not start at segment position 1 (e.g. HA after the signal peptide).
-- Fixed `find_raw_query_position` to skip alignment-gap positions so variants
-  near a deletion boundary map to the actual nucleotide instead of a gap.
-- Fixed column-order misalignment in the `--annotate-minor-variants` output
-  where `minority_frequency` was written in a different position than the header
+- [PR #100](https://github.com/CDCgov/mira-oxide/pull/112) - Fixed
+  `find_raw_query_position` to skip alignment-gap positions so variants near a
+  deletion boundary map to the actual nucleotide instead of a gap.
+- [PR #100](https://github.com/CDCgov/mira-oxide/pull/112) - Fixed column-order
+  misalignment in the `--annotate-minor-variants` output where
+  `minority_frequency` was written in a different position than the header
   declared.
-- Fixed `major_aa_vs_minor_aa` so the position between the two amino acids is
-  the amino-acid position rather than the nucleotide position. Affects
+- [PR #100](https://github.com/CDCgov/mira-oxide/pull/112) - Fixed
+  `major_aa_vs_minor_aa` so the position between the two amino acids is the
+  amino-acid position rather than the nucleotide position. Affects
   `--all-diffs`, `--positions-of-interest` and `--annotate-minor-variants`.
 
 ### `Changed`
 
-- [PR #107](https://github.com/CDCgov/mira-oxide/pull/107) - Restructured output
+- [PR #100](https://github.com/CDCgov/mira-oxide/pull/112) -
+  [PR #107](https://github.com/CDCgov/mira-oxide/pull/107) - Restructured output
   schema for MIRA reports
-- Renamed the `--annotate-minor-variants` columns `dais_reference` and
+- [PR #100](https://github.com/CDCgov/mira-oxide/pull/112) - Renamed the
+  `--annotate-minor-variants` columns `dais_reference` and
   `dais_ref_position` to `numbering_reference` and `numbering_ref_position`, and
   `numbering_reference` now holds the original FASTA header of the sequence
   whose CDS alignment defines the numbering frame instead of the DAIS reference
   ID.
-- Moved `minority_frequency` to the third-from-last column of the
+- [PR #100](https://github.com/CDCgov/mira-oxide/pull/112) - Moved
+  `minority_frequency` to the third-from-last column of the
   `--annotate-minor-variants` output, immediately before `run_id` and
   `instrument`.
-- Made IRMA frequency input optional for possibility of `NA` values expected in
-  IRMA v1.4.0
+- [PR #100](https://github.com/CDCgov/mira-oxide/pull/112) - Made IRMA frequency
+  input optional for possibility of `NA` values expected in IRMA v1.4.0
 
 ### `Dependencies`
 
