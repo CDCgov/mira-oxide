@@ -239,6 +239,7 @@ sample_1,ref_A,H3N2,ref_A_id,HA,148,148,148,G,A,1,GCC,ACC,T:50:A,50,50,50,true,1
 ```
 sample,reference,numbering_reference,numbering_ref_position,sample_position,depth,consensus_allele,minority_allele,consensus_count,minority_count,consensus_codon,minor_variant_codon,consensus_aa,minor_variant_aa,major_aa_vs_minor_aa,minority_frequency,run_id,instrument
 sample_1,H3N2,sample_1_A_HA,148,148,1000,A,G,950,50,ACC,GCC,T,A,T:50:A,0.05,run_2024_08,MiSeq
+
 ```
 
 - Each row of the input minor-variants CSV is annotated with the codon and amino acid context derived from the matching query DAIS entry.
