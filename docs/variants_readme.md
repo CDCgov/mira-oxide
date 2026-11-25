@@ -13,19 +13,19 @@ Exactly one mode must be specified:
 ### `--all-diffs`
 Reports every nucleotide difference between each query and its matching reference, without regard to positions of interest.
 
-- **Requires:** `--query-dais-file`, `--query-insertion-file`, `--query-deletion-file`, `--ref-dais-file`, `--ref-insertion-file`, `--ref-deletion-file`
+- **Requires:** `--query-dais-file`, `--query-insertion-file`, `--query-deletion-file`, `--ref-dais-file`, `--ref-insertion-file`, `--ref-deletion-file`, `--output-xsv`
 - **Optional:** `--variants-of-interest` (adds `variant_of_interest`/`position_of_interest` columns), `--minor-variants` (adds minor-variant columns)
 
 ### `--positions-of-interest`
 Produces a variants inormation report restricted to positions listed in the variants-of-interest file.
 
-- **Requires:** `--query-dais-file`, `--query-insertion-file`, `--query-deletion-file`, `--ref-dais-file`, `--ref-insertion-file`, `--ref-deletion-file`, `--variants-of-interest`
-- **Optional:** `--minor-variants` (adds minor-variant columns)
+- **Requires:** `--query-dais-file`, `--query-insertion-file`, `--query-deletion-file`, `--ref-dais-file`, `--ref-insertion-file`, `--ref-deletion-file`, `--variants-of-interest`  `--output-xsv`
+- **Optional:** `--minor-variants` (adds minor-variant columns) `--all-positions` (prints all positions)
 
 ### `--annotate-minor-variants`
 Annotates the minor-variants file with codon/amino-acid context derived from the query DAIS data. Does not require any reference dais/insertion/deletion files.
 
-- **Requires:** `--query-dais-file`, `--query-insertion-file`, `--query-deletion-file`, `--minor-variants`
+- **Requires:** `--query-dais-file`, `--query-insertion-file`, `--query-deletion-file`, `--minor-variants`,  `--output-xsv`
 
 ## Command-Line Flags
 
