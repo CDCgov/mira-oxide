@@ -1,5 +1,5 @@
-use crate::io::data_ingest::CoverageData;
 use crate::constants::theme;
+use crate::io::data_ingest::CoverageData;
 use crate::processes::plotter::get_segment_color;
 use plotly::{
     Plot, Scatter,

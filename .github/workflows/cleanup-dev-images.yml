@@ -1,0 +1,166 @@
+name: Cleanup Dev Images in GHCR
+
+# build-dev-image.yml tags every dev* branch, so deleting a branch would otherwise leave
+# <branch>, <branch>-x86_64 and <branch>-aarch64 in GHCR forever.
+on:
+  delete:
+  schedule:
+    # Weekly sweep for untagged leftovers, which no branch deletion accounts for.
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: Branch whose image tags should be deleted (leave empty to sweep untagged versions)
+        required: false
+      dry_run:
+        description: List the versions instead of deleting them
+        type: boolean
+        default: true
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.inputs.branch || github.event.ref || 'sweep' }}
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    name: Delete branch image tags
+    # The delete event fires for tags too, and only dev* branches are ever published.
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.branch != '') ||
+      (github.event_name == 'delete' && github.event.ref_type == 'branch' && startsWith(github.event.ref, 'dev'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Delete image versions for the branch
+        shell: bash
+        env:
+          # GITHUB_TOKEN can delete versions of repo-scoped packages; set GHCR_CLEANUP_TOKEN
+          # (a PAT with delete:packages) if the package is org-scoped without repo inheritance.
+          GH_TOKEN: ${{ secrets.GHCR_CLEANUP_TOKEN || secrets.GITHUB_TOKEN }}
+          RAW_BRANCH: ${{ github.event.inputs.branch || github.event.ref }}
+          DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+        run: |
+          set -euo pipefail
+
+          # Must match the tag sanitising in build-dev-image.yml.
+          BRANCH=$(echo "${RAW_BRANCH,,}" | sed 's#[^a-z0-9._-]#-#g')
+
+          if [[ "$BRANCH" == "dev" ]]; then
+            echo "Refusing to delete the shared ':dev' tag; MIRA-NF's dev image builds from it."
+            exit 0
+          fi
+          if [[ ! "$BRANCH" =~ ^dev ]]; then
+            echo "Branch '$BRANCH' is not a dev* branch, nothing was published for it."
+            exit 0
+          fi
+
+          OWNER="${GITHUB_REPOSITORY%%/*}"
+          PACKAGE="${GITHUB_REPOSITORY##*/}"
+          PACKAGE="${PACKAGE,,}"
+
+          BASE="/orgs/${OWNER}/packages/container/${PACKAGE}"
+          if ! gh api "$BASE" >/dev/null 2>&1; then
+            BASE="/users/${OWNER}/packages/container/${PACKAGE}"
+          fi
+
+          gh api --paginate "${BASE}/versions" > versions.json
+
+          mapfile -t IDS < <(jq -r --arg b "$BRANCH" '
+            .[]
+            | select((.metadata.container.tags // [])
+                | any(. == $b or . == ($b + "-x86_64") or . == ($b + "-aarch64")))
+            | .id
+          ' versions.json)
+
+          if [[ ${#IDS[@]} -eq 0 ]]; then
+            echo "No image versions tagged for branch '$BRANCH'."
+            exit 0
+          fi
+
+          for id in "${IDS[@]}"; do
+            TAGS=$(jq -r --argjson id "$id" \
+              '.[] | select(.id == $id) | (.metadata.container.tags // []) | join(", ")' versions.json)
+            if [[ "$DRY_RUN" == "true" ]]; then
+              echo "[dry-run] would delete version $id (tags: $TAGS)"
+            else
+              echo "Deleting version $id (tags: $TAGS)"
+              gh api -X DELETE "${BASE}/versions/${id}"
+            fi
+          done
+
+  prune-untagged:
+    name: Prune untagged versions
+    if: >-
+      github.event_name == 'schedule' ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.branch == '')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Log in to the Container registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Delete untagged versions
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GHCR_CLEANUP_TOKEN || secrets.GITHUB_TOKEN }}
+          DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+          RETENTION_DAYS: '30'
+        run: |
+          set -euo pipefail
+
+          OWNER="${GITHUB_REPOSITORY%%/*}"
+          PACKAGE="${GITHUB_REPOSITORY##*/}"
+          PACKAGE="${PACKAGE,,}"
+          IMAGE="ghcr.io/${OWNER,,}/${PACKAGE}"
+
+          BASE="/orgs/${OWNER}/packages/container/${PACKAGE}"
+          if ! gh api "$BASE" >/dev/null 2>&1; then
+            BASE="/users/${OWNER}/packages/container/${PACKAGE}"
+          fi
+
+          gh api --paginate "${BASE}/versions" > versions.json
+
+          # A multi-arch manifest's children are untagged versions; deleting them breaks the
+          # manifest, so collect every digest referenced by a tagged manifest and spare those.
+          : > referenced.txt
+          while read -r tag; do
+            docker buildx imagetools inspect --raw "${IMAGE}:${tag}" 2>/dev/null \
+              | jq -r '.manifests[]?.digest' >> referenced.txt || true
+          done < <(jq -r '.[] | (.metadata.container.tags // [])[]' versions.json)
+          sort -u -o referenced.txt referenced.txt
+          echo "Referenced by a manifest: $(wc -l < referenced.txt) digest(s)"
+
+          CUTOFF=$(date -u -d "${RETENTION_DAYS} days ago" +%s)
+
+          mapfile -t CANDIDATES < <(jq -r --argjson cutoff "$CUTOFF" '
+            .[]
+            | select((.metadata.container.tags // []) | length == 0)
+            | select((.updated_at | fromdateiso8601) < $cutoff)
+            | "\(.id) \(.name)"
+          ' versions.json)
+
+          if [[ ${#CANDIDATES[@]} -eq 0 ]]; then
+            echo "No untagged versions older than ${RETENTION_DAYS} days."
+            exit 0
+          fi
+
+          for entry in "${CANDIDATES[@]}"; do
+            id="${entry%% *}"
+            digest="${entry#* }"
+            if grep -qxF "$digest" referenced.txt; then
+              echo "Keeping $id ($digest) - referenced by a manifest"
+            elif [[ "$DRY_RUN" == "true" ]]; then
+              echo "[dry-run] would delete untagged version $id ($digest)"
+            else
+              echo "Deleting untagged version $id ($digest)"
+              gh api -X DELETE "${BASE}/versions/${id}"
+            fi
+          done

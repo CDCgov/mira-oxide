@@ -340,12 +340,9 @@ pub fn positions_of_interest_process(args: PositionsArgs) -> Result<(), Box<dyn 
                         )?;
                     }
                 } else {
-                    let query = dais_entry.cds_aln.as_bytes();
-                    let reference = ref_entry.cds_aln.as_bytes();
-                    let (aligned_1, aligned_2) = {
-                        let (a1, a2) = align_sequences(query, reference);
-                        (Nucleotides::from(a1), Nucleotides::from(a2))
-                    };
+                    let query = Nucleotides::from(dais_entry.cds_aln.as_bytes());
+                    let reference = Nucleotides::from(ref_entry.cds_aln.as_bytes());
+                    let (aligned_1, aligned_2) = align_sequences(query, reference);
 
                     let mut entry = Entry {
                         sample_id: &dais_entry.sample_id,

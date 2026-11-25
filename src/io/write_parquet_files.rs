@@ -1,8 +1,9 @@
+use crate::constants::summary_schema::summary_schema;
 use crate::io::data_ingest::{AllAllelesData, ReadsData};
 use crate::processes::prepare_mira_reports::Samplesheet;
 use crate::processes::summary_report_update::UpdatedIRMASummary;
 use crate::utils::data_processing::{AASequences, IRMASummary, NTSequences, extract_field};
-use arrow::array::Float64Array;
+use arrow::array::{Float64Array, UInt32Array};
 use arrow::{
     array::{ArrayRef, Float32Array, Int32Array, StringArray},
     datatypes::{DataType, Field, Schema},
@@ -201,7 +202,7 @@ pub fn write_reads_to_parquet(
     // Convert the vectors into Arrow columns
     let sample_array: ArrayRef = Arc::new(StringArray::from(sample_ids_vec));
     let record_array: ArrayRef = Arc::new(StringArray::from(record_vec));
-    let reads_array: ArrayRef = Arc::new(Int32Array::from(reads_vec));
+    let reads_array: ArrayRef = Arc::new(UInt32Array::from(reads_vec));
     let patterns_array: ArrayRef = Arc::new(Float32Array::from(patterns_vec));
     let pairs_and_windows_array: ArrayRef = Arc::new(Float32Array::from(pairs_and_windows_vec));
     let stage_array: ArrayRef = Arc::new(Int32Array::from(stages_vec));
@@ -212,7 +213,7 @@ pub fn write_reads_to_parquet(
     let fields = vec![
         Field::new("sample_id", DataType::Utf8, true),
         Field::new("stage", DataType::Utf8, true),
-        Field::new("readcount", DataType::Int32, true),
+        Field::new("readcount", DataType::UInt32, true),
         Field::new("patterns", DataType::Float32, true),
         Field::new("pairsandwindows", DataType::Float32, true),
         Field::new("stagenum", DataType::Int32, true),
@@ -530,83 +531,62 @@ pub fn write_irma_summary_to_parquet(
     let di_ratios_vec = extract_field(irma_summary_data, |item| {
         item.di_ratios_5prime_3prime.clone()
     });
+    let secondary_hits_vec = extract_field(irma_summary_data, |item| item.secondary_hits.clone());
     let runid_vec = extract_field(irma_summary_data, |item| item.runid.clone());
     let instrument_vec = extract_field(irma_summary_data, |item| item.instrument.clone());
 
     let sample_array: ArrayRef = Arc::new(StringArray::from(sample_ids_vec));
-    let total_reads_array: ArrayRef = Arc::new(Int32Array::from(total_reads_vec));
-    let pass_qc_array: ArrayRef = Arc::new(Int32Array::from(pass_qc_vec));
-    let reads_mapped_array: ArrayRef = Arc::new(Int32Array::from(reads_mapped_vec));
+    let total_reads_array: ArrayRef = Arc::new(UInt32Array::from(total_reads_vec));
+    let pass_qc_array: ArrayRef = Arc::new(UInt32Array::from(pass_qc_vec));
+    let reads_mapped_array: ArrayRef = Arc::new(UInt32Array::from(reads_mapped_vec));
     let reference_array: ArrayRef = Arc::new(StringArray::from(reference_vec));
     let percent_reference_coverage_array: ArrayRef =
         Arc::new(Float64Array::from(percent_reference_coverage_vec));
     let median_coverage_array: ArrayRef = Arc::new(Int32Array::from(median_coverage_vec));
     let count_minor_snv_at_or_over_5_pct_array: ArrayRef =
         Arc::new(Int32Array::from(count_minor_snv_at_or_over_5_pct_vec));
+    let spike_percent_coverage_array: ArrayRef =
+        Arc::new(Float64Array::from(spike_percent_coverage_vec));
+    let spike_median_coverage_array: ArrayRef =
+        Arc::new(Int32Array::from(spike_median_coverage_vec));
+    let di_ratios_array: ArrayRef = Arc::new(StringArray::from(di_ratios_vec));
+    let secondary_hits_array: ArrayRef = Arc::new(StringArray::from(secondary_hits_vec));
     let pass_fail_reason_array: ArrayRef = Arc::new(StringArray::from(pass_fail_reason_vec));
     let subtype_array: ArrayRef = Arc::new(StringArray::from(subtype_vec));
     let mira_module_array: ArrayRef = Arc::new(StringArray::from(mira_module_vec));
     let runid_array: ArrayRef = Arc::new(StringArray::from(runid_vec));
     let instrument_array: ArrayRef = Arc::new(StringArray::from(instrument_vec));
 
-    let mut fields = vec![
-        Field::new("sample_id", DataType::Utf8, true),
-        Field::new("total_reads", DataType::Int32, true),
-        Field::new("pass_qc", DataType::Int32, true),
-        Field::new("reads_mapped", DataType::Int32, true),
-        Field::new("reference", DataType::Utf8, true),
-        Field::new("percent_reference_coverage", DataType::Float64, true),
-        Field::new("median_coverage", DataType::Int32, true),
-        Field::new("count_minor_snv_at_or_over_5_pct", DataType::Int32, true),
-        Field::new("pass_fail_reason", DataType::Utf8, true),
-        Field::new("mira_version;module;irma_config", DataType::Utf8, true),
-        Field::new("runid", DataType::Utf8, true),
-        Field::new("instrument", DataType::Utf8, true),
-        Field::new("subtype", DataType::Utf8, true),
-    ];
-
-    let mut arrays = vec![
-        sample_array,
-        total_reads_array,
-        pass_qc_array,
-        reads_mapped_array,
-        reference_array,
-        percent_reference_coverage_array,
-        median_coverage_array,
-        count_minor_snv_at_or_over_5_pct_array,
-        pass_fail_reason_array,
-        mira_module_array,
-        runid_array,
-        instrument_array,
-        subtype_array,
-    ];
-
-    // Existing SC2-specific fields
-    if virus == "sc2-wgs" {
-        fields.push(Field::new(
-            "spike_percent_coverage",
-            DataType::Float64,
-            true,
-        ));
-        fields.push(Field::new("spike_median_coverage", DataType::Int32, true));
-
-        arrays.push(Arc::new(Float64Array::from(spike_percent_coverage_vec)));
-        arrays.push(Arc::new(Int32Array::from(spike_median_coverage_vec)));
-    }
-
-    // Flu-specific field - inserted before pass_fail_reason
-    if virus == "flu" {
-        let insert_idx = fields
-            .iter()
-            .position(|f| f.name() == "pass_fail_reason")
-            .expect("pass_fail_reason field not found");
-
-        fields.insert(
-            insert_idx,
-            Field::new("di_5prime;di_3prime", DataType::Utf8, true),
-        );
-
-        arrays.insert(insert_idx, Arc::new(StringArray::from(di_ratios_vec)));
+    let mut fields = Vec::new();
+    let mut arrays = Vec::new();
+    for column in summary_schema(virus) {
+        let (data_type, array): (DataType, ArrayRef) = match column.field {
+            "sample_id" => (DataType::Utf8, sample_array.clone()),
+            "total_reads" => (DataType::UInt32, total_reads_array.clone()),
+            "pass_qc" => (DataType::UInt32, pass_qc_array.clone()),
+            "reads_mapped" => (DataType::UInt32, reads_mapped_array.clone()),
+            "reference" => (DataType::Utf8, reference_array.clone()),
+            "percent_reference_coverage" => {
+                (DataType::Float64, percent_reference_coverage_array.clone())
+            }
+            "median_coverage" => (DataType::Int32, median_coverage_array.clone()),
+            "count_minor_snv_at_or_over_5_pct" => (
+                DataType::Int32,
+                count_minor_snv_at_or_over_5_pct_array.clone(),
+            ),
+            "spike_percent_coverage" => (DataType::Float64, spike_percent_coverage_array.clone()),
+            "spike_median_coverage" => (DataType::Int32, spike_median_coverage_array.clone()),
+            "di_ratios_5prime_3prime" => (DataType::Utf8, di_ratios_array.clone()),
+            "secondary_hits" => (DataType::Utf8, secondary_hits_array.clone()),
+            "pass_fail_reason" => (DataType::Utf8, pass_fail_reason_array.clone()),
+            "subtype" => (DataType::Utf8, subtype_array.clone()),
+            "mira_module" => (DataType::Utf8, mira_module_array.clone()),
+            "runid" => (DataType::Utf8, runid_array.clone()),
+            "instrument" => (DataType::Utf8, instrument_array.clone()),
+            _ => unreachable!("summary schema contains an unsupported field"),
+        };
+        fields.push(Field::new(column.output_name, data_type, true));
+        arrays.push(array);
     }
 
     let schema = Arc::new(Schema::new(fields));
@@ -918,6 +898,7 @@ pub fn write_updated_irma_summary_to_parquet(
     let median_coverage_vec = extract_field(summary_data, |i| i.median_coverage);
     let count_minor_snv_at_or_over_5_pct_vec =
         extract_field(summary_data, |i| i.count_minor_snv_at_or_over_5_pct);
+    let secondary_hits_vec = extract_field(summary_data, |i| i.secondary_hits.clone());
     let pass_fail_reason_vec = extract_field(summary_data, |i| i.pass_fail_reason.clone());
     let subtype_vec = extract_field(summary_data, |i| i.subtype.clone());
     let mira_module_vec = extract_field(summary_data, |i| i.mira_module.clone());
@@ -927,9 +908,9 @@ pub fn write_updated_irma_summary_to_parquet(
 
     let mut fields = vec![
         Field::new("sample_id", DataType::Utf8, true),
-        Field::new("total_reads", DataType::Int32, true),
-        Field::new("pass_qc", DataType::Int32, true),
-        Field::new("reads_mapped", DataType::Int32, true),
+        Field::new("total_reads", DataType::UInt32, true),
+        Field::new("pass_qc", DataType::UInt32, true),
+        Field::new("reads_mapped", DataType::UInt32, true),
         Field::new("reference", DataType::Utf8, true),
         Field::new("percent_reference_coverage", DataType::Float64, true),
         Field::new("median_coverage", DataType::Int32, true),
@@ -938,9 +919,9 @@ pub fn write_updated_irma_summary_to_parquet(
 
     let mut arrays: Vec<ArrayRef> = vec![
         Arc::new(StringArray::from(sample_id_vec)) as ArrayRef,
-        Arc::new(Int32Array::from(total_reads_vec)) as ArrayRef,
-        Arc::new(Int32Array::from(pass_qc_vec)) as ArrayRef,
-        Arc::new(Int32Array::from(reads_mapped_vec)) as ArrayRef,
+        Arc::new(UInt32Array::from(total_reads_vec)) as ArrayRef,
+        Arc::new(UInt32Array::from(pass_qc_vec)) as ArrayRef,
+        Arc::new(UInt32Array::from(reads_mapped_vec)) as ArrayRef,
         Arc::new(StringArray::from(reference_vec)) as ArrayRef,
         Arc::new(Float64Array::from(percent_reference_coverage_vec)) as ArrayRef,
         Arc::new(Int32Array::from(median_coverage_vec)) as ArrayRef,
@@ -1041,6 +1022,13 @@ pub fn write_updated_irma_summary_to_parquet(
             fields.push(Field::new("clade", DataType::Utf8, true));
             arrays.push(Arc::new(StringArray::from(clade_vec)) as ArrayRef);
         }
+    }
+
+    // Secondary hits are available for flu reports and go at the end, to not
+    // affect existing schema that might read in these reports
+    if virus == "flu" {
+        fields.push(Field::new("secondary_hits", DataType::Utf8, true));
+        arrays.push(Arc::new(StringArray::from(secondary_hits_vec)) as ArrayRef);
     }
 
     // Write parquet

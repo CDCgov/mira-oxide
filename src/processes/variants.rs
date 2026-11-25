@@ -12,16 +12,15 @@ use std::{
     path::{Path, PathBuf},
 };
 use zoe::{
-    alignment::{ScalarProfile, sw::sw_scalar_align},
     data::{
         WeightMatrix,
         mappings::{ByteIndexMap, StdGeneticCode},
         nucleotides::GetCodons,
     },
-    prelude::{Len, Nucleotides},
+    prelude::{Len, NucleotidesView},
 };
 
-use crate::io::data_ingest::read_csv;
+use crate::io::data_ingest::{deserialize_optional_frequency, read_csv};
 use crate::utils::get_dais_refs::assign_dais_refs;
 
 #[derive(Debug, Parser)]
@@ -203,7 +202,8 @@ pub struct MinorVariantInput {
     minority_allele: String,
     consensus_count: i64,
     minority_count: i64,
-    minority_frequency: f64,
+    #[serde(default, deserialize_with = "deserialize_optional_frequency")]
+    minority_frequency: Option<f64>,
     run_id: String,
     instrument: String,
 }
@@ -220,6 +220,11 @@ pub struct Entry<'a> {
     aa_position: usize,
     aa_mut: char,
     variant_of_interest: bool,
+}
+
+// unwraps `Option<f64>` into printable `f64` or empty string
+fn format_optional_frequency(frequency: Option<f64>) -> String {
+    frequency.map_or_else(String::new, |frequency| frequency.to_string())
 }
 
 impl Entry<'_> {
@@ -564,7 +569,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
     println!(
         "Read {} entries from the insertion file: {:?}",
         insertions.len(),
-        &args.query_insertion_file.display()
+        args.query_insertion_file.display()
     );
 
     let del_reader = create_reader(Some(&args.query_deletion_file))?;
@@ -572,7 +577,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
     println!(
         "Read {} entries from the deletion file: {:?}",
         deletions.len(),
-        &args.query_deletion_file.display()
+        args.query_deletion_file.display()
     );
 
     // Optional: minor variants (.csv, with headers)
@@ -605,8 +610,8 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
 
         println!(
             "Processing all nucleotide differences for input file: {:?} and reference file: {:?}",
-            &args.query_dais_file.display(),
-            &ref_dais_file.display()
+            args.query_dais_file.display(),
+            ref_dais_file.display()
         );
 
         // positions-of-interest is optional in this mode.
@@ -636,7 +641,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
         println!(
             "Read {} entries from the reference insertion file: {:?}",
             ref_insertions.len(),
-            &ref_insertion_file.display()
+            ref_insertion_file.display()
         );
 
         let ref_del_reader = create_reader(Some(&ref_deletion_file))?;
@@ -644,7 +649,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
         println!(
             "Read {} entries from the reference deletion file: {:?}",
             ref_deletions.len(),
-            &ref_deletion_file.display()
+            ref_deletion_file.display()
         );
 
         let mut writer = if let Some(ref file_path) = args.output_xsv {
@@ -675,8 +680,8 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                     && dais_entry.dais_ref_id == ref_entry.dais_ref_id
                     && dais_entry.protein == ref_entry.protein
                 {
-                    let nt_seq1: Nucleotides = ref_entry.ref_cds_aln.clone().into();
-                    let nt_seq2: Nucleotides = dais_entry.query_cds_aln.clone().into();
+                    let nt_seq1 = NucleotidesView::from(ref_entry.ref_cds_aln.as_str());
+                    let nt_seq2 = NucleotidesView::from(dais_entry.query_cds_aln.as_str());
 
                     if nt_seq1.len() != nt_seq2.len() {
                         println!(
@@ -727,16 +732,13 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
 
                         // Only used to populate variant_of_interest when requested; the row
                         // itself is still emitted regardless of whether this matches.
-                        let matched_poi = if include_variant_of_interest {
-                            entry.update_entry(
+                        let matched_poi = include_variant_of_interest
+                            && entry.update_entry(
                                 &ref_entry.dais_ref_id,
                                 ref_aa,
                                 query_aa,
                                 &muts_interest,
-                            )
-                        } else {
-                            false
-                        };
+                            );
                         let _ = matched_poi;
 
                         let Entry {
@@ -839,14 +841,14 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                                             None => (String::new(), String::new()),
                                         };
                                         let major_aa_vs_minor_aa =
-                                            format!("{aa_mut}:{query_nt_position}:{mv_aa}");
+                                            format!("{aa_mut}:{query_aa_position}:{mv_aa}");
                                         let mv_suffix = format!(
                                             "{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}",
                                             mv.depth,
                                             mv.minority_allele,
                                             mv.consensus_count,
                                             mv.minority_count,
-                                            mv.minority_frequency,
+                                            format_optional_frequency(mv.minority_frequency),
                                             mv_codon,
                                             mv_aa
                                         );
@@ -985,14 +987,14 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                                         None => (String::new(), String::new()),
                                     };
                                     let major_aa_vs_minor_aa =
-                                        format!("{aa_mut}:{query_nt_position}:{mv_aa}");
+                                        format!("{aa_mut}:{query_aa_position}:{mv_aa}");
                                     let mv_suffix = format!(
                                         "{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}",
                                         mv.depth,
                                         mv.minority_allele,
                                         mv.consensus_count,
                                         mv.minority_count,
-                                        mv.minority_frequency,
+                                        format_optional_frequency(mv.minority_frequency),
                                         mv_codon,
                                         mv_aa
                                     );
@@ -1027,9 +1029,9 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
 
         println!(
             "Processing positions of interest for input file: {:?}, reference file: {:?}, and variants file: {:?}",
-            &args.query_dais_file.display(),
-            &ref_dais_file.display(),
-            &muts_path.display()
+            args.query_dais_file.display(),
+            ref_dais_file.display(),
+            muts_path.display()
         );
 
         let muts_reader = create_reader(Some(muts_path))?;
@@ -1051,7 +1053,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
         println!(
             "Read {} entries from the reference insertion file: {:?}",
             ref_insertions.len(),
-            &ref_insertion_file.display()
+            ref_insertion_file.display()
         );
 
         let ref_del_reader = create_reader(Some(&ref_deletion_file))?;
@@ -1059,7 +1061,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
         println!(
             "Read {} entries from the reference deletion file: {:?}",
             ref_deletions.len(),
-            &ref_deletion_file.display()
+            ref_deletion_file.display()
         );
 
         let mut writer = if let Some(ref file_path) = args.output_xsv {
@@ -1086,8 +1088,8 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                     && dais_entry.dais_ref_id == ref_entry.dais_ref_id
                     && dais_entry.protein == ref_entry.protein
                 {
-                    let nt_seq1: Nucleotides = ref_entry.ref_cds_aln.clone().into();
-                    let nt_seq2: Nucleotides = dais_entry.query_cds_aln.clone().into();
+                    let nt_seq1 = NucleotidesView::from(ref_entry.ref_cds_aln.as_str());
+                    let nt_seq2 = NucleotidesView::from(dais_entry.query_cds_aln.as_str());
 
                     if nt_seq1.len() == nt_seq2.len() {
                         let mut entry = Entry {
@@ -1223,7 +1225,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                                                             None => (String::new(), String::new()),
                                                         };
                                                     let major_aa_vs_minor_aa = format!(
-                                                        "{aa_mut}:{query_nt_position}:{mv_aa}"
+                                                        "{aa_mut}:{query_aa_position}:{mv_aa}"
                                                     );
                                                     format!(
                                                         "{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}",
@@ -1231,7 +1233,9 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                                                         mv.minority_allele,
                                                         mv.consensus_count,
                                                         mv.minority_count,
-                                                        mv.minority_frequency,
+                                                        format_optional_frequency(
+                                                            mv.minority_frequency
+                                                        ),
                                                         mv_codon,
                                                         mv_aa,
                                                         major_aa_vs_minor_aa
@@ -1379,7 +1383,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                                                         None => (String::new(), String::new()),
                                                     };
                                                 let major_aa_vs_minor_aa = format!(
-                                                    "{aa_mut}:{query_nt_position}:{mv_aa}"
+                                                    "{aa_mut}:{query_aa_position}:{mv_aa}"
                                                 );
                                                 format!(
                                                     "{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}{d}{}",
@@ -1388,7 +1392,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                                                     mv.minority_allele,
                                                     mv.consensus_count,
                                                     mv.minority_count,
-                                                    mv.minority_frequency,
+                                                    format_optional_frequency(mv.minority_frequency),
                                                     consensus_codon,
                                                     consensus_aa,
                                                     mv_codon,
@@ -1436,7 +1440,9 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
         /// `calc_query_nt_position` until one matches. Returns None if no raw position maps to it (but that shouldn't happen?).
         /// Filters insertions/deletions by `reference_id` and `product_name` (in addition to `sample_id`
         /// and ctype) so that samples with multiple products/references sharing a ctype don't have
-        /// unrelated indels applied.
+        /// unrelated indels applied. Positions that are alignment gaps in `aligned` are skipped, so
+        /// that at a deletion boundary (where a gap position and the following real base map to the
+        /// same adjusted position) the actual nucleotide is returned rather than the gap.
         #[allow(clippy::too_many_arguments)]
         fn find_raw_query_position(
             aln_len: usize,
@@ -1445,10 +1451,15 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
             ctype: &str,
             reference_id: &str,
             product_name: &str,
+            aligned: &[u8],
             insertions: &[InsertionInput],
             deletions: &[DeletionInput],
         ) -> Option<usize> {
             (1..=aln_len).find(|&raw_pos| {
+                if aligned.get(raw_pos - 1) == Some(&b'-') {
+                    return false;
+                }
+
                 let mut position = i64::try_from(raw_pos).unwrap_or(i64::MAX);
 
                 for ins in insertions {
@@ -1477,6 +1488,33 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
             })
         }
 
+        /// Maps a segment (query consensus) nucleotide position to a CDS-local nucleotide
+        /// position using the DAIS `query_nt_coordinates` field. That field lists the segment
+        /// ranges the CDS spans (each `start..end`), joined by `;` for spliced/multi-exon CDSs.
+        /// Returns None if the position falls outside all of the CDS's ranges. This offset is
+        /// what lets segment-relative minor-variant positions be resolved for CDSs that don't
+        /// begin at segment position 1 (e.g. HA after the signal peptide, or BM2/M2).
+        fn segment_pos_to_cds_local(
+            query_nt_coordinates: &str,
+            segment_pos: usize,
+        ) -> Option<usize> {
+            let mut offset = 0usize;
+            for seg in query_nt_coordinates.split(';') {
+                let seg = seg.trim();
+                if seg.is_empty() {
+                    continue;
+                }
+                let (start, end) = seg.split_once("..")?;
+                let start: usize = start.trim().parse().ok()?;
+                let end: usize = end.trim().parse().ok()?;
+                if start <= segment_pos && segment_pos <= end {
+                    return Some(offset + (segment_pos - start) + 1);
+                }
+                offset += end.saturating_sub(start) + 1;
+            }
+            None
+        }
+
         debug_assert!(args.annotate_minor_variants);
 
         // Minor-variants only will annotate the minor variants CSV with minor_variant_codon
@@ -1494,117 +1532,149 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
 
         writeln!(
             &mut writer,
-            "sample{delim}reference{delim}dais_reference{delim}dais_ref_position{delim}sample_position{delim}depth{delim}consensus_allele{delim}minority_allele{delim}consensus_count{delim}minority_count{delim}minority_frequency{delim}consensus_codon{delim}minor_variant_codon{delim}consensus_aa{delim}minor_variant_aa{delim}major_aa_vs_minor_aa{delim}run_id{delim}instrument"
+            "sample{delim}reference{delim}numbering_reference{delim}numbering_ref_position{delim}sample_position{delim}depth{delim}consensus_allele{delim}minority_allele{delim}consensus_count{delim}minority_count{delim}consensus_codon{delim}minor_variant_codon{delim}consensus_aa{delim}minor_variant_aa{delim}major_aa_vs_minor_aa{delim}minority_frequency{delim}run_id{delim}instrument"
         )?;
 
         for mv in &minor_variants {
             // Find the query dais row matching this minor variant: sample_id contains sample,
-            // ctype == reference. Multiple product rows (e.g. HA-signal, HA, HA1) can share the
-            // same sample_id/ctype, so prefer the one with the longest query_cds_aln, since
-            // shorter fragments (like signal peptides) can't contain large sample_positions.
+            // ctype == reference. Multiple product rows (e.g. HA-signal, HA, HA1, or M1/BM2 on
+            // the MP segment) can share the same sample_id/ctype. sample_position is a segment
+            // (query consensus) coordinate, so prefer the longest query_cds_aln among the
+            // products whose query_nt_coordinates actually span this segment position. This
+            // correctly routes second-ORF positions (e.g. BM2/M2) to their own CDS instead of
+            // defaulting to the longest overall (M1), which cannot contain them.
+            let sample_pos = usize::try_from(mv.sample_position).unwrap_or(0);
             let matching_dais_entry = dais
                 .iter()
                 .filter(|d| d.sample_id.contains(mv.sample.as_str()) && d.ctype == mv.reference)
-                .max_by_key(|d| d.query_cds_aln.len());
+                .filter(|d| segment_pos_to_cds_local(&d.query_nt_coordinates, sample_pos).is_some())
+                .max_by_key(|d| d.query_cds_aln.len())
+                .or_else(|| {
+                    dais.iter()
+                        .filter(|d| {
+                            d.sample_id.contains(mv.sample.as_str()) && d.ctype == mv.reference
+                        })
+                        .max_by_key(|d| d.query_cds_aln.len())
+                });
 
-            let (dais_reference, dais_ref_position, consensus_codon, consensus_aa, mv_codon, mv_aa) =
-                if let Some(dais_entry) = matching_dais_entry {
-                    let dais_reference = dais_entry.dais_ref_id.clone();
-                    let nt_seq: Nucleotides = dais_entry.query_cds_aln.clone().into();
-                    let aln_len = nt_seq.len();
-                    let raw_pos = find_raw_query_position(
-                        aln_len,
-                        usize::try_from(mv.sample_position).unwrap_or(0),
-                        &dais_entry.sample_id,
-                        &dais_entry.ctype,
-                        &dais_entry.dais_ref_id,
-                        &dais_entry.protein,
-                        &insertions,
-                        &deletions,
-                    );
+            let (
+                numbering_reference,
+                numbering_ref_position,
+                numbering_ref_aa_position,
+                consensus_codon,
+                consensus_aa,
+                mv_codon,
+                mv_aa,
+            ) = if let Some(dais_entry) = matching_dais_entry {
+                // The numbering frame is the CDS alignment of this sequence, so report its
+                // original FASTA header rather than the DAIS reference ID.
+                let numbering_reference = dais_entry.sample_id.clone();
+                let nt_seq = NucleotidesView::from(dais_entry.query_cds_aln.as_str());
+                let aln_len = nt_seq.len();
+                // Translate the segment-relative sample_position into this CDS's own
+                // coordinate frame before resolving the aligned position; fall back to the
+                // raw segment position if the coordinates can't be parsed.
+                let cds_local_pos =
+                    segment_pos_to_cds_local(&dais_entry.query_nt_coordinates, sample_pos)
+                        .unwrap_or(sample_pos);
+                let raw_pos = find_raw_query_position(
+                    aln_len,
+                    cds_local_pos,
+                    &dais_entry.sample_id,
+                    &dais_entry.ctype,
+                    &dais_entry.dais_ref_id,
+                    &dais_entry.protein,
+                    dais_entry.query_cds_aln.as_bytes(),
+                    &insertions,
+                    &deletions,
+                );
 
-                    match raw_pos {
-                        Some(raw_pos) => {
-                            // dais_ref_position is the raw (pre-indel-adjustment) position; the codon
-                            // and amino acid are derived directly from this position.
-                            let dais_ref_position = raw_pos;
-                            let (codons, tail) = nt_seq.as_codons();
-                            let codon_index = (dais_ref_position - 1) / 3;
-                            let position_in_codon = ((dais_ref_position - 1) % 3) + 1;
-                            let codon_bytes: Option<&[u8]> = if codon_index < codons.len() {
-                                Some(&codons[codon_index])
-                            } else if codon_index == codons.len() && !tail.is_empty() {
-                                Some(tail)
-                            } else {
-                                None
-                            };
-                            match codon_bytes {
-                                Some(codon_bytes) => {
-                                    let codon_str = std::str::from_utf8(codon_bytes)
-                                        .unwrap_or_default()
-                                        .to_string();
-                                    // consensus_codon/consensus_aa reflect the reference codon as-is
-                                    // only the minority allele is substituted in to build the minor variant codon/aa.
-                                    let (consensus_codon, consensus_aa) = if codon_str.len() == 3 {
-                                        let aa =
-                                            StdGeneticCode::translate_codon(codon_str.as_bytes())
-                                                as char;
-                                        (codon_str.clone(), aa.to_string())
-                                    } else {
-                                        (String::new(), String::new())
-                                    };
-                                    let (mv_codon, mv_aa) = match build_minor_variant_codon(
-                                        &codon_str,
-                                        position_in_codon,
-                                        &mv.minority_allele,
-                                    ) {
-                                        Some((codon, aa)) => (codon, aa.to_string()),
-                                        None => (String::new(), String::new()),
-                                    };
-                                    (
-                                        dais_reference,
-                                        dais_ref_position.to_string(),
-                                        consensus_codon,
-                                        consensus_aa,
-                                        mv_codon,
-                                        mv_aa,
-                                    )
-                                }
-                                None => (
-                                    dais_reference,
-                                    dais_ref_position.to_string(),
-                                    String::new(),
-                                    String::new(),
-                                    String::new(),
-                                    String::new(),
-                                ),
+                match raw_pos {
+                    Some(raw_pos) => {
+                        // numbering_ref_position is the raw (pre-indel-adjustment) position; the
+                        // codon and amino acid are derived directly from this position.
+                        let numbering_ref_position = raw_pos;
+                        let (codons, tail) = nt_seq.as_codons();
+                        let codon_index = (numbering_ref_position - 1) / 3;
+                        let position_in_codon = ((numbering_ref_position - 1) % 3) + 1;
+                        let codon_bytes: Option<&[u8]> = if codon_index < codons.len() {
+                            Some(&codons[codon_index])
+                        } else if codon_index == codons.len() && !tail.is_empty() {
+                            Some(tail)
+                        } else {
+                            None
+                        };
+                        match codon_bytes {
+                            Some(codon_bytes) => {
+                                let codon_str = std::str::from_utf8(codon_bytes)
+                                    .unwrap_or_default()
+                                    .to_string();
+                                // consensus_codon/consensus_aa reflect the reference codon as-is
+                                // only the minority allele is substituted in to build the minor variant codon/aa.
+                                let (consensus_codon, consensus_aa) = if codon_str.len() == 3 {
+                                    let aa = StdGeneticCode::translate_codon(codon_str.as_bytes())
+                                        as char;
+                                    (codon_str.clone(), aa.to_string())
+                                } else {
+                                    (String::new(), String::new())
+                                };
+                                let (mv_codon, mv_aa) = match build_minor_variant_codon(
+                                    &codon_str,
+                                    position_in_codon,
+                                    &mv.minority_allele,
+                                ) {
+                                    Some((codon, aa)) => (codon, aa.to_string()),
+                                    None => (String::new(), String::new()),
+                                };
+                                (
+                                    numbering_reference,
+                                    numbering_ref_position.to_string(),
+                                    (codon_index + 1).to_string(),
+                                    consensus_codon,
+                                    consensus_aa,
+                                    mv_codon,
+                                    mv_aa,
+                                )
                             }
+                            None => (
+                                numbering_reference,
+                                numbering_ref_position.to_string(),
+                                (codon_index + 1).to_string(),
+                                String::new(),
+                                String::new(),
+                                String::new(),
+                                String::new(),
+                            ),
                         }
-                        None => (
-                            dais_reference,
-                            String::new(),
-                            String::new(),
-                            String::new(),
-                            String::new(),
-                            String::new(),
-                        ),
                     }
-                } else {
-                    (
+                    None => (
+                        numbering_reference,
                         String::new(),
                         String::new(),
                         String::new(),
                         String::new(),
                         String::new(),
                         String::new(),
-                    )
-                };
+                    ),
+                }
+            } else {
+                (
+                    String::new(),
+                    String::new(),
+                    String::new(),
+                    String::new(),
+                    String::new(),
+                    String::new(),
+                    String::new(),
+                )
+            };
 
-            let major_aa_vs_minor_aa = format!("{consensus_aa}:{dais_ref_position}:{mv_aa}");
+            let major_aa_vs_minor_aa =
+                format!("{consensus_aa}:{numbering_ref_aa_position}:{mv_aa}");
 
             writeln!(
                 &mut writer,
-                "{}{delim}{}{delim}{dais_reference}{delim}{dais_ref_position}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{consensus_codon}{delim}{mv_codon}{delim}{consensus_aa}{delim}{mv_aa}{delim}{major_aa_vs_minor_aa}{delim}{}{delim}{}{delim}{}",
+                "{}{delim}{}{delim}{numbering_reference}{delim}{numbering_ref_position}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{}{delim}{consensus_codon}{delim}{mv_codon}{delim}{consensus_aa}{delim}{mv_aa}{delim}{major_aa_vs_minor_aa}{delim}{}{delim}{}{delim}{}",
                 mv.sample,
                 mv.reference,
                 mv.sample_position,
@@ -1613,7 +1683,7 @@ pub fn variants_process(args: VariantsArgs) -> Result<(), Box<dyn Error>> {
                 mv.minority_allele,
                 mv.consensus_count,
                 mv.minority_count,
-                mv.minority_frequency,
+                format_optional_frequency(mv.minority_frequency),
                 mv.run_id,
                 mv.instrument,
             )?;

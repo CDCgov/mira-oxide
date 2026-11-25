@@ -92,9 +92,9 @@ impl std::str::FromStr for NextcladeMetadata {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct UpdatedIRMASummary {
     pub sample_id: Option<String>,
-    pub total_reads: Option<i32>,
-    pub pass_qc: Option<i32>,
-    pub reads_mapped: Option<i32>,
+    pub total_reads: Option<u32>,
+    pub pass_qc: Option<u32>,
+    pub reads_mapped: Option<u32>,
     pub reference: Option<String>,
     pub percent_reference_coverage: Option<f64>,
     pub median_coverage: Option<i32>,
@@ -103,6 +103,7 @@ pub struct UpdatedIRMASummary {
     pub spike_median_coverage: Option<i32>,
     #[serde(rename = "di_5prime;di_3prime")]
     pub di_ratios_5prime_3prime: Option<String>,
+    pub secondary_hits: Option<String>,
     pub pass_fail_reason: Option<String>,
     pub subtype: Option<String>,
     #[serde(rename = "mira_version;module;irma_config")]

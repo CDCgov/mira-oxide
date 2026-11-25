@@ -13,19 +13,19 @@ Exactly one mode must be specified:
 ### `--all-diffs`
 Reports every nucleotide difference between each query and its matching reference, without regard to positions of interest.
 
-- **Requires:** `--query-dais-file`, `--query-insertion-file`, `--query-deletion-file`, `--ref-dais-file`, `--ref-insertion-file`, `--ref-deletion-file`
+- **Requires:** `--query-dais-file`, `--query-insertion-file`, `--query-deletion-file`, `--ref-dais-file`, `--ref-insertion-file`, `--ref-deletion-file`, `--output-xsv`
 - **Optional:** `--variants-of-interest` (adds `variant_of_interest`/`position_of_interest` columns), `--minor-variants` (adds minor-variant columns)
 
 ### `--positions-of-interest`
 Produces a variants inormation report restricted to positions listed in the variants-of-interest file.
 
-- **Requires:** `--query-dais-file`, `--query-insertion-file`, `--query-deletion-file`, `--ref-dais-file`, `--ref-insertion-file`, `--ref-deletion-file`, `--variants-of-interest`
-- **Optional:** `--minor-variants` (adds minor-variant columns)
+- **Requires:** `--query-dais-file`, `--query-insertion-file`, `--query-deletion-file`, `--ref-dais-file`, `--ref-insertion-file`, `--ref-deletion-file`, `--variants-of-interest`  `--output-xsv`
+- **Optional:** `--minor-variants` (adds minor-variant columns) `--all-positions` (prints all positions)
 
 ### `--annotate-minor-variants`
 Annotates the minor-variants file with codon/amino-acid context derived from the query DAIS data. Does not require any reference dais/insertion/deletion files.
 
-- **Requires:** `--query-dais-file`, `--query-insertion-file`, `--query-deletion-file`, `--minor-variants`
+- **Requires:** `--query-dais-file`, `--query-insertion-file`, `--query-deletion-file`, `--minor-variants`,  `--output-xsv`
 
 ## Command-Line Flags
 
@@ -184,7 +184,7 @@ sample_1,ref_A,H3N2,ref_A_id,HA,225,225,222,T,C,3,AAT,AAC,75,75,74,N:74:N,false,
 | `minority_frequency`† | Frequency of the minority allele (minority_count / depth) |
 | `minor_variant_codon`† | Query codon with the minority allele substituted in at `position_in_codon` in DAIS-ribosome alignment space|
 | `minor_variant_aa`† | Amino acid translated from `minor_variant_codon` in DAIS-ribosome alignment space |
-| `major_aa_vs_minor_aa`† | Formatted comparison of query vs. minor amino acid in DAIS-ribosome alignment space, as `query_aa:dais_ref_position:minor_variant_aa` |
+| `major_aa_vs_minor_aa`† | Formatted comparison of query vs. minor amino acid in DAIS-ribosome alignment space, as `query_aa:query_aa_position:minor_variant_aa` |
 
 \* Present only when `--variants-of-interest` is supplied.
 † Present only when `--minor-variants` is supplied. If no minor variant matches this position, these fields are emitted empty.
@@ -230,15 +230,16 @@ sample_1,ref_A,H3N2,ref_A_id,HA,148,148,148,G,A,1,GCC,ACC,T:50:A,50,50,50,true,1
 | `minority_frequency`† | Frequency of the minority allele (minority_count / depth) |
 | `minor_variant_codon`† | Query codon with the minority allele substituted in at `position_in_codon` in DAIS-ribosome alignment space|
 | `minor_variant_aa`† | Amino acid translated from `minor_variant_codon` in DAIS-ribosome alignment space|
-| `major_aa_vs_minor_aa`† | Formatted comparison of query vs. minor amino acid in DAIS-ribosome alignment space, as `query_aa:dais_ref_position:minor_variant_aa` |
+| `major_aa_vs_minor_aa`† | Formatted comparison of query vs. minor amino acid in DAIS-ribosome alignment space, as `query_aa:query_aa_position:minor_variant_aa` |
 
 † Present only when `--minor-variants` is supplied. If no minor variant matches this position, these fields are emitted empty.
 
 ### `--annotate-minor-variants` output
 
 ```
-sample,reference,dais_reference,dais_ref_position,sample_position,depth,consensus_allele,minority_allele,consensus_count,minority_count,minority_frequency,consensus_codon,minor_variant_codon,consensus_aa,minor_variant_aa,major_aa_vs_minor_aa,run_id,instrument
-sample_1,H3N2,ref_A_id,148,148,1000,A,G,950,50,0.05,ACC,GCC,T,A,T:148:A,run_2024_08,MiSeq
+sample,reference,numbering_reference,numbering_ref_position,sample_position,depth,consensus_allele,minority_allele,consensus_count,minority_count,consensus_codon,minor_variant_codon,consensus_aa,minor_variant_aa,major_aa_vs_minor_aa,minority_frequency,run_id,instrument
+sample_1,H3N2,sample_1_A_HA,148,148,1000,A,G,950,50,ACC,GCC,T,A,T:50:A,0.05,run_2024_08,MiSeq
+
 ```
 
 - Each row of the input minor-variants CSV is annotated with the codon and amino acid context derived from the matching query DAIS entry.
@@ -250,19 +251,19 @@ sample_1,H3N2,ref_A_id,148,148,1000,A,G,950,50,0.05,ACC,GCC,T,A,T:148:A,run_2024
 |---|---|
 | `sample` | Sample name from the minor-variants file |
 | `reference` | Reference/ctype from the minor-variants file |
-| `dais_reference` | DAIS reference ID of the matching query entry (longest `query_cds_aln` match on sample/ctype) |
-| `dais_ref_position` | Raw (pre-indel-adjustment) alignment position in the query sequence that maps to `sample_position` |
+| `numbering_reference` | Original FASTA header of the sequence whose CDS alignment defines the numbering frame (longest `query_cds_aln` match on sample/ctype) |
+| `numbering_ref_position` | Raw (pre-indel-adjustment) alignment position in the numbering reference sequence that maps to `sample_position` |
 | `sample_position` | Original sample position from the minor-variants file |
 | `depth` | Sequencing depth at this position |
 | `consensus_allele` | Consensus (majority) nucleotide allele |
 | `minority_allele` | Minority (sub-consensus) nucleotide allele |
 | `consensus_count` | Read count supporting the consensus allele |
 | `minority_count` | Read count supporting the minority allele |
-| `minority_frequency` | Frequency of the minority allele (minority_count / depth) |
-| `consensus_codon` | Codon at `dais_ref_position` as observed in the query sequence |
+| `consensus_codon` | Codon at `numbering_ref_position` as observed in the query sequence |
 | `minor_variant_codon` | Codon with the minority allele substituted in |
 | `consensus_aa` | Amino acid translated from `consensus_codon` |
 | `minor_variant_aa` | Amino acid translated from `minor_variant_codon` |
-| `major_aa_vs_minor_aa` | Formatted comparison of consensus vs. minor amino acid, as `consensus_aa:dais_ref_position:minor_variant_aa` |
+| `major_aa_vs_minor_aa` | Formatted comparison of consensus vs. minor amino acid, as `consensus_aa:amino_acid_position:minor_variant_aa`, where the position is `numbering_ref_position` converted to its codon number |
+| `minority_frequency` | Frequency of the minority allele (minority_count / depth) |
 | `run_id` | Sequencing run ID from the minor-variants file |
 | `instrument` | Sequencing instrument from the minor-variants file |

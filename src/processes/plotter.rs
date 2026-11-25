@@ -33,7 +33,7 @@ use crate::constants::theme;
 /// Colors for IRMA indels overlaid on coverage subplots.
 const INSERTION_COLOR: &str = "#2CA02C"; // green
 const DELETION_COLOR: &str = "#9467BD"; // purple
-/// Fallback minor-indel frequency thresholds when IRMA run_info.txt is absent.
+/// Fallback minor-indel frequency thresholds when IRMA `run_info.txt` is absent.
 const INDEL_FREQ_DEFAULT_ILLUMINA: f32 = 0.05;
 const INDEL_FREQ_DEFAULT_ONT: f32 = 0.30;
 
@@ -76,14 +76,17 @@ fn load_variant_data(
             .from_reader(file);
         for result in rdr.records() {
             let record = result?;
-            if record.len() >= 8 {
+            if record.len() >= 9 {
                 let segment_name = record[0].to_string();
                 let position: u32 = record[1].parse()?;
                 let consensus_allele: String = record[3].to_string();
                 let minority_allele: String = record[4].to_string();
                 let consensus_count: u32 = record[5].parse()?;
                 let minority_count: u32 = record[6].parse()?;
-                let minority_frequency: f32 = record[8].parse()?;
+                let Ok(minority_frequency) = record[8].parse::<f32>() else {
+                    // irma frequency is missing, no minor variant
+                    continue;
+                };
                 variants_data.entry(segment_name).or_default().push((
                     position,
                     consensus_allele,
@@ -99,7 +102,7 @@ fn load_variant_data(
 }
 
 /// Load IRMA insertions/deletions per segment. Per-type frequency thresholds are
-/// sourced from run_info.txt (MIN_FI/MIN_FD), floored at a platform default so
+/// sourced from `run_info.txt` (`MIN_FI`/`MIN_FD`), floored at a platform default so
 /// low IRMA settings do not bury the coverage curve in indel noise.
 #[allow(clippy::type_complexity)]
 fn load_indel_data(
@@ -112,10 +115,16 @@ fn load_indel_data(
     Box<dyn Error>,
 > {
     let run_info = read_run_info(input_directory);
-    let platform_default = if input_directory
-        .components()
-        .any(|c| c.as_os_str().eq_ignore_ascii_case("ont"))
-    {
+    // Prefer IRMA's own platform marker (MinION module) over the input path,
+    // which is absent when the app runs the plotter from a generic run dir.
+    let is_ont = run_info
+        .get("MODULE_CONFIG")
+        .or_else(|| run_info.get("PARAM_FILE_NAME"))
+        .is_some_and(|v| v.to_ascii_lowercase().contains("minion"))
+        || input_directory
+            .components()
+            .any(|c| c.as_os_str().eq_ignore_ascii_case("ont"));
+    let platform_default = if is_ont {
         INDEL_FREQ_DEFAULT_ONT
     } else {
         INDEL_FREQ_DEFAULT_ILLUMINA
@@ -146,7 +155,10 @@ fn load_indel_data(
         for result in rdr.records() {
             let record = result?;
             if record.len() >= 8 {
-                let frequency: f32 = record[7].parse().unwrap_or(0.0);
+                let Ok(frequency) = record[7].parse::<f32>() else {
+                    // irma frequency missing, no indel
+                    continue;
+                };
                 if frequency < insertion_min_frequency {
                     continue;
                 }
@@ -177,7 +189,10 @@ fn load_indel_data(
         for result in rdr.records() {
             let record = result?;
             if record.len() >= 8 {
-                let frequency: f32 = record[7].parse().unwrap_or(0.0);
+                let Ok(frequency) = record[7].parse::<f32>() else {
+                    // irma frequency missing, no indel
+                    continue;
+                };
                 if frequency < deletion_min_frequency {
                     continue;
                 }
@@ -218,6 +233,42 @@ fn add_variant_indel_traces(
     variants_data: &HashMap<String, Vec<VariantRec>>,
     insertions_data: &HashMap<String, Vec<InsertionRec>>,
     deletions_data: &HashMap<String, Vec<DeletionRec>>,
+    xaxis: &str,
+    yaxis: &str,
+    legend_group: &str,
+) {
+    add_minor_snv_traces(
+        plot,
+        segment_name,
+        segment_color,
+        variants_data,
+        xaxis,
+        yaxis,
+        legend_group,
+    );
+    add_insertion_traces(
+        plot,
+        segment_name,
+        insertions_data,
+        xaxis,
+        yaxis,
+        legend_group,
+    );
+    add_deletion_traces(
+        plot,
+        segment_name,
+        deletions_data,
+        xaxis,
+        yaxis,
+        legend_group,
+    );
+}
+
+fn add_minor_snv_traces(
+    plot: &mut Plot,
+    segment_name: &str,
+    segment_color: &'static str,
+    variants_data: &HashMap<String, Vec<VariantRec>>,
     xaxis: &str,
     yaxis: &str,
     legend_group: &str,
@@ -270,7 +321,16 @@ fn add_variant_indel_traces(
             plot.add_trace(total_line);
         }
     }
+}
 
+fn add_insertion_traces(
+    plot: &mut Plot,
+    segment_name: &str,
+    insertions_data: &HashMap<String, Vec<InsertionRec>>,
+    xaxis: &str,
+    yaxis: &str,
+    legend_group: &str,
+) {
     // Insertions: solid green major count, dashed green indel count.
     if let Some(insertions) = insertions_data.get(segment_name) {
         for (position, insert, count, total, frequency) in insertions {
@@ -314,7 +374,16 @@ fn add_variant_indel_traces(
             plot.add_trace(indel_line);
         }
     }
+}
 
+fn add_deletion_traces(
+    plot: &mut Plot,
+    segment_name: &str,
+    deletions_data: &HashMap<String, Vec<DeletionRec>>,
+    xaxis: &str,
+    yaxis: &str,
+    legend_group: &str,
+) {
     // Deletions: solid purple major count, dashed purple indel count.
     if let Some(deletions) = deletions_data.get(segment_name) {
         for (position, _length, context, count, total, frequency) in deletions {
@@ -654,7 +723,7 @@ pub fn generate_plot_coverage_seg(input_directory: &Path) -> Result<Plot, Box<dy
         // Vertical anchor also varies per subplot so the label clears the data:
         // low local coverage -> pin to the top; high local coverage -> float
         // just above the local curve.
-        let (label_y, label_y_anchor) = if region_peak * 2 <= max_y {
+        let (label_y, y_label_anchor) = if region_peak * 2 <= max_y {
             (f64::from(max_y), plotly::common::Anchor::Top)
         } else {
             (f64::from(region_peak), plotly::common::Anchor::Bottom)
@@ -700,7 +769,7 @@ pub fn generate_plot_coverage_seg(input_directory: &Path) -> Result<Plot, Box<dy
                 .x(label_x)
                 .y(label_y)
                 .x_anchor(label_x_anchor)
-                .y_anchor(label_y_anchor)
+                .y_anchor(y_label_anchor)
                 .font(
                     plotly::common::Font::new()
                         .family(theme::TITLE_FONT)
@@ -940,6 +1009,30 @@ pub fn generate_sankey_plot(input_directory: &Path) -> Result<Plot, Box<dyn Erro
         values.push(no_match);
     }
 
+    // Plotly drops link-less nodes (e.g. a zero-read "No Match") from its
+    // internal graph but still reads node.x/node.y by the original node order,
+    // so every node after a dropped one lands in the wrong column. Prune them
+    // here and remap the link indices to keep the arrays aligned.
+    {
+        let used: std::collections::HashSet<usize> = source_indices
+            .iter()
+            .chain(target_indices.iter())
+            .copied()
+            .collect();
+        let mut remap = vec![usize::MAX; node_labels.len()];
+        let mut kept = Vec::with_capacity(used.len());
+        for (old, label) in node_labels.iter().enumerate() {
+            if used.contains(&old) {
+                remap[old] = kept.len();
+                kept.push(label.clone());
+            }
+        }
+        node_labels = kept;
+        for idx in source_indices.iter_mut().chain(target_indices.iter_mut()) {
+            *idx = remap[*idx];
+        }
+    }
+
     // Prepare Sankey plot
     let mut plot = Plot::new();
 
@@ -982,7 +1075,7 @@ pub fn generate_sankey_plot(input_directory: &Path) -> Result<Plot, Box<dyn Erro
         s.chars()
             .enumerate()
             .flat_map(|(i, c)| {
-                if i > 0 && (len - i) % 3 == 0 {
+                if i > 0 && (len - i).is_multiple_of(3) {
                     vec![',', c]
                 } else {
                     vec![c]
@@ -999,14 +1092,11 @@ pub fn generate_sankey_plot(input_directory: &Path) -> Result<Plot, Box<dyn Erro
             let incoming = node_in.get(&i).copied().unwrap_or(0);
             let outgoing = parent_totals.get(&i).copied().unwrap_or(0);
             let count = incoming.max(outgoing);
-            let denom: u32 = node_parents
-                .get(&i)
-                .map(|ps| {
-                    ps.iter()
-                        .map(|s| parent_totals.get(s).copied().unwrap_or(0))
-                        .sum()
-                })
-                .unwrap_or(0);
+            let denom: u32 = node_parents.get(&i).map_or(0, |ps| {
+                ps.iter()
+                    .map(|s| parent_totals.get(s).copied().unwrap_or(0))
+                    .sum()
+            });
             if denom > 0 {
                 format!(
                     "{name} ({} reads, {:.1}%)",
@@ -1044,21 +1134,39 @@ pub fn generate_sankey_plot(input_directory: &Path) -> Result<Plot, Box<dyn Erro
         .iter()
         .map(|&c| 0.001 + (c as f64) * (0.998 / max_col as f64))
         .collect();
-    let mut col_seen = vec![0usize; max_col + 1];
+
+    // Every column stacks by read count, highest at the top.
+    let mut rank = vec![0usize; cols.len()];
+    for c in 0..=max_col {
+        let mut members: Vec<usize> = cols
+            .iter()
+            .enumerate()
+            .filter_map(|(i, &nc)| (nc == c).then_some(i))
+            .collect();
+        members.sort_by(|&a, &b| {
+            node_in
+                .get(&b)
+                .copied()
+                .unwrap_or(0)
+                .cmp(&node_in.get(&a).copied().unwrap_or(0))
+                .then_with(|| node_labels[a].cmp(&node_labels[b]))
+        });
+        for (k, &i) in members.iter().enumerate() {
+            rank[i] = k;
+        }
+    }
+
     let node_y: Vec<f64> = cols
         .iter()
-        .map(|&c| {
+        .enumerate()
+        .map(|(i, &c)| {
             let n = col_counts[c].max(1);
-            let k = col_seen[c];
-            col_seen[c] += 1;
-            (k as f64 + 0.5) / n as f64
+            (rank[i] as f64 + 0.5) / n as f64
         })
         .collect();
 
-    // Compact height driven by the busiest column. With the "snap" arrangement
-    // (below) Plotly auto-stacks each column, so a taller busiest column just
-    // needs a little more room; the node bars scale down to stay short, never
-    // overlap a sibling, and never spill past the frame.
+    // Compact height driven by the busiest column: each node gets an even
+    // vertical slot, so a taller busiest column just needs a little more room.
     let max_col_nodes = col_counts.iter().copied().max().unwrap_or(6).max(6);
     let sankey_height = (max_col_nodes * 34).clamp(240, 480);
 
@@ -1076,13 +1184,13 @@ pub fn generate_sankey_plot(input_directory: &Path) -> Result<Plot, Box<dyn Erro
         .map(|&s| hex_to_rgba(node_colors[s], 0.35))
         .collect();
 
-    // Built as raw JSON to control the node/link fields directly. Node x/y are
-    // left to Plotly's automatic "snap" layout: it derives the columns from the
-    // link topology and stacks nodes without overlap or overflow, which keeps
-    // the diagram compact. Thin bars + generous padding concentrate the visual.
+    // Built as raw JSON to control the node/link fields directly. "fixed" keeps
+    // the explicit node x/y above: "snap" re-derives columns from the link
+    // topology, which drifts terminal segment nodes out of the right-hand
+    // column. Thin bars + generous padding concentrate the visual.
     let sankey_json = serde_json::json!({
         "type": "sankey",
-        "arrangement": "snap",
+        "arrangement": "fixed",
         "node": {
             "label": node_display,
             "color": node_colors,

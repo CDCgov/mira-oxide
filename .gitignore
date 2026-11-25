@@ -11,3 +11,5 @@
 **/*lock
 *.crt
 .DS_Store
+.nextflow*
+work

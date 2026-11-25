@@ -2,10 +2,10 @@ use clap::Parser;
 use either::Either;
 use std::{
     fs::OpenOptions,
-    io::{BufReader, BufWriter, Write, stdin, stdout},
+    io::{BufWriter, Write, stdin, stdout},
     path::PathBuf,
 };
-use zoe::{data::fasta::FastaNT, distance::dna::NucleotidesDistance, prelude::*};
+use zoe::{data::fasta::Fasta, distance::dna::NucleotidesDistance, prelude::*};
 
 #[derive(Debug, Parser)]
 #[command(
@@ -37,14 +37,14 @@ pub fn all_sample_hd_process(args: &HammingArgs) -> Result<(), std::io::Error> {
 
     //read in fasta file
     let reader = if let Some(ref file_path) = args.input_fasta {
-        FastaReader::new(BufReader::new(Either::Left(
+        FastaReader::new(Either::Left(
             OpenOptions::new()
                 .read(true)
                 .open(file_path)
                 .expect("File opening error"),
-        )))
+        ))
     } else {
-        FastaReader::new(BufReader::new(Either::Right(stdin())))
+        FastaReader::new(Either::Right(stdin()))
     };
 
     //output
@@ -65,9 +65,9 @@ pub fn all_sample_hd_process(args: &HammingArgs) -> Result<(), std::io::Error> {
         .map(|record|
             // TODO: don't translate, instead defer until later
             record.map(|r| {
-                let FastaNT { name, sequence } = r.recode_to_dna();
+                let Fasta { header, sequence } = r.recode_to_dna();
                 ValidSeq {
-                    name,
+                    name: header,
                     sequence,
                 }
               }))

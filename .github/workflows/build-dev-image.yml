@@ -3,7 +3,7 @@ name: Build Dev Image and Push to GHCR
 on:
   push:
     branches:
-      - dev
+      - dev*
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -27,6 +27,9 @@ jobs:
     permissions:
       contents: read
       packages: write
+    outputs:
+      image: ${{ steps.img.outputs.name }}
+      branch: ${{ steps.img.outputs.branch }}
     steps:
       - uses: actions/checkout@v6
 
@@ -40,9 +43,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Compute lowercase image name
+      - name: Compute lowercase image name and branch tag
         id: img
-        run: echo "name=${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "name=${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+          # Branch names allow characters that are invalid in a Docker tag (e.g. '/').
+          echo "branch=$(echo "${GITHUB_REF_NAME,,}" | sed 's#[^a-z0-9._-]#-#g')" >> "$GITHUB_OUTPUT"
 
       - name: Build and push dev image (${{ matrix.arch }})
         uses: docker/build-push-action@v7
@@ -50,14 +56,14 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
-          tags: ${{ env.REGISTRY }}/${{ steps.img.outputs.name }}:dev-${{ matrix.arch }}
+          tags: ${{ env.REGISTRY }}/${{ steps.img.outputs.name }}:${{ steps.img.outputs.branch }}-${{ matrix.arch }}
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.description=mira-oxide dev image (${{ matrix.arch }})
+            org.opencontainers.image.description=mira-oxide ${{ github.ref_name }} image (${{ matrix.arch }})
           provenance: false
-          cache-from: type=gha,scope=dev-${{ matrix.arch }}
-          cache-to: type=gha,mode=max,scope=dev-${{ matrix.arch }}
+          cache-from: type=gha,scope=${{ steps.img.outputs.branch }}-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=${{ steps.img.outputs.branch }}-${{ matrix.arch }}
 
   create-dev-manifest:
     name: Create Dev Image Manifest
@@ -76,8 +82,10 @@ jobs:
 
       - name: Create and push dev manifest
         shell: bash
+        env:
+          REPO: ${{ env.REGISTRY }}/${{ needs.build-dev.outputs.image }}
+          BRANCH: ${{ needs.build-dev.outputs.branch }}
         run: |
-          REPO=$(echo "${{ env.REGISTRY }}/${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
-          docker buildx imagetools create -t ${REPO}:dev \
-            ${REPO}:dev-x86_64 \
-            ${REPO}:dev-aarch64
+          docker buildx imagetools create -t "${REPO}:${BRANCH}" \
+            "${REPO}:${BRANCH}-x86_64" \
+            "${REPO}:${BRANCH}-aarch64"

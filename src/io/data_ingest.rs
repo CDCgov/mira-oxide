@@ -61,6 +61,21 @@ where
     }
 }
 
+/// Deserialize IRMA frequency values, treating `NA` markers as null
+pub fn deserialize_optional_frequency<'de, D>(deserializer: D) -> Result<Option<f64>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = Option::<String>::deserialize(deserializer)?;
+    match value.as_deref().map(str::trim) {
+        None | Some("" | "NA") => Ok(None),
+        Some(value) => value
+            .parse::<f64>()
+            .map(Some)
+            .map_err(serde::de::Error::custom),
+    }
+}
+
 /// Coverage struct
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct CoverageData {
@@ -99,7 +114,7 @@ pub struct ReadsData {
     #[serde(rename = "Record")]
     pub record: String,
     #[serde(rename = "Reads")]
-    pub reads: i32,
+    pub reads: u32,
     #[serde(rename = "Patterns")]
     pub patterns: Option<String>,
     #[serde(rename = "PairsAndWidows")]
@@ -136,7 +151,8 @@ pub struct MinorVariantsData {
     #[serde(rename = "Minority_Count")]
     pub minority_count: i32,
     #[serde(rename = "Minority_Frequency")]
-    pub minority_frequency: f64,
+    #[serde(default, deserialize_with = "deserialize_optional_frequency")]
+    pub minority_frequency: Option<f64>,
     #[serde(rename = "Run_ID")]
     pub run_id: Option<String>,
     #[serde(rename = "Instrument")]
@@ -174,7 +190,8 @@ pub struct IndelsData {
     #[serde(rename = "Total")]
     pub total: i32,
     #[serde(rename = "Frequency")]
-    pub frequency: f64,
+    #[serde(default, deserialize_with = "deserialize_optional_frequency")]
+    pub frequency: Option<f64>,
     #[serde(rename = "Average_Quality")]
     pub average_quality: Option<String>,
     #[serde(rename = "ConfidenceNotMacErr")]
@@ -205,7 +222,8 @@ pub struct AllAllelesData {
     #[serde(rename = "Total")]
     pub total_count: i32,
     #[serde(rename = "Frequency")]
-    pub allele_frequency: f64,
+    #[serde(default, deserialize_with = "deserialize_optional_frequency")]
+    pub allele_frequency: Option<f64>,
     #[serde(rename = "Average_Quality")]
     pub average_quality: String,
     #[serde(rename = "ConfidenceNotMacErr")]
@@ -248,6 +266,7 @@ pub struct SeqData {
 }
 
 /////////////// Structs to hold dais-ribosome data ///////////////
+
 /// Dais Sequence Data
 #[derive(Deserialize, Debug)]
 pub struct DaisSeqData {
@@ -295,6 +314,7 @@ pub struct DIStatData {
 }
 
 /////////////// Structs to hold nextcalde data ///////////////
+
 /// Nextclade Data
 #[derive(Serialize, Deserialize, Debug)]
 pub struct NextcladeData {
@@ -317,6 +337,7 @@ pub struct NextcladeData {
 }
 
 /////////////// Imp for the process_txt_with_sample_function ///////////////
+
 /// Define a trait for structs that have a `sample_id` field
 trait GetSampleId {
     fn set_sample_id(&mut self, sample_id: String);
@@ -358,6 +379,7 @@ impl GetSampleId for AllAllelesData {
 }
 
 /////////////// Data reading functions for IRMA///////////////
+
 /// Creating a reader for processing files
 pub fn create_reader(path: &PathBuf) -> io::Result<BufReader<Either<File, Stdin>>> {
     if path.to_str() == Some("-") {
@@ -422,6 +444,9 @@ fn extract_sample_name(path: &Path) -> Result<String, Box<dyn Error>> {
 }
 
 /// Read tab-delimited data and include the sample name
+///
+/// This builds a csv reader and tacks on the provided `sample_id` to the
+/// deserialized struct created for each row in the csv
 fn process_txt_with_sample<R, T>(
     reader: R,
     has_headers: bool,
@@ -530,7 +555,7 @@ pub fn coverage_data_collection(
     Ok(cov_data)
 }
 
-///  Collect read data created by IRMA and save to vector of `ReadsData`
+/// Collect read data created by IRMA and save to vector of `ReadsData`
 pub fn reads_data_collection(
     irma_path: impl AsRef<Path>,
     platform: &str,
@@ -565,6 +590,7 @@ pub fn reads_data_collection(
     }
     Ok(reads_data)
 }
+
 /// Collecting minor vairant data created by IRMA and save to two vectors of `MinorVariantsData`
 /// One vector contains filtered minor variants (frequency >= 0.05), and the other contains all minor variants.
 pub fn minor_variant_data_collection(
@@ -594,14 +620,18 @@ pub fn minor_variant_data_collection(
                     record.instrument = Some(platform.to_string());
                     record.run_id = Some(runid.to_string());
 
-                    // Round minority_frequency to 3 decimal places
-                    record.minority_frequency =
-                        (record.minority_frequency * 1000.0).round() / 1000.0;
+                    // Round minority_frequency to 3 decimal places when IRMA supplied it.
+                    record.minority_frequency = record
+                        .minority_frequency
+                        .map(|frequency| (frequency * 1000.0).round() / 1000.0);
                 }
 
                 // Separate records into filtered and unfiltered vectors
                 for record in records {
-                    if record.minority_frequency >= 0.05 {
+                    if record
+                        .minority_frequency
+                        .is_some_and(|frequency| frequency >= 0.05)
+                    {
                         filtered_minor_variants.push(record.clone());
                     }
                     all_minor_variants.push(record);
@@ -618,7 +648,9 @@ pub fn minor_variant_data_collection(
 }
 
 /// Collect indel data and save to vector of `IndelsData`
-/// Note that insertions and deletions are being added  to the same Vec<Indelsdata>
+///
+/// Note that insertions and deletions are being added to the same
+/// `Vec<Indelsdata>`
 pub fn indels_data_collection(
     irma_path: impl AsRef<Path>,
     platform: &str,
@@ -770,7 +802,7 @@ pub fn amended_consensus_data_collection(
     Ok(seq_data)
 }
 
-// Function to collect reference lengths from IRMA outputs
+/// Function to collect reference lengths from IRMA outputs
 pub fn get_reference_lens(
     irma_path: impl AsRef<Path>,
 ) -> Result<HashMap<String, usize>, Box<dyn std::error::Error>> {
@@ -819,8 +851,9 @@ pub fn get_reference_lens(
     Ok(ref_len_map)
 }
 
-// Function to get the current timestamp in the desired format
-// For irma_config file - ingest of run_info.txt
+/// Function to get the current timestamp in the desired format
+///
+/// For `irma_config` file - ingest of `run_info.txt`
 fn get_current_timestamp() -> String {
     let now = SystemTime::now();
     match now.duration_since(UNIX_EPOCH) {
@@ -833,9 +866,9 @@ fn get_current_timestamp() -> String {
     }
 }
 
-// Function to get timestamp into correct format for CDP
-// Accounts for leap years
-// For irma_config file - ingest of run_info.txt
+/// Function to get timestamp into correct format for CDP.
+///
+/// Accounts for leap years. For `irma_config` file - ingest of `run_info.txt`
 fn format_timestamp(secs: u64, nanos: u32) -> String {
     const SECONDS_IN_MINUTE: u64 = 60;
     const SECONDS_IN_HOUR: u64 = 3600;
@@ -892,12 +925,12 @@ fn format_timestamp(secs: u64, nanos: u32) -> String {
     )
 }
 
-// Helper function to determine if a year is a leap year
+/// Helper function to determine if a year is a leap year
 fn is_leap_year(year: u64) -> bool {
     (year.is_multiple_of(4) && !year.is_multiple_of(100)) || year.is_multiple_of(400)
 }
 
-// Helper function to calculate the number of days in a year
+/// Helper function to calculate the number of days in a year
 fn days_in_year(year: u64) -> u64 {
     if is_leap_year(year) { 366 } else { 365 }
 }
@@ -939,6 +972,7 @@ pub fn run_info_collection(
 }
 
 /////////////// Data reading functions for DAIS-ribosome ///////////////
+
 /// Read tab-delimited data a without including sample name
 pub fn process_txt<R, T>(reader: R, has_headers: bool) -> Result<Vec<T>, Box<dyn std::error::Error>>
 where
@@ -1048,6 +1082,7 @@ pub fn di_stat_data_collection(
 }
 
 /////////////// Data reading functions for Nextclade ///////////////
+
 /// Collect read data created by IRMA and save to vector of `NextcladeData`
 pub fn nextclade_data_collection(
     work_path: impl AsRef<Path>,
@@ -1100,4 +1135,41 @@ pub fn nextclade_data_collection(
     }
 
     Ok(nextclade_data)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // bogus struct for testing deserialization of irma frequencies
+    #[derive(Debug, Deserialize)]
+    struct FrequencyRecord {
+        #[serde(
+            rename = "Frequency",
+            deserialize_with = "deserialize_optional_frequency"
+        )]
+        frequency: Option<f64>,
+        #[serde(rename = "Label")]
+        _label: String,
+    }
+
+    // tests tsv reading of frequency data with `NA`/empty values
+    #[test]
+    fn deserializes_irma_na_and_blank_frequencies_as_null() {
+        let input = b"Frequency\tLabel\nNA\tna_frequency\n\tempty_frequency\n0.125\tcorrect_f64\n";
+        let mut reader = ReaderBuilder::new()
+            .delimiter(b'\t')
+            .has_headers(true)
+            .from_reader(&input[..]);
+
+        let records: Vec<FrequencyRecord> = reader
+            .deserialize()
+            .collect::<Result<_, _>>()
+            .expect("frequency rows should deserialize");
+
+        assert_eq!(records.len(), 3);
+        assert_eq!(records[0].frequency, None);
+        assert_eq!(records[1].frequency, None);
+        assert_eq!(records[2].frequency, Some(0.125));
+    }
 }
